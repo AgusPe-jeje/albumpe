@@ -758,19 +758,30 @@ async function inicializarBaseDeDatos() {
 }
 
 function obtenerRarezaAleatoria(tipo) {
-    const rand = Math.random() * 100;
+    const r = Math.random() * 100;
+    const tipoLimpio = (tipo || 'estandar').toLowerCase().trim();
 
-    // Ajustá los porcentajes a tu gusto, pero las palabras siempre en minúsculas:
-    if (tipo === 'premium') { // Si tenés sobres premium en el futuro
-        if (rand < 50) return 'rara';
-        if (rand < 85) return 'epica';
-        return 'legendaria';
-    } {
-        // Sobre Mundial común:
-        if (rand < 70) return 'comun';      // 70% comunes
-        if (rand < 90) return 'rara';       // 20% raras
-        if (rand < 98) return 'epica';      // 8% épicas
-        return 'legendaria';                // 2% legendarias
+    // 1. ORO ELITE / ELITE: Pensado para no dar NADA común. Asegura alta calidad.
+    if (tipoLimpio === 'oro elite' || tipoLimpio === 'elite') {
+        if (r < 15) return 'legendaria'; // Un 15% es un número picante pero balanceado
+        if (r < 55) return 'epica';      // 40% de probabilidad
+        return 'rara';                   // 45% de probabilidad
+    } 
+    
+    // 2. PREMIUM: El sobre del "salto". Bajamos la basura común al 25%.
+    else if (tipoLimpio === 'premium') {
+        if (r < 7) return 'legendaria';  // Subimos un toque de 5% a 7% (recompensa el gasto)
+        if (r < 27) return 'epica';      // 20% de probabilidad
+        if (r < 75) return 'rara';       // 48% de probabilidad (¡el fuerte del sobre!)
+        return 'comun';                  // Solo 25% de que salga común
+    } 
+    
+    // 3. ESTÁNDAR / COMÚN / CUALQUIER OTRO: El sobre base, más amigable.
+    else {
+        if (r < 1.5) return 'legendaria'; // Un mimo de 1% a 1.5% cambia el historial
+        if (r < 8) return 'epica';        // Subimos a un 6.5% real de chances
+        if (r < 35) return 'rara';        // 27% de probabilidad
+        return 'comun';                   // 65% común (antes era un doloroso 80%)
     }
 }
 
@@ -880,7 +891,7 @@ app.post('/api/abrir-sobre', (req, res) => {
                 const jugadoresElegidos = [];
                 for (let i = 0; i < 5; i++) {
                     const rarezaBuscada = obtenerRarezaAleatoria(tipo); 
-                    let filtrados = todosLosJugadores.filter(j => j.rareza.toLowerCase() === rarezaBuscada.toLowerCase());
+                    let filtrados = todosLosJugadores.filter(j => j.rareza === rarezaBuscada);
                     if (filtrados.length === 0) filtrados = todosLosJugadores.filter(j => j.rareza === 'comun');
 
                     const elegido = filtrados[Math.floor(Math.random() * filtrados.length)];
@@ -913,7 +924,7 @@ app.post('/api/abrir-sobre', (req, res) => {
                         if (j.rareza === 'comun') j.monedasDevueltas = 50;
                         else if (j.rareza === 'rara') j.monedasDevueltas = 150;
                         else if (j.rareza === 'epica') j.monedasDevueltas = 300;
-                        else if (j.rareza === 'legendaria') j.monedasDevueltas = 1000;
+                        else if (j.rareza === 'legendaria') j.monedasDevueltas = 100;
 
                         monedasTotalesGanadas += j.monedasDevueltas;
 
