@@ -747,7 +747,7 @@ async function inicializarBaseDeDatos() {
             for (const j of jugadoresMundial) {
                 await pool.query(
                     "INSERT INTO jugadores (nombre, pais, bandera, posicion, foto, rareza) VALUES ($1, $2, $3, $4, $5, $6)",
-                    j
+                    [j[0], j[1], j[2], j[3], j[4], j[5]]
                 );
             }
             console.log("🌱 Base de datos poblada con jugadores iniciales.");
