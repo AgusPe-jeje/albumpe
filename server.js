@@ -1023,24 +1023,6 @@ app.get('/api/obtener-ranking', (req, res) => {
     });
 });
 
-app.get('/api/jugador-aleatorio', (req, res) => {
-    const { usuario_id } = req.query;
-    
-    // Trae un jugador al azar de los que el usuario ya posee
-    const query = `
-        SELECT j.* FROM jugadores j
-        JOIN album_usuario au ON j.id = au.jugador_id
-        WHERE au.usuario_id = $1
-        ORDER BY RANDOM() LIMIT 1
-    `;
-
-    pool.query(query, [usuario_id], (err, resultado) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (resultado.rows.length === 0) return res.status(404).json({ error: "Necesitás cartas en el álbum para jugar" });
-        res.json(resultado.rows[0]);
-    });
-});
-
 // ==========================================
 // APERTURA DEL SERVIDOR (ADAPTADO PARA RENDER) 🚀
 // ==========================================
