@@ -826,27 +826,30 @@ app.post('/api/login', (req, res) => {
 // RUTAS DEL JUEGO DINÁMICAS (POR USUARIO)
 // ==========================================
 
-app.get('/api/progreso', (req, res) => {
-    const usuario_id = req.query.usuario_id;
-    if (!usuario_id) return res.status(400).json({ error: "Falta usuario_id" });
+app.get('/api/progreso', async (req, res) => {
+    const { usuario_id } = req.query;
 
-    const query = `
-        SELECT u.username, up.monedas, up.sobres, COALESCE(r.puntos, 0) AS puntos
-        FROM usuario_progreso up
-        JOIN usuarios u ON up.usuario_id = u.id
-        LEFT JOIN ranking r ON up.usuario_id = r.usuario_id
-        WHERE up.usuario_id = $1
-    `;
+    try {
+        // 1. Traemos las monedas del usuario
+        const progresoRes = await pool.query('SELECT monedas FROM usuario_progreso WHERE usuario_id = $1', [usuario_id]);
+        if (progresoRes.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
 
-    pool.query(query, [usuario_id], (err, resultado) => {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        if (resultado.rows.length > 0) {
-            res.json(resultado.rows[0]);
-        } else {
-            res.json({ username: "Usuario", monedas: 0, sobres: 0, puntos: 0 });
-        }
-    });
+        const monedas = progresoRes.rows[0].monedas;
+
+        // 2. Traemos todos los sobres reales que compramos de la nueva tabla
+        const sobresRes = await pool.query('SELECT id, tipo FROM inventario_sobres WHERE usuario_id = $1', [usuario_id]);
+        const listaSobres = sobresRes.rows; // Esto va a ser un array de objetos: [{id: 1, tipo: 'elite'}, {id: 2, tipo: 'elite'}]
+
+        // 3. Devolvemos todo sincronizado
+        res.json({
+            monedas: monedas,
+            sobres: listaSobres // Mandamos el array real con los 2 sobres Élite
+        });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener el progreso." });
+    }
 });
 
 app.get('/api/album', (req, res) => {
