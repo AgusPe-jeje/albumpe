@@ -1003,20 +1003,43 @@ app.post('/api/modificar-monedas', (req, res) => {
     });
 });
 
-app.post('/api/comprar-sobre-tienda', (req, res) => {
+app.post('/api/comprar-sobre-tienda', async (req, res) => {
     const { usuario_id, tipo, costo } = req.body;
 
-    pool.query("SELECT monedas FROM usuario_progreso WHERE usuario_id = $1", [usuario_id], (err, resultado) => {
-        if (err) return res.status(500).json({ error: err.message });
-        if (resultado.rows.length === 0 || resultado.rows[0].monedas < costo) {
-            return res.status(400).json({ error: "❌ No te alcanzan las monedas, ¡andá a entrenar!" });
+    try {
+        // 1. Primero verificamos si el usuario tiene monedas suficientes
+        const resUser = await pool.query('SELECT monedas FROM usuario_progreso WHERE usuario_id = $1', [usuario_id]);
+        
+        if (resUser.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+        
+        const monedasActuales = resUser.rows[0].monedas;
+        if (monedasActuales < costo) {
+            return res.status(400).json({ error: "No tenés monedas suficientes, crack." });
         }
 
-        pool.query("UPDATE usuario_progreso SET monedas = monedas - $1, sobres = sobres + 1 WHERE usuario_id = $2", [costo, usuario_id], (err2) => {
-            if (err2) return res.status(500).json({ error: err2.message });
-            res.json({ success: true, tipo: tipo });
+        // 2. Descontamos las monedas (OJO: ya NO sumamos en la columna 'sobres')
+        await pool.query('UPDATE usuario_progreso SET monedas = monedas - $1 WHERE usuario_id = $2', [costo, usuario_id]);
+
+        // 3. ¡EL CAMBIO CLAVE!: Insertamos la fila real en inventario_sobres
+        // Usamos RETURNING id para mandárselo al frontend de inmediato
+        const resSobre = await pool.query(`
+            INSERT INTO inventario_sobres (usuario_id, tipo) 
+            VALUES ($1, $2) 
+            RETURNING id
+        `, [usuario_id, tipo.toLowerCase().trim()]);
+
+        const nuevoSobreId = resSobre.rows[0].id;
+
+        // 4. Respondemos al frontend con el ID real de la base de datos
+        res.json({ 
+            exito: true, 
+            nuevoSobreId: nuevoSobreId 
         });
-    });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error interno del servidor al comprar sobre." });
+    }
 });
 
 // ==========================================
