@@ -42,29 +42,48 @@ function ocultarCarga() {
 /* ========================================================================
    👤 2. AUTENTICACIÓN Y ESTADO DE USUARIO
    ======================================================================== */
-async function autenticarUsuario() {
-    const username = document.getElementById("input-usuario").value;
+async function autenticarUsuario(accion) {
+    const username = document.getElementById("input-usuario").value.trim();
     const password = document.getElementById("input-pass").value;
+    
     if (!username || !password) return alert("❌ Completá los datos.");
 
+    // Cambiamos dinámicamente el mensaje de carga y la ruta del fetch
+    const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
+    const endpointFinal = accion === 'login' ? 'login' : 'registro';
+
+    mostrarCarga(textoSpinner);
+
     try {
-        const res = await fetch(`${URL_BASE}/login`, {
+        const res = await fetch(`${URL_BASE}/${endpointFinal}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
+        
         const data = await res.json();
-        if (data.error) alert(data.error);
-        else {
+        ocultarCarga(); // Apagamos el spinner de inmediato al recibir respuesta
+
+        if (data.error) {
+            alert(data.error);
+        } else {
             usuarioActual = data.usuario;
             document.getElementById("seccion-login").style.display = "none";
             document.getElementById("interfaz-juego").classList.add("mostrar");
             
             actualizarInterfazUI();
             cargarAlbumLocal();
-            alert(`⚔️ ¡Bienvenido a la Arena, ${usuarioActual.username}!`);
+            
+            if (accion === 'login') {
+                alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
+            } else {
+                alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
+            }
         }
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+        console.error(err); 
+        ocultarCarga();
+    }
 }
 
 function actualizarInterfazUI() {

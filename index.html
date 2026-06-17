@@ -15,11 +15,13 @@
     <h1 style="text-shadow: 3px 3px #000; margin-bottom: 10px;">🏆 ÁLBUM MUNDIAL PE 🏆</h1>
 
     <div id="seccion-login">
-        <h3>INGRESAR AL SISTEMA LOCAL</h3>
-        <input type="text" id="input-usuario" placeholder="USUARIO">
-        <input type="password" id="input-pass" placeholder="CONTRASEÑA">
-        <br>
-        <button onclick="autenticarUsuario()">INGRESAR / REGISTRAR</button>
+        <input type="text" id="input-usuario" placeholder="Usuario">
+        <input type="password" id="input-pass" placeholder="Contraseña">
+
+        <div class="contenedor-botones-login" style="display: flex; gap: 10px; margin-top: 15px;">
+            <button type="button" class="btn-modulo" onclick="autenticarUsuario('login')">Iniciar Sesión</button>
+            <button type="button" class="btn-modulo btn-registro" onclick="autenticarUsuario('registro')" style="background: #28a745;">Crear Cuenta</button>
+        </div>
     </div>
 
     <main id="interfaz-juego" style="display: none; width: 100%; display: flex; flex-direction: column; align-items: center;">

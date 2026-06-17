@@ -755,29 +755,50 @@ async function inicializarTablas() {
 inicializarTablas();
 
 /* ========================================================================
-   👤 ENDPOINTS DE AUTENTICACIÓN Y SISTEMA DE USUARIOS
+   👤 ENDPOINTS DE AUTENTICACIÓN Y SISTEMA DE USUARIOS REFORMADO
    ======================================================================== */
+
+// 1. INICIAR SESIÓN (Solo entra si ya existe y coincide la clave)
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
         
-        if (userCheck.rows.length > 0) {
-            const user = userCheck.rows[0];
-            if (user.password === password) {
-                console.log(`🔑 [LOGIN] El usuario "${username.toUpperCase()}" ingresó a la Arena.`);
-                return res.json({ mensaje: "Login exitoso", usuario: user });
-            } else {
-                return res.status(400).json({ error: "Contraseña incorrecta" });
-            }
-        } else {
-            const nuevoUsuario = await pool.query(
-                "INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING *", 
-                [username, password]
-            );
-            console.log(`✨ [REGISTRO] Nuevo usuario creado en la red: "${username.toUpperCase()}"`);
-            return res.json({ mensaje: "Registrado", usuario: nuevoUsuario.rows[0] });
+        if (userCheck.rows.length === 0) {
+            return res.status(400).json({ error: "❌ El usuario no existe. ¡Registrate primero!" });
         }
+
+        const user = userCheck.rows[0];
+        if (user.password === password) {
+            console.log(`🔑 [LOGIN] El usuario "${username.toUpperCase()}" ingresó a la Arena.`);
+            return res.json({ mensaje: "Login exitoso", usuario: user });
+        } else {
+            return res.status(400).json({ error: "❌ Contraseña incorrecta." });
+        }
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// 2. CREAR USUARIO (Solo registra si el nombre está libre)
+app.post('/api/registro', async (req, res) => {
+    const { username, password } = req.body;
+    try {
+        // Verificamos si ya existe alguien con ese nombre
+        const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
+        
+        if (userCheck.rows.length > 0) {
+            return res.status(400).json({ error: "❌ Ese nombre de usuario ya está ocupado." });
+        }
+
+        // Si está libre, lo creamos
+        const nuevoUsuario = await pool.query(
+            "INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING *", 
+            [username, password]
+        );
+        console.log(`✨ [REGISTRO] Nuevo usuario creado: "${username.toUpperCase()}"`);
+        return res.json({ mensaje: "Registrado con éxito", usuario: nuevoUsuario.rows[0] });
+
     } catch (err) {
         return res.status(500).json({ error: err.message });
     }
