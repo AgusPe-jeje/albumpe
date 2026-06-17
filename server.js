@@ -930,7 +930,7 @@ app.post('/api/comprar-sobre', async (req, res) => {
    ⚽ ENDPOINTS DEL MÓDULO DE PENALES (SISTEMA DE ENERGÍA POR HORA)
    ======================================================================== */
 const MAX_TIROS = 10;
-const MILISEGUNDOS_POR_TIRO = 60 * 60 * 1000; // ⏱️ 1 Hora en milisegundos
+const MILISEGUNDOS_POR_TIRO = 6 * 60 * 1000; // ⏱️ 1 Hora en milisegundos
 
 function calcularTirosActuales(usuario) {
     const ahora = new Date();
