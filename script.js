@@ -6,7 +6,7 @@
    🌐 CONFIGURACIÓN DE RED (MUGADO A LA NUBE - RENDER)
    ======================================================================== */
 // ⚠️ REEMPLAZÁ este link de ejemplo por la URL real que te dé Render al crear el Web Service
-const URL_RENDER_SERVICIO = "https://tu-album-backend.onrender.com"; 
+const URL_RENDER_SERVICIO = "https://proyectoalbum.onrender.com";
 const URL_BASE = `${URL_RENDER_SERVICIO}/api`;
 
 let usuarioActual = null;
