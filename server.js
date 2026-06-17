@@ -1136,9 +1136,9 @@ app.post('/api/timba/procesar', async (req, res) => {
     let puntosAsignados = 0;
 
     if (opcionReal.tipo === 'exacto') {
-        balanceMonedas = montoApuesta * 2;
+        balanceMonedas = montoApuesta * 3;
         puntosAsignados = 20;
-        mensajeResultado = `¡QUÉ ANIMAL! Elegiste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 2} monedas (Total devuelto: ${montoApuesta * 3})`;
+        mensajeResultado = `¡QUÉ ANIMAL! Elegiste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 3} monedas (Total devuelto: ${montoApuesta * 4})`;
     } else if (opcionReal.tipo === 'signo') {
         balanceMonedas = Math.round(montoApuesta * 0.5);
         mensajeResultado = `¡BIEN AHÍ! Acertaste el ganador/empate (Elegiste ${opcionReal.label}). El resultado real fue ${golesLReal}-${golesVReal}.\nGanaste: ${balanceMonedas} monedas (Total devuelto: ${montoApuesta + balanceMonedas})`;
