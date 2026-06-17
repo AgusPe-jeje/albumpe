@@ -3,10 +3,11 @@
    ======================================================================== */
 
 /* ========================================================================
-   🌐 CONFIGURACIÓN DE RED LOCAL
+   🌐 CONFIGURACIÓN DE RED (MUGADO A LA NUBE - RENDER)
    ======================================================================== */
-const IP_LOCAL_SERVIDOR = "192.168.1.210"; 
-const URL_BASE = `http://${IP_LOCAL_SERVIDOR}:3000/api`;
+// ⚠️ REEMPLAZÁ este link de ejemplo por la URL real que te dé Render al crear el Web Service
+const URL_RENDER_SERVICIO = "https://tu-album-backend.onrender.com"; 
+const URL_BASE = `${URL_RENDER_SERVICIO}/api`;
 
 let usuarioActual = null;
 let direccionGanadora = "";
@@ -86,7 +87,7 @@ async function cargarAlbumLocal() {
         const paisesMap = new Map();
         albumCompleto.forEach(figu => {
             if (!paisesMap.has(figu.pais)) {
-                paisesMap.set(figu.pais, { bandera: figu.bandera, completo: true });
+                paisesMap.set(figu.pais, { bandera: figu.bandera, complete: true });
             }
         });
 
@@ -428,7 +429,7 @@ function actualizarHistorialUI(infoPartido) {
     });
 }
 
-// ✨ ACTUALIZADO: El cliente pide las opciones encriptadas y anónimas al server
+// El cliente pide las opciones encriptadas y anónimas al server
 async function prepararOpcionesApuesta() {
     if (!usuarioActual) return alert("❌ Iniciá sesión para timbear.");
     
@@ -473,7 +474,7 @@ async function prepararOpcionesApuesta() {
     } catch (err) { console.error("Error al preparar opciones seguras:", err); }
 }
 
-// ✨ ACTUALIZADO: Validación del lado del Backend (Inhackeable)
+// Validación del lado del Backend (Inhackeable)
 async function procesarEleccionTimbaSegura(idOpcionElegida) {
     if (!timbaPreparada) return;
 
