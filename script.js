@@ -60,6 +60,7 @@ function arrancarCronometroVisual(milisegundosFaltantes) {
         if (tiempoRestante <= 0) {
             clearInterval(intervaloCronometro);
             lblCronometro.innerText = "⚡ ¡Tiro recargado! Actualizando...";
+            // Al llegar a 0, vuelve a consultar las energías e implícitamente desbloquea el arco y el botón amarillo
             if (usuarioActual) iniciarDueloLocal();
             return;
         }
@@ -286,6 +287,11 @@ async function comprarSobreEspecifico(tipoCofre) {
 async function iniciarDueloLocal() {
     if (!usuarioActual) return alert("❌ Iniciá sesión.");
     const resTexto = document.getElementById("resultado-penal");
+    const btnProximo = document.querySelector("button[onclick='iniciarDueloLocal()']");
+    const escenario = document.getElementById("escenario-penal");
+
+    // 🏆 Cargamos el ranking en este preciso instante para que no aparezca vacío al entrar
+    cargarRankingLocal();
 
     try {
         const res = await fetch(`${URL_BASE}/tiros-restantes/${usuarioActual.id}`);
@@ -294,12 +300,25 @@ async function iniciarDueloLocal() {
         if (data.tiros <= 0) {
             resTexto.style.color = "var(--rojo)";
             resTexto.innerText = "❌ ¡NO TE QUEDAN TIROS! Esperá que recargue energía.";
+            
+            // 🚫 Bloqueamos el botón y el arco por completo
+            if (btnProximo) btnProximo.disabled = true;
+            if (escenario) escenario.classList.add("bloqueado-energia");
+            direccionGanadora = ""; // Vaciamos para impedir que se disparen peticiones
         } else {
             resTexto.style.color = "white";
             resTexto.innerText = `⚽ ¡PREPARÁ EL DISPARO! — Te quedan ${data.tiros} tiros.`;
+            
+            // ✅ Habilitamos todo si recuperó tiros
+            if (btnProximo) btnProximo.disabled = false;
+            if (escenario) escenario.classList.remove("bloqueado-energia");
+
+            // Habilitamos la puntería
+            const opciones = ['IZQUIERDA', 'CENTRO', 'DERECHA'];
+            direccionGanadora = opciones[Math.floor(Math.random() * opciones.length)];
         }
 
-        // Encendemos la cuenta regresiva con los milisegundos reales del backend
+        // Encendemos la cuenta regresiva
         arrancarCronometroVisual(data.siguienteIn);
         
     } catch (err) {
@@ -312,15 +331,12 @@ async function iniciarDueloLocal() {
         balon.style.transform = 'translate(0, 0) scale(1)';
         arquero.style.transform = 'translateX(0px)';
     }
-    
-    const opciones = ['IZQUIERDA', 'CENTRO', 'DERECHA'];
-    direccionGanadora = opciones[Math.floor(Math.random() * opciones.length)];
 }
 
 async function ejecutarPenalLocal(direccionElegida) {
+    // Si no hay tiros o no se presionó próximo tiro, frenamos en seco
     if (!usuarioActual || !direccionGanadora) {
-        alert("❌ Primero dale a 'Próximo tiro' para habilitar el arco.");
-        return;
+        return; 
     }
 
     const arquero = document.getElementById('arquero-animado');
@@ -334,6 +350,10 @@ async function ejecutarPenalLocal(direccionElegida) {
         else if (direccionElegida === 'DERECHA') balon.style.transform = 'translate(80px, -70px) scale(0.6)';
         else balon.style.transform = 'translate(0px, -70px) scale(0.6)';
     }
+
+    // Congelamos el arco temporalmente durante la animación para evitar clics dobles molestos
+    const escenario = document.getElementById("escenario-penal");
+    if (escenario) escenario.style.pointerEvents = "none";
 
     await new Promise(r => setTimeout(r, 600));
 
@@ -350,6 +370,7 @@ async function ejecutarPenalLocal(direccionElegida) {
         resTexto.innerText = "¡GOOOL! 🪙 +100 Oro";
     }
     
+    // Reseteamos el estado de tiro para exigir presionar "Próximo tiro" nuevamente
     direccionGanadora = "";
 
     try {
@@ -364,6 +385,7 @@ async function ejecutarPenalLocal(direccionElegida) {
             alert(data.mensaje);
             resTexto.style.color = "var(--rojo)";
             resTexto.innerText = "¡SIN ENERGÍA! ⏱️";
+            if (escenario) escenario.classList.add("bloqueado-energia");
             return;
         }
 
@@ -374,10 +396,23 @@ async function ejecutarPenalLocal(direccionElegida) {
         
         resTexto.innerText += ` — Te quedan ${data.tiros_restantes} tiros.`;
         
-        // Actualizamos el reloj de inmediato con el tiempo devuelto por el server
+        const btnProximo = document.querySelector("button[onclick='iniciarDueloLocal()']");
+        
+        // 🚫 Si este fue el último tiro, bloqueamos todo al instante
+        if (data.tiros_restantes <= 0) {
+            if (btnProximo) btnProximo.disabled = true;
+            if (escenario) escenario.classList.add("bloqueado-energia");
+        } else {
+            // Si le quedan tiros, liberamos los clics del arco para la próxima tanda
+            if (escenario) escenario.style.pointerEvents = "auto";
+        }
+        
         arrancarCronometroVisual(data.siguienteIn);
 
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+        console.error(err); 
+        if (escenario) escenario.style.pointerEvents = "auto";
+    }
 }
 
 /* ========================================================================

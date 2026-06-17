@@ -371,3 +371,19 @@ input {
     letter-spacing: 1px;
     text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
+
+/* Estado deshabilitado para el botón amarillo */
+button:disabled {
+    background: #555555 !important;
+    color: #aaaaaa !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* Apagar el arco y quitarle los clics */
+.arco-futbol.bloqueado-energia {
+    opacity: 0.4;
+    pointer-events: none; /* Deshabilita físicamente los clics en IZQ, CEN, DER */
+    cursor: not-allowed;
+}
