@@ -30,6 +30,15 @@ function cambiarModulo(idModulo, botonPresionado) {
     if (idModulo === 'modulo-timba' && usuarioActual) rotarPartidoTimba();
 }
 
+function mostrarCarga(mensaje = "Conectando con la Arena...") {
+    document.getElementById("texto-carga-dinamico").innerText = mensaje;
+    document.getElementById("pantalla-carga").classList.add("activo");
+}
+
+function ocultarCarga() {
+    document.getElementById("pantalla-carga").classList.remove("activo");
+}
+
 /* ========================================================================
    👤 2. AUTENTICACIÓN Y ESTADO DE USUARIO
    ======================================================================== */
@@ -148,6 +157,9 @@ function mostrarJugadoresPorPais() {
 async function comprarSobreEspecifico(tipoCofre) {
     if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
 
+    // ⏳ Encendemos el overlay de bloqueo tapando el lag antes del fetch
+    mostrarCarga(`Abriendo Cofre de ${tipoCofre.toUpperCase()}...`);
+
     try {
         const res = await fetch(`${URL_BASE}/comprar-sobre`, {
             method: 'POST',
@@ -156,6 +168,10 @@ async function comprarSobreEspecifico(tipoCofre) {
         });
         
         const data = await res.json();
+        
+        // ⏳ Apagamos el spinner apenas el servidor responde para liberar la UI
+        ocultarCarga();
+
         if (data.error_oro) return alert(data.mensaje);
         if (data.error) return alert("❌ Error: " + data.error);
 
@@ -203,7 +219,11 @@ async function comprarSobreEspecifico(tipoCofre) {
             itemContenedor.appendChild(divInfoExterna);
             contenedorSobre.appendChild(itemContenedor);
         });
-    } catch (err) { console.error(err); }
+    } catch (err) { 
+        console.error(err);
+        // ⏳ Si el fetch explota por falta de internet o timeout, apagamos el spinner para no congelar la pantalla
+        ocultarCarga(); 
+    }
 }
 
 /* ========================================================================
