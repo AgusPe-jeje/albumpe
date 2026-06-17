@@ -440,23 +440,30 @@ button:disabled {
         box-sizing: border-box;
     }
 
-    /* 4. Módulo Tienda: Ajuste de Cofres */
+/* 4. Módulo Tienda: Ajuste de Cofres */
     .contenedor-tienda-cofres {
-        flex-direction: column; /* Apilamos los cofres uno abajo del otro */
-        gap: 15px;
-        width: 100%;
+        display: flex !important;
+        flex-direction: column !important; /* Los apila uno abajo del otro obligatoriamente */
+        align-items: center !important;    /* Los centra en la pantalla del celu */
+        gap: 20px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        padding: 0 10px !important;
     }
 
     .tarjeta-cofre {
-        width: 100% !important;
-        max-width: none;
+        width: 100% !important;            /* Ocupa el ancho disponible del celu */
+        max-width: 340px !important;       /* Evita que se haga gigante si el celu es ancho */
+        box-sizing: border-box !important;
+        margin: 0 auto !important;         /* Centrado perfecto */
     }
 
     /* Recompensas obtenidas (Sobre abierto) */
     #grid-sobre-abierto {
-        grid-template-columns: repeat(3, 1fr) !important; /* Fuerza las 3 cartas en una fila horizontal */
+        grid-template-columns: repeat(3, 1fr) !important; 
         gap: 8px !important;
-        width: 100%;
+        width: 100% !important;
     }
 
     /* 5. Módulo Álbum: Grilla de Figuritas y Selector */
