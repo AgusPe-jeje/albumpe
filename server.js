@@ -28,15 +28,15 @@ pool.query('SELECT NOW()', (err, res) => {
 
 async function inicializarTablas() {
     try {
-        // 1. Tabla de Usuarios (SERIAL reemplaza a AUTOINCREMENT)
+        // 1. Tabla de Usuarios (Actualizada con TIMESTAMP para el reloj por hora)
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
             password TEXT NOT NULL,
             monedas INTEGER DEFAULT 200,
             puntos_ranking INTEGER DEFAULT 0,
-            ultimo_tiro VARCHAR(20) DEFAULT '',
-            tiros_hoy INTEGER DEFAULT 0
+            ultimo_tiro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            tiros_hoy INTEGER DEFAULT 10
         )`);
 
         // 2. Tabla de Jugadores
@@ -734,9 +734,9 @@ async function inicializarTablas() {
                     ['Ryan Thomas', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_thomas.jpg', 'comun'], //
                     ['Francis de Vries', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_vries.jpg', 'comun'], //
                     ['Chris Wood', 'Nueva Zelanda', '🇳🇿', 'Delantero', 'fotos/zel_wood.jpg', 'legendaria'], //
+
             ];
 
-            // En Postgres usamos promesas agrupadas para insertar masivamente de forma segura
             for (const j of granListaJugadores) {
                 await pool.query(
                     `INSERT INTO jugadores (nombre, pais, bandera, posicion, foto, rareza) 
@@ -784,14 +784,12 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/registro', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // Verificamos si ya existe alguien con ese nombre
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
         
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: "❌ Ese nombre de usuario ya está ocupado." });
         }
 
-        // Si está libre, lo creamos
         const nuevoUsuario = await pool.query(
             "INSERT INTO usuarios (username, password) VALUES ($1, $2) RETURNING *", 
             [username, password]
@@ -901,7 +899,6 @@ app.post('/api/comprar-sobre', async (req, res) => {
         const nuevoOro = usuario.monedas - costo;
         await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
 
-        // Guardamos las figuritas obtenidas impactando las relaciones en la DB remota
         for (let jugador of sobreAbierto) {
             const progCheck = await pool.query(
                 "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", 
@@ -930,68 +927,85 @@ app.post('/api/comprar-sobre', async (req, res) => {
 });
 
 /* ========================================================================
-   ⚽ ENDPOINTS DEL MÓDULO DE PENALES (ESTADIO) Y RANKING
+   ⚽ ENDPOINTS DEL MÓDULO DE PENALES (SISTEMA DE ENERGÍA POR HORA)
    ======================================================================== */
+const MAX_TIROS = 10;
+const MILISEGUNDOS_POR_TIRO = 60 * 60 * 1000; // ⏱️ 1 Hora en milisegundos
+
+function calcularTirosActuales(usuario) {
+    const ahora = new Date();
+    
+    if (!usuario.ultimo_tiro_timestamp) {
+        return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
+    }
+
+    const ultimoTiro = new Date(usuario.ultimo_tiro_timestamp);
+    const tiempoTranscurrido = ahora - ultimoTiro;
+
+    // Aquí "tiros_hoy" almacena cuántos tiros le quedaban al usuario la última vez que interactuó
+    const tirosRegenerados = Math.floor(tiempoTranscurrido / MILISEGUNDOS_POR_TIRO);
+    let tirosActuales = usuario.tiros_hoy + tirosRegenerados;
+
+    if (tirosActuales >= MAX_TIROS) {
+        return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
+    }
+
+    const tiempoConsumidoEnEsteTiro = tiempoTranscurrido % MILISEGUNDOS_POR_TIRO;
+    const tiempoParaSiguiente = MILISEGUNDOS_POR_TIRO - tiempoConsumidoEnEsteTiro;
+
+    return { tirosActuales, tiempoParaSiguiente };
+}
+
 app.get('/api/tiros-restantes/:usuarioId', async (req, res) => {
     const usuarioId = req.params.usuarioId;
-    const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
-
     try {
-        const result = await pool.query("SELECT ultimo_tiro, tiros_hoy FROM usuarios WHERE id = $1", [usuarioId]);
-        if (result.rows.length === 0) return res.json({ tiros: 10 });
+        const result = await pool.query("SELECT ultimo_tiro_timestamp, tiros_hoy FROM usuarios WHERE id = $1", [usuarioId]);
+        if (result.rows.length === 0) return res.json({ tiros: MAX_TIROS, siguienteIn: 0 });
 
-        const usuario = result.rows[0];
-        let tirosHoy = usuario.tiros_hoy;
-        if (usuario.ultimo_tiro !== hoy) {
-            tirosHoy = 0;
-        }
-        return res.json({ tiros: 10 - tirosHoy });
+        const { tirosActuales, tiempoParaSiguiente } = calcularTirosActuales(result.rows[0]);
+        return res.json({ tiros: tirosActuales, siguienteIn: tiempoParaSiguiente });
     } catch (err) {
-        return res.json({ tiros: 10 });
+        return res.json({ tiros: MAX_TIROS, siguienteIn: 0 });
     }
 });
 
 app.post('/api/jugar-penal', async (req, res) => {
     const { usuario_id, gano } = req.body;
-    const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' });
+    const ahora = new Date();
 
     try {
-        const result = await pool.query("SELECT monedas, puntos_ranking, ultimo_tiro, tiros_hoy FROM usuarios WHERE id = $1", [usuario_id]);
+        const result = await pool.query("SELECT monedas, puntos_ranking, ultimo_tiro_timestamp, tiros_hoy FROM usuarios WHERE id = $1", [usuario_id]);
         if (result.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
 
         const usuario = result.rows[0];
-        let tirosHoy = usuario.tiros_hoy;
-        if (usuario.ultimo_tiro !== hoy) {
-            tirosHoy = 0;
-        }
+        let { tirosActuales, tiempoParaSiguiente } = calcularTirosActuales(usuario);
 
-        if (tirosHoy >= 10) {
+        if (tirosActuales <= 0) {
             return res.json({ 
                 error_limite: true, 
-                mensaje: "❌ Ya jugaste tus 10 penales de hoy. ¡Volvé mañana! 🛌" 
+                mensaje: "❌ ¡Te quedaste sin energía! Esperá a que se recupere un tiro. ⏱️" 
             });
         }
 
-        tirosHoy += 1;
-        let monedasGanadas = 0;
-        let puntosGanados = 0;
-
-        if (gano) {
-            monedasGanadas = 100;
-            puntosGanados = 15;
-        }
-
+        const nuevosTirosGuardados = tirosActuales - 1;
+        
+        let monedasGanadas = gano ? 100 : 0;
+        let puntosGanados = gano ? 15 : 0;
         const nuevasMonedas = usuario.monedas + monedasGanadas;
         const nuevosPuntos = usuario.puntos_ranking + puntosGanados;
 
+        // Guardamos el estado y reseteamos el timestamp al momento exacto de este tiro
         await pool.query(
-            `UPDATE usuarios SET monedas = $1, puntos_ranking = $2, ultimo_tiro = $3, tiros_hoy = $4 WHERE id = $5`,
-            [nuevasMonedas, nuevosPuntos, hoy, tirosHoy, usuario_id]
+            `UPDATE usuarios SET monedas = $1, puntos_ranking = $2, ultimo_tiro_timestamp = $3, tiros_hoy = $4 WHERE id = $5`,
+            [nuevasMonedas, nuevosPuntos, ahora, nuevosTirosGuardados, usuario_id]
         );
         
+        const tiempoActualizado = nuevosTirosGuardados >= MAX_TIROS ? 0 : MILISEGUNDOS_POR_TIRO;
+
         return res.json({
             success: true,
-            tiros_restantes: 10 - tirosHoy,
+            tiros_restantes: nuevosTirosGuardados,
+            siguienteIn: tiempoActualizado,
             datos: { monedas: nuevasMonedas, puntos_ranking: nuevosPuntos }
         });
     } catch (err) {

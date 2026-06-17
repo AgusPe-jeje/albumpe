@@ -14,6 +14,7 @@ let direccionGanadora = "";
 let albumCompleto = [];
 let paisSeleccionado = "";
 let timbaPreparada = false; // Manejo seguro de estado local
+let intervaloCronometro = null; // ⏱️ Intervalo global para el reloj de tiros
 
 /* ========================================================================
    🎛️ 1. CONTROL DE MÓDULOS DE LA UI
@@ -25,7 +26,7 @@ function cambiarModulo(idModulo, botonPresionado) {
     botonPresionado.classList.add('activo');
 
     if (idModulo === 'modulo-album' && usuarioActual) cargarAlbumLocal();
-    if (idModulo === 'modulo-penales' && usuarioActual) cargarRankingLocal();
+    if (idModulo === 'modulo-penales' && usuarioActual) iniciarDueloLocal(); // Actualizado para cargar tiros al entrar
     // 🎰 Al entrar al módulo separado de la timba, rotamos el partido en la UI
     if (idModulo === 'modulo-timba' && usuarioActual) rotarPartidoTimba();
 }
@@ -40,6 +41,43 @@ function ocultarCarga() {
 }
 
 /* ========================================================================
+   ⏱️ REGENERACIÓN DE TIROS (CRONÓMETRO VISUAL)
+   ======================================================================== */
+function arrancarCronometroVisual(milisegundosFaltantes) {
+    clearInterval(intervaloCronometro);
+    const lblCronometro = document.getElementById("cronometro-tiros");
+    if (!lblCronometro) return;
+    
+    if (milisegundosFaltantes <= 0) {
+        lblCronometro.innerText = "🔋 ¡Energía al Máximo!";
+        return;
+    }
+
+    let tiempoRestante = milisegundosFaltantes;
+
+    intervaloCronometro = setInterval(() => {
+        tiempoRestante -= 1000;
+        if (tiempoRestante <= 0) {
+            clearInterval(intervaloCronometro);
+            lblCronometro.innerText = "⚡ ¡Tiro recargado! Actualizando...";
+            if (usuarioActual) iniciarDueloLocal();
+            return;
+        }
+
+        const totalSegundos = Math.floor(tiempoRestante / 1000);
+        const horas = Math.floor(totalSegundos / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+
+        let textoReloj = "";
+        if (horas > 0) textoReloj += `${horas}h `;
+        textoReloj += `${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+
+        lblCronometro.innerText = `⏱️ Próximo tiro en: ${textoReloj}`;
+    }, 1000);
+}
+
+/* ========================================================================
    👤 2. AUTENTICACIÓN Y ESTADO DE USUARIO
    ======================================================================== */
 async function autenticarUsuario(accion) {
@@ -48,7 +86,6 @@ async function autenticarUsuario(accion) {
     
     if (!username || !password) return alert("❌ Completá los datos.");
 
-    // Cambiamos dinámicamente el mensaje de carga y la ruta del fetch
     const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
     const endpointFinal = accion === 'login' ? 'login' : 'registro';
 
@@ -62,13 +99,14 @@ async function autenticarUsuario(accion) {
         });
         
         const data = await res.json();
-        ocultarCarga(); // Apagamos el spinner de inmediato al recibir respuesta
+        ocultarCarga(); 
 
         if (data.error) {
             alert(data.error);
         } else {
             usuarioActual = data.usuario;
             document.getElementById("seccion-login").style.display = "none";
+            document.getElementById("interfaz-juego").style.display = "flex";
             document.getElementById("interfaz-juego").classList.add("mostrar");
             
             actualizarInterfazUI();
@@ -152,6 +190,7 @@ async function cargarAlbumLocal() {
 
 function mostrarJugadoresPorPais() {
     const contenedorGrid = document.getElementById("contenedor-grid-album");
+    if (!contenedorGrid) return;
     contenedorGrid.innerHTML = "";
     const jugadoresFiltrados = albumCompleto.filter(figu => figu.pais === paisSeleccionado);
 
@@ -176,7 +215,6 @@ function mostrarJugadoresPorPais() {
 async function comprarSobreEspecifico(tipoCofre) {
     if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
 
-    // ⏳ Encendemos el overlay de bloqueo tapando el lag antes del fetch
     mostrarCarga(`Abriendo Cofre de ${tipoCofre.toUpperCase()}...`);
 
     try {
@@ -187,8 +225,6 @@ async function comprarSobreEspecifico(tipoCofre) {
         });
         
         const data = await res.json();
-        
-        // ⏳ Apagamos el spinner apenas el servidor responde para liberar la UI
         ocultarCarga();
 
         if (data.error_oro) return alert(data.mensaje);
@@ -240,13 +276,12 @@ async function comprarSobreEspecifico(tipoCofre) {
         });
     } catch (err) { 
         console.error(err);
-        // ⏳ Si el fetch explota por falta de internet o timeout, apagamos el spinner para no congelar la pantalla
         ocultarCarga(); 
     }
 }
 
 /* ========================================================================
-   ⚽ 5. DUELO DE PENALES (INTERACTIVO CON ARQUERO)
+   ⚽ 5. DUELO DE PENALES (INTERACTIVO CON ENERGÍA POR HORA)
    ======================================================================== */
 async function iniciarDueloLocal() {
     if (!usuarioActual) return alert("❌ Iniciá sesión.");
@@ -258,23 +293,25 @@ async function iniciarDueloLocal() {
         
         if (data.tiros <= 0) {
             resTexto.style.color = "var(--rojo)";
-            resTexto.innerText = "❌ ¡NO TE QUEDAN TIROS! Volvé mañana para más penales. 🛌";
-            alert("❌ Ya jugaste tus 10 penales de hoy. ¡No podés preparar más tiros!");
-            return;
+            resTexto.innerText = "❌ ¡NO TE QUEDAN TIROS! Esperá que recargue energía.";
+        } else {
+            resTexto.style.color = "white";
+            resTexto.innerText = `⚽ ¡PREPARÁ EL DISPARO! — Te quedan ${data.tiros} tiros.`;
         }
 
-        resTexto.style.color = "white";
-        resTexto.innerText = `⚽ ¡PREPARÁ EL DISPARO! — Te quedan ${data.tiros} tiros hoy.`;
+        // Encendemos la cuenta regresiva con los milisegundos reales del backend
+        arrancarCronometroVisual(data.siguienteIn);
         
     } catch (err) {
         console.error("Error al verificar tiros iniciales:", err);
-        resTexto.innerText = "⚽ ¡PREPARÁ EL DISPARO!";
     }
     
     const balon = document.getElementById('balon-animado');
     const arquero = document.getElementById('arquero-animado');
-    balon.style.transform = 'translate(0, 0) scale(1)';
-    arquero.style.transform = 'translateX(0px)';
+    if (balon && arquero) {
+        balon.style.transform = 'translate(0, 0) scale(1)';
+        arquero.style.transform = 'translateX(0px)';
+    }
     
     const opciones = ['IZQUIERDA', 'CENTRO', 'DERECHA'];
     direccionGanadora = opciones[Math.floor(Math.random() * opciones.length)];
@@ -286,28 +323,17 @@ async function ejecutarPenalLocal(direccionElegida) {
         return;
     }
 
-    try {
-        const checkRes = await fetch(`${URL_BASE}/tiros-restantes/${usuarioActual.id}`);
-        const checkData = await checkRes.json();
-        
-        if (checkData.tiros <= 0) {
-            const resTexto = document.getElementById("resultado-penal");
-            resTexto.style.color = "var(--rojo)";
-            resTexto.innerText = "❌ ¡NO TE QUEDAN TIROS! Volvé mañana. 🛌";
-            alert("❌ Ya gastaste tus 10 tiros diarios.");
-            return;
-        }
-    } catch (err) { console.error("Error en chequeo previo:", err); }
-
     const arquero = document.getElementById('arquero-animado');
     const posicionesArquero = ['-80px', '0px', '80px']; 
     const movArquero = posicionesArquero[Math.floor(Math.random() * posicionesArquero.length)];
-    arquero.style.transform = `translateX(${movArquero})`;
+    if (arquero) arquero.style.transform = `translateX(${movArquero})`;
 
     const balon = document.getElementById('balon-animado');
-    if (direccionElegida === 'IZQUIERDA') balon.style.transform = 'translate(-80px, -70px) scale(0.6)';
-    else if (direccionElegida === 'DERECHA') balon.style.transform = 'translate(80px, -70px) scale(0.6)';
-    else balon.style.transform = 'translate(0px, -70px) scale(0.6)';
+    if (balon) {
+        if (direccionElegida === 'IZQUIERDA') balon.style.transform = 'translate(-80px, -70px) scale(0.6)';
+        else if (direccionElegida === 'DERECHA') balon.style.transform = 'translate(80px, -70px) scale(0.6)';
+        else balon.style.transform = 'translate(0px, -70px) scale(0.6)';
+    }
 
     await new Promise(r => setTimeout(r, 600));
 
@@ -337,7 +363,7 @@ async function ejecutarPenalLocal(direccionElegida) {
         if (data.error_limite) {
             alert(data.mensaje);
             resTexto.style.color = "var(--rojo)";
-            resTexto.innerText = "¡MAÑANA SE VUELVE A PATEAR! ⏱️";
+            resTexto.innerText = "¡SIN ENERGÍA! ⏱️";
             return;
         }
 
@@ -346,7 +372,11 @@ async function ejecutarPenalLocal(direccionElegida) {
         actualizarInterfazUI();
         cargarRankingLocal();
         
-        resTexto.innerText += ` — Te quedan ${data.tiros_restantes} tiros hoy.`;
+        resTexto.innerText += ` — Te quedan ${data.tiros_restantes} tiros.`;
+        
+        // Actualizamos el reloj de inmediato con el tiempo devuelto por el server
+        arrancarCronometroVisual(data.siguienteIn);
+
     } catch (err) { console.error(err); }
 }
 
@@ -409,6 +439,7 @@ async function cerrarSesionLocal() {
         });
     } catch (err) { console.error("Error al avisar logout al servidor:", err); }
 
+    clearInterval(intervaloCronometro); // Frenamos el reloj para evitar fugas de memoria
     usuarioActual = null;
     direccionGanadora = "";
     albumCompleto = [];
@@ -417,8 +448,8 @@ async function cerrarSesionLocal() {
     document.getElementById("input-usuario").value = "";
     document.getElementById("input-pass").value = "";
 
-    document.getElementById("interfaz-juego").classList.remove("mostrar");
     document.getElementById("interfaz-juego").style.display = "none";
+    document.getElementById("interfaz-juego").classList.remove("mostrar");
     document.getElementById("seccion-login").style.display = "block";
 
     alert("🚪 Sesión cerrada correctamente. Volviste al menú local.");
@@ -480,14 +511,16 @@ async function prepararOpcionesApuesta() {
         return alert("🪙 No tenés suficiente Oro para bancar esa apuesta.");
     }
 
+    mostrarCarga("Estudiando probabilidades...");
+
     try {
-        // Consultamos el endpoint seguro que simula en secreto
         const res = await fetch(`${URL_BASE}/timba/preparar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ usuario_id: usuarioActual.id, montoApuesta })
         });
         const data = await res.json();
+        ocultarCarga();
 
         if (!data.ok) return alert(data.mensaje);
 
@@ -496,21 +529,22 @@ async function prepararOpcionesApuesta() {
         contenedor.innerHTML = "";
         contenedor.style.display = "grid";
 
-        // Renderizamos las 6 opciones ciegas (F12 solo ve IDs de 0 a 5)
         data.opciones.forEach(opc => {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "btn-modulo btn-opcion-resultado";
             btn.style.margin = "5px";
             btn.innerText = opc.label;
-            // Pasamos el ID de opción seguro al backend para validar
             btn.onclick = () => procesarEleccionTimbaSegura(opc.idOpcion);
             contenedor.appendChild(btn);
         });
 
         timbaPreparada = true;
 
-    } catch (err) { console.error("Error al preparar opciones seguras:", err); }
+    } catch (err) { 
+        console.error("Error al preparar opciones seguras:", err); 
+        ocultarCarga();
+    }
 }
 
 // Validación del lado del Backend (Inhackeable)
@@ -522,6 +556,8 @@ async function procesarEleccionTimbaSegura(idOpcionElegida) {
     const bandVis = document.getElementById("timba-bandera-visitante").innerText;
     const nomVis = document.getElementById("timba-visitante").innerText;
 
+    mostrarCarga("Procesando tu jugada...");
+
     try {
         const res = await fetch(`${URL_BASE}/timba/procesar`, {
             method: 'POST',
@@ -529,10 +565,10 @@ async function procesarEleccionTimbaSegura(idOpcionElegida) {
             body: JSON.stringify({ usuario_id: usuarioActual.id, idOpcionElegida })
         });
         const data = await res.json();
+        ocultarCarga();
 
         if (!data.ok) return alert(data.mensaje);
 
-        // Actualizamos los datos reales de oro y ranking devueltos por la DB
         usuarioActual.monedas = data.datos.monedas;
         usuarioActual.puntos_ranking = data.datos.puntos_ranking;
         actualizarInterfazUI();
@@ -542,7 +578,6 @@ async function procesarEleccionTimbaSegura(idOpcionElegida) {
         document.getElementById("contenedor-opciones-goles").style.display = "none";
         document.getElementById("input-monto-apuesta").value = "50";
 
-        // Alimentamos la bitácora con la verdad del partido simulado
         actualizarHistorialUI({ 
             local: `${bandLoc} ${nomLoc}`, 
             visitante: `${bandVis} ${nomVis}`, 
@@ -552,7 +587,10 @@ async function procesarEleccionTimbaSegura(idOpcionElegida) {
         timbaPreparada = false;
         rotarPartidoTimba();
 
-    } catch (err) { console.error("Error al procesar jugada segura:", err); }
+    } catch (err) { 
+        console.error("Error al procesar jugada segura:", err); 
+        ocultarCarga();
+    }
 }
 
 // 🔄 Enganchamos la rotación inicial del partido cuando cargue el script por primera vez

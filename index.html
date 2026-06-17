@@ -119,6 +119,9 @@
 
                     <h3 id="resultado-penal">¡PREPARÁ EL DISPARO!</h3>
                     
+                    <!-- ⏱️ RELOJ DINÁMICO: Muestra la cuenta regresiva de energía por hora -->
+                    <p id="cronometro-tiros" style="color: #ffb100; font-weight: bold; font-size: 0.9rem; margin-top: 5px; min-height: 20px;"></p>
+                    
                     <button style="width: 60%; margin-top: 10px;" onclick="iniciarDueloLocal()">⚽ PRÓXIMO TIRO</button>
                 </div>
 
@@ -138,7 +141,7 @@
             </div>
         </div>
 
-        <!-- 🎰 MÓDULO DE LA TIMBA (LIMPIO Y SIN DUPLICADOS) -->
+        <!-- 🎰 MÓDULO DE LA TIMBA -->
         <div id="modulo-timba" class="modulo-contenido">
             <div class="caja-modulo">
                 <h2 style="color: #ffb100; margin-top:0;">🎰 LA TIMBA DE LA ARENA</h2>
@@ -167,7 +170,6 @@
 
                         <button type="button" id="btn-preparar-apuesta" onclick="prepararOpcionesApuesta()" style="background: linear-gradient(180deg, #3498db 0%, #2980b9 100%); color: white; width: 80%; font-weight: bold;">🎲 VER OPCIONES DE PRONÓSTICO</button>
 
-                        <!-- Contenedor inyectado en grilla por JS para los 4 botones de resultados mezclados -->
                         <div id="contenedor-opciones-goles" class="grid-opciones-goles" style="display: none; margin-top: 15px;"></div>
                     </div>
                 </div>
