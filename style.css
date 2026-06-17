@@ -387,3 +387,164 @@ button:disabled {
     pointer-events: none; /* Deshabilita físicamente los clics en IZQ, CEN, DER */
     cursor: not-allowed;
 }
+
+/* ========================================================================
+   📱 ADAPTACIÓN RESPONSIVA PARA CELULARES (MOBILE FIRST DESIGN)
+   ======================================================================== */
+@media (max-width: 768px) {
+    
+    /* 1. Ajustes Generales del Cuerpo */
+    body {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 1.8rem !important;
+        margin-top: 10px;
+    }
+
+    /* 2. Header de Estado (Usuario, Monedas, Copas) */
+    .header-status {
+        flex-direction: column; /* Lo ponemos en vertical */
+        gap: 8px;
+        width: 100%;
+        padding: 10px;
+        box-sizing: border-box;
+    }
+
+    .stat-box {
+        width: 100%;
+        text-align: center;
+        font-size: 0.9rem;
+        padding: 6px;
+    }
+
+    .btn-logout-clash {
+        width: 100%;
+        margin-top: 5px;
+    }
+
+    /* 3. Botones de Navegación entre Módulos */
+    .nav-modulos {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* 2 arriba y 2 abajo para que no queden diminutos */
+        gap: 8px;
+        width: 100%;
+        margin: 15px 0;
+    }
+
+    .btn-modulo {
+        padding: 10px 5px;
+        font-size: 0.85rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* 4. Módulo Tienda: Ajuste de Cofres */
+    .contenedor-tienda-cofres {
+        flex-direction: column; /* Apilamos los cofres uno abajo del otro */
+        gap: 15px;
+        width: 100%;
+    }
+
+    .tarjeta-cofre {
+        width: 100% !important;
+        max-width: none;
+    }
+
+    /* Recompensas obtenidas (Sobre abierto) */
+    #grid-sobre-abierto {
+        grid-template-columns: repeat(3, 1fr) !important; /* Fuerza las 3 cartas en una fila horizontal */
+        gap: 8px !important;
+        width: 100%;
+    }
+
+    /* 5. Módulo Álbum: Grilla de Figuritas y Selector */
+    #selector-paises {
+        gap: 6px;
+        padding-bottom: 10px;
+    }
+
+    .btn-pais {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+
+    .grid-album {
+        grid-template-columns: repeat(3, 1fr) !important; /* 3 figus por fila en celular se ve de diez */
+        gap: 10px;
+    }
+
+    .carta-clash {
+        height: auto;
+        aspect-ratio: 2 / 3; /* Mantiene la proporción clásica Panini */
+    }
+
+    .rareza-vertical {
+        font-size: 0.5rem;
+        width: 12px;
+    }
+
+    .badge-repetidas {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
+
+    /* 6. Módulo Penales: Arco y Leaderboard */
+    .contenedor-penales-layout {
+        flex-direction: column; /* El arco arriba y el Top 10 abajo */
+        gap: 20px;
+        width: 100%;
+    }
+
+    .juego-penales-principal, .panel-lateral-ranking {
+        width: 100% !important;
+    }
+
+    /* Ajuste de escala para el Arco en pantallas chicas */
+    .contenedor-penales-juego {
+        overflow: hidden;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .arco-futbol {
+        width: 100%;
+        max-width: 320px; /* Evita que el arco se rompa o se desborde */
+        height: 180px; /* Reducimos la altura proporcionalmente */
+        background-size: 100% 100%;
+    }
+
+    /* Escalamos las posiciones del arquero y pelota para que no queden fuera del arco chico */
+    #arquero-animado {
+        font-size: 2rem;
+    }
+    
+    #balon-animado {
+        font-size: 1.5rem;
+    }
+
+    /* 7. Módulo Timba */
+    .arena-versus-container {
+        gap: 10px;
+    }
+
+    #timba-bandera-local, #timba-bandera-visitante {
+        font-size: 2.2rem !important;
+    }
+
+    #timba-local, #timba-visitante {
+        font-size: 1rem !important;
+    }
+
+    .vs-circulo {
+        width: 35px;
+        height: 35px;
+        font-size: 0.8rem;
+    }
+
+    .grid-opciones-goles {
+        grid-template-columns: repeat(2, 1fr) !important; /* 2 columnas de opciones de goles */
+    }
+}
