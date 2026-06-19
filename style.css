@@ -202,6 +202,15 @@ input {
 .tabla-ranking tr:nth-child(2) td:nth-child(1) { color: #c0c0c0; font-size: 1.1rem; }
 .tabla-ranking tr:nth-child(3) td:nth-child(1) { color: #cd7f32; font-size: 1.05rem; }
 .fila-usuario-actual { background: rgba(32, 181, 203, 0.2) !important; border: 2px solid var(--celeste); }
+/* ✨ PARCHE: Evita que nombres muy largos deformen la tabla del Top 10 */
+.tabla-ranking td:nth-child(2) {
+    max-width: 140px;           /* Ancho máximo para la celda del nombre */
+    white-space: nowrap;        /* Obliga a que todo el nombre se mantenga en una sola línea */
+    overflow: hidden;           /* Oculta el excedente de texto */
+    text-overflow: ellipsis;    /* Clava los tres puntitos (...) automáticamente si no entra */
+    text-align: left;           /* Lo alinea a la izquierda para un look más prolijo */
+    padding-left: 15px;         /* Le da una luz respecto a la medalla/posición */
+}
 
 /* Campo de fútbol interactivo */
 .arco-futbol {
@@ -300,6 +309,10 @@ input {
 @media (max-width: 768px) {
     .contenedor-penales-layout { flex-direction: column; align-items: center; }
     .juego-penales-principal, .panel-lateral-ranking { width: 100%; }
+    /* Ajuste de puntos suspensivos exclusivo para la pantalla del celu */
+    .tabla-ranking td:nth-child(2) {
+        max-width: 100px; /* Al ser el celu más angosto, acorta el texto un cachito antes */
+    }
     .menu-navegacion { display: flex; flex-direction: row; justify-content: space-around; padding: 10px; }
     #contenedor-grid-album, #grid-sobre-abierto { grid-template-columns: repeat(3, 1fr) !important; gap: 8px; padding: 5px; }
     .carta-clash { width: 100%; height: auto; }

@@ -830,8 +830,12 @@ app.post('/api/login', async (req, res) => {
 // 2. CREAR USUARIO (Con restricción estricta de una cuenta por IP)
 app.post('/api/registro', async (req, res) => {
     const { username, password } = req.body;
-    const ipCliente = req.ip; // Captura la IP del dispositivo o router
+    const ipCliente = req.ip;
 
+    // ✨ Parche para evitar nombres larguísimos que rompan la UI
+    if (!username || username.trim().length > 14) {
+        return res.status(400).json({ error: "❌ El nombre de usuario no puede tener más de 14 caracteres." });
+    }
     try {
         // A. Verificamos si ya existe alguien con ese nombre
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
