@@ -36,7 +36,7 @@ app.use((req, res, next) => {
     const { username } = req.body;
 
     // ✨ CONTROL DE ACCESO: Si es tu cuenta, te deja pasar sin trabas
-    if (username && username.toLowerCase() === "Aguspe") {
+    if (username && username.toLowerCase() === "aguspe") {
         return next();
     }
 
