@@ -1148,9 +1148,9 @@ app.get('/api/timbas-restantes/:usuarioId', async (req, res) => {
 });
 
 app.post('/api/timba/preparar', async (req, res) => { 
-    const { usuario_id, montoApuesta } = req.body;
+    const { usuario_id, tipoApuesta, montoApuesta, jugadorIdApostado } = req.body;
     
-    if (!usuario_id || !montoApuesta || montoApuesta <= 0) {
+    if (!usuario_id || !tipoApuesta) {
         return res.status(400).json({ ok: false, mensaje: "Datos inválidos." });
     }
 
@@ -1160,10 +1160,23 @@ app.post('/api/timba/preparar', async (req, res) => {
 
         const usuario = userCheck.rows[0];
 
-        if (usuario.monedas < montoApuesta) {
-            return res.json({ ok: false, error_oro: true, mensaje: "🪙 No tenés suficiente Oro para bancar esa apuesta." });
+        // VERIFICACIÓN DEPENDIENDO DE LA MODALIDAD ELEGIDA
+        if (tipoApuesta === "monedas") {
+            if (usuario.monedas < montoApuesta || montoApuesta <= 0) {
+                return res.json({ ok: false, error_oro: true, mensaje: "🪙 No tenés suficiente Oro para bancar esa apuesta." });
+            }
+        } else {
+            // Validamos que de verdad tenga el cromo repetido en Postgres
+            const progCheck = await pool.query(
+                "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
+                [usuario_id, jugadorIdApostado]
+            );
+            if (progCheck.rows.length === 0 || progCheck.rows[0].cantidad <= 1) {
+                return res.json({ ok: false, mensaje: "❌ No tenés stock de repetidas de ese cromo para apostar." });
+            }
         }
 
+        // CONTROL DE ENERGÍA DE LA BANCA
         let { timbasActuales, tiempoParaSiguienteTimba } = calcularTimbasActuales(usuario);
 
         if (timbasActuales <= 0) {
@@ -1182,6 +1195,7 @@ app.post('/api/timba/preparar', async (req, res) => {
             [ahora, nuevasTimbasGuardadas, usuario_id]
         );
 
+        // SIMULACIÓN INTERNA DEL PARTIDO
         const golesLReal = generarGolesServidor();
         const golesVReal = generarGolesServidor();
         const signoReal = golesLReal > golesVReal ? 'L' : (golesLReal < golesVReal ? 'V' : 'E');
@@ -1193,49 +1207,38 @@ app.post('/api/timba/preparar', async (req, res) => {
             { label: `${golesLReal} - ${golesVReal}`, tipo: 'exacto' }
         ];
 
+        // Llenado de opciones falsas (signo correcto y erróneos)
         for (let i = 0; i < 2; i++) {
-            let glSigno = generarGolesServidor();
-            let gvSigno = generarGolesServidor();
+            let glSigno = generarGolesServidor(); let gvSigno = generarGolesServidor();
             let combo = `${glSigno}-${gvSigno}`;
             let signoOpc = glSigno > gvSigno ? 'L' : (glSigno < gvSigno ? 'V' : 'E');
             let intentos = 0;
-
             while ((combinacionesUsadas.has(combo) || signoOpc !== signoReal) && intentos < 30) {
-                glSigno = generarGolesServidor();
-                gvSigno = generarGolesServidor();
+                glSigno = generarGolesServidor(); gvSigno = generarGolesServidor();
                 if (intentos > 15) {
                     if (signoReal === 'L') { glSigno = golesLReal + 1; gvSigno = golesVReal; }
                     else if (signoReal === 'V') { glSigno = golesLReal; gvSigno = golesVReal + 1; }
                     else { glSigno = golesLReal + 1; gvSigno = golesVReal + 1; }
                 }
-                combo = `${glSigno}-${gvSigno}`;
-                signoOpc = glSigno > gvSigno ? 'L' : (glSigno < gvSigno ? 'V' : 'E');
-                intentos++;
+                combo = `${glSigno}-${gvSigno}`; signoOpc = glSigno > gvSigno ? 'L' : (glSigno < gvSigno ? 'V' : 'E'); intentos++;
             }
-            combinacionesUsadas.add(combo);
-            poolOpciones.push({ label: `${glSigno} - ${gvSigno}`, tipo: 'signo' });
+            combinacionesUsadas.add(combo); poolOpciones.push({ label: `${glSigno} - ${gvSigno}`, tipo: 'signo' });
         }
 
         for (let i = 0; i < 3; i++) {
-            let glErr = generarGolesServidor();
-            let gvErr = generarGolesServidor();
+            let glErr = generarGolesServidor(); let gvErr = generarGolesServidor();
             let combo = `${glErr}-${gvErr}`;
             let signoOpc = glErr > gvErr ? 'L' : (glErr < gvErr ? 'V' : 'E');
             let intentos = 0;
-
             while ((combinacionesUsadas.has(combo) || signoOpc === signoReal) && intentos < 30) {
-                glErr = generarGolesServidor();
-                gvErr = generarGolesServidor();
+                glErr = generarGolesServidor(); gvErr = generarGolesServidor();
                 if (intentos > 15) {
                     if (signoReal === 'L' || signoReal === 'E') { glErr = 0; gvErr = i + 1; } 
                     else { glErr = i + 1; gvErr = 0; }
                 }
-                combo = `${glErr}-${gvErr}`;
-                signoOpc = glErr > gvErr ? 'L' : (glErr < gvErr ? 'V' : 'E');
-                intentos++;
+                combo = `${glErr}-${gvErr}`; signoOpc = glErr > gvErr ? 'L' : (glErr < gvErr ? 'V' : 'E'); intentos++;
             }
-            combinacionesUsadas.add(combo);
-            poolOpciones.push({ label: `${glErr} - ${gvErr}`, tipo: 'error' });
+            combinacionesUsadas.add(combo); poolOpciones.push({ label: `${glErr} - ${gvErr}`, tipo: 'error' });
         }
 
         const poolParaCliente = poolOpciones.map((opc, index) => ({
@@ -1243,10 +1246,13 @@ app.post('/api/timba/preparar', async (req, res) => {
             label: opc.label
         })).sort(() => Math.random() - 0.5);
 
+        // RESPALDAMOS LA APUESTA ACTIVA EN LA MEMORIA DEL PROCESO
         apuestasActivasServidor[usuario_id] = {
             golesLReal,
             golesVReal,
+            tipoApuesta,
             montoApuesta,
+            jugadorIdApostado,
             mapeoOpciones: poolOpciones
         };
 
@@ -1259,7 +1265,7 @@ app.post('/api/timba/preparar', async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(500).json({ ok: false, mensaje: "Error en el servidor al procesar energía de timba." });
+        return res.status(500).json({ ok: false, mensaje: "Error en el servidor al preparar." });
     }
 });
 
@@ -1268,46 +1274,86 @@ app.post('/api/timba/procesar', async (req, res) => {
     const apuesta = apuestasActivasServidor[usuario_id];
 
     if (!apuesta) {
-        return res.status(400).json({ ok: false, mensaje: "No hay una apuesta activa preparada para este jugador." });
+        return res.status(400).json({ ok: false, mensaje: "No hay una apuesta activa preparada." });
     }
 
-    const { golesLReal, golesVReal, montoApuesta, mapeoOpciones } = apuesta;
+    const { golesLReal, golesVReal, tipoApuesta, montoApuesta, jugadorIdApostado, mapeoOpciones } = apuesta;
     const opcionReal = mapeoOpciones[idOpcionElegida];
 
     let balanceMonedas = 0;
-    let mensajeResultado = "";
     let puntosAsignados = 0;
-
-    if (opcionReal.tipo === 'exacto') {
-        balanceMonedas = montoApuesta * 3;
-        puntosAsignados = 20;
-        mensajeResultado = `¡QUÉ ANIMAL! Elegiste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 3} monedas (Total devuelto: ${montoApuesta * 4})`;
-    } else if (opcionReal.tipo === 'signo') {
-        balanceMonedas = Math.round(montoApuesta * 0.5);
-        mensajeResultado = `¡BIEN AHÍ! Acertaste el ganador/empate (Elegiste ${opcionReal.label}). El resultado real fue ${golesLReal}-${golesVReal}.\nGanaste: ${balanceMonedas} monedas (Total devuelto: ${montoApuesta + balanceMonedas})`;
-    } else {
-        balanceMonedas = -montoApuesta;
-        mensajeResultado = `¡ERRASTE! El partido terminó ${golesLReal}-${golesVReal} y vos elegiste ${opcionReal.label}.\nPerdiste: ${montoApuesta} monedas.`;
-    }
+    let mensajeResultado = "";
 
     try {
-        await pool.query(
-            `UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3`, 
-            [balanceMonedas, puntosAsignados, usuario_id]
-        );
+        if (tipoApuesta === "monedas") {
+            // LÓGICA DE MONEDAS TRADICIONAL
+            if (opcionReal.tipo === 'exacto') {
+                balanceMonedas = montoApuesta * 3; puntosAsignados = 20;
+                mensajeResultado = `¡QUÉ ANIMAL! Acertaste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 3} monedas.`;
+            } else if (opcionReal.tipo === 'signo') {
+                balanceMonedas = Math.round(montoApuesta * 0.5);
+                mensajeResultado = `¡BIEN AHÍ! Acertaste el ganador (${opcionReal.label}). El resultado fue ${golesLReal}-${golesVReal}.\nGanaste: ${balanceMonedas} monedas.`;
+            } else {
+                balanceMonedas = -montoApuesta;
+                mensajeResultado = `¡ERRASTE! El partido terminó ${golesLReal}-${golesVReal} y elegiste ${opcionReal.label}.\nPerdiste: ${montoApuesta} monedas.`;
+            }
+
+            // Aplicamos balance directo a la cuenta
+            await pool.query(
+                `UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3`, 
+                [balanceMonedas, puntosAsignados, usuario_id]
+            );
+
+        } else {
+            // 🃏 LÓGICA DE LA TIMBA DE CROMOS
+            // Traemos los datos de la carta arriesgada para saber su rareza
+            const cardQuery = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugadorIdApostado]);
+            const cromoApostado = cardQuery.rows[0];
+
+            if (opcionReal.tipo === 'exacto') {
+                // ACIERTO EXACTO: Se destruye la repetida pero la banca te regala un cromo de RAREZA SUPERIOR
+                await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
+                
+                let rarezaPremio = "especial";
+                if (cromoApostado.rareza === "especial" || cromoApostado.rareza === "rara") rarezaPremio = "epica";
+                else if (cromoApostado.rareza === "epica" || cromoApostado.rareza === "legendaria") rarezaPremio = "legendaria";
+
+                // Buscamos un cromo aleatorio de esa rareza alta
+                const poolPremio = await pool.query("SELECT id, nombre FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaPremio]);
+                const cromoGanado = poolPremio.rows[0];
+
+                // Lo inyectamos en su progreso
+                const checkProg = await pool.query("SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, cromoGanado.id]);
+                if (checkProg.rows.length > 0) {
+                    await pool.query("UPDATE usuario_progreso SET cantidad = cantidad + 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, cromoGanado.id]);
+                } else {
+                    await pool.query("INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)", [usuario_id, cromoGanado.id]);
+                }
+
+                puntosAsignados = 30;
+                await pool.query("UPDATE usuarios SET puntos_ranking = puntos_ranking + $1 WHERE id = $2", [puntosAsignados, usuario_id]);
+
+                mensajeResultado = `🔥 ¡PRO DISPARO! Arriesgaste a ${cromoApostado.nombre.toUpperCase()} y pegaste el resultado exacto (${golesLReal}-${golesVReal}).\n\n🎁 ¡LA BANCA TE REGALA A: ${cromoGanado.nombre.toUpperCase()} [${rarezaPremio.toUpperCase()}]!`;
+
+            } else {
+                // ERRASTE O COINCIDIÓ SOLO EL SIGNO: En cromos, para balancear el juego, si no es exacto, perdiste la carta
+                await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
+                mensajeResultado = `❌ ¡CROMO PERDIDO! El partido terminó ${golesLReal}-${golesVReal} y tu opción fue ${opcionReal.label}.\nPerdiste 1 copia de ${cromoApostado.nombre.toUpperCase()} de tu álbum.`;
+            }
+        }
+
         const userCheck = await pool.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
-        
         delete apuestasActivasServidor[usuario_id];
 
         return res.json({
             ok: true,
             mensajeResultado,
-            golesLReal,
-            golesVReal,
             datos: userCheck.rows[0]
         });
+
     } catch (err) {
-        return res.status(500).json({ ok: false, mensaje: "Error en DB." });
+        console.error(err);
+        return res.status(500).json({ ok: false, mensaje: "Error en DB al procesar." });
     }
 });
 
