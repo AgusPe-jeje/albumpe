@@ -60,7 +60,6 @@ app.use(express.static(path.join(__dirname)));
 /* ========================================================================
    📦 CONFIGURACIÓN Y CONEXIÓN DE BASE DE DATOS (POSTGRESQL - NEON)
    ======================================================================== */
-// Se conecta usando la variable de entorno segura que vas a setear en Render
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false } // Requerido obligatoriamente por Neon
@@ -74,7 +73,7 @@ pool.query('SELECT NOW()', (err, res) => {
 
 async function inicializarTablas() {
     try {
-        // 1. Tabla de Usuarios (Actualizada con TIMESTAMP y columna ip_registro)
+        // 1. Tabla de Usuarios 
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -107,7 +106,6 @@ async function inicializarTablas() {
             PRIMARY KEY (usuario_id, jugador_id)
         )`);
 
-        // Verificamos si la tabla de jugadores está vacía para meter la lista inicial
         const checkJugadores = await pool.query("SELECT COUNT(*) as count FROM jugadores");
         if (parseInt(checkJugadores.rows[0].count) === 0) {
             const granListaJugadores = [
@@ -800,14 +798,11 @@ async function inicializarTablas() {
     }
 }
 
-// Ejecutamos la inicialización de tablas asíncrona
 inicializarTablas();
 
 /* ========================================================================
    👤 ENDPOINTS DE AUTENTICACIÓN Y SISTEMA DE USUARIOS REFORMADO
    ======================================================================== */
-
-// 1. INICIAR SESIÓN (Solo entra si ya existe y coincide la clave)
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
@@ -829,23 +824,19 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 2. CREAR USUARIO (Con restricción estricta de una cuenta por IP)
 app.post('/api/registro', async (req, res) => {
     const { username, password } = req.body;
     const ipCliente = req.ip;
 
-    // ✨ Parche para evitar nombres larguísimos que rompan la UI
     if (!username || username.trim().length > 14) {
         return res.status(400).json({ error: "❌ El nombre de usuario no puede tener más de 14 caracteres." });
     }
     try {
-        // A. Verificamos si ya existe alguien con ese nombre
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username]);
         if (userCheck.rows.length > 0) {
             return res.status(400).json({ error: "❌ Ese nombre de usuario ya está ocupado." });
         }
 
-        // B. Verificamos si esa IP ya registró una cuenta anteriormente
         if (ipCliente && ipCliente !== '::1' && ipCliente !== '127.0.0.1') {
             const ipCheck = await pool.query("SELECT * FROM usuarios WHERE ip_registro = $1", [ipCliente]);
             if (ipCheck.rows.length > 0) {
@@ -853,7 +844,6 @@ app.post('/api/registro', async (req, res) => {
             }
         }
 
-        // C. Si está libre el nombre y la IP, creamos la cuenta guardando su IP
         const nuevoUsuario = await pool.query(
             "INSERT INTO usuarios (username, password, ip_registro) VALUES ($1, $2, $3) RETURNING *", 
             [username, password, ipCliente]
@@ -994,7 +984,7 @@ app.post('/api/comprar-sobre', async (req, res) => {
    ⚽ ENDPOINTS DEL MÓDULO DE PENALES (SISTEMA DE ENERGÍA POR HORA)
    ======================================================================== */
 const MAX_TIROS = 10;
-const MILISEGUNDOS_POR_TIRO = 6 * 60 * 1000; // ⏱️ 6 min por tiro para testeo rápido
+const MILISEGUNDOS_POR_TIRO = 6 * 60 * 1000; 
 
 function calcularTirosActuales(usuario) {
     const ahora = new Date();
@@ -1091,7 +1081,7 @@ app.get('/api/ranking', async (req, res) => {
 });
 
 /* ========================================================================
-   🎰 CONFIGURACIÓN DE ENERGÍA PARA LA TIMBA (MOVIDA ARRIBA)
+   🎰 CONFIGURACIÓN DE ENERGÍA PARA LA TIMBA
    ======================================================================== */
 const MAX_TIMBAS = 10; 
 const MILISEGUNDOS_POR_TIMBA = 6 * 60 * 1000; 
@@ -1133,7 +1123,6 @@ function generarGolesServidor() {
     return Math.floor(Math.random() * 3) + 4;
 }
 
-// ✨ AGREGADO: Endpoint GET indispensable que pedía tu script.js para activar el cronómetro visual
 app.get('/api/timbas-restantes/:usuarioId', async (req, res) => {
     const usuarioId = req.params.usuarioId;
     try {
@@ -1160,13 +1149,11 @@ app.post('/api/timba/preparar', async (req, res) => {
 
         const usuario = userCheck.rows[0];
 
-        // VERIFICACIÓN DEPENDIENDO DE LA MODALIDAD ELEGIDA
         if (tipoApuesta === "monedas") {
             if (usuario.monedas < montoApuesta || montoApuesta <= 0) {
                 return res.json({ ok: false, error_oro: true, mensaje: "🪙 No tenés suficiente Oro para bancar esa apuesta." });
             }
         } else {
-            // Validamos que de verdad tenga el cromo repetido en Postgres
             const progCheck = await pool.query(
                 "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
                 [usuario_id, jugadorIdApostado]
@@ -1176,7 +1163,6 @@ app.post('/api/timba/preparar', async (req, res) => {
             }
         }
 
-        // CONTROL DE ENERGÍA DE LA BANCA
         let { timbasActuales, tiempoParaSiguienteTimba } = calcularTimbasActuales(usuario);
 
         if (timbasActuales <= 0) {
@@ -1195,7 +1181,6 @@ app.post('/api/timba/preparar', async (req, res) => {
             [ahora, nuevasTimbasGuardadas, usuario_id]
         );
 
-        // SIMULACIÓN INTERNA DEL PARTIDO
         const golesLReal = generarGolesServidor();
         const golesVReal = generarGolesServidor();
         const signoReal = golesLReal > golesVReal ? 'L' : (golesLReal < golesVReal ? 'V' : 'E');
@@ -1207,7 +1192,6 @@ app.post('/api/timba/preparar', async (req, res) => {
             { label: `${golesLReal} - ${golesVReal}`, tipo: 'exacto' }
         ];
 
-        // Llenado de opciones falsas (signo correcto y erróneos)
         for (let i = 0; i < 2; i++) {
             let glSigno = generarGolesServidor(); let gvSigno = generarGolesServidor();
             let combo = `${glSigno}-${gvSigno}`;
@@ -1246,7 +1230,6 @@ app.post('/api/timba/preparar', async (req, res) => {
             label: opc.label
         })).sort(() => Math.random() - 0.5);
 
-        // RESPALDAMOS LA APUESTA ACTIVA EN LA MEMORIA DEL PROCESO
         apuestasActivasServidor[usuario_id] = {
             golesLReal,
             golesVReal,
@@ -1286,7 +1269,6 @@ app.post('/api/timba/procesar', async (req, res) => {
 
     try {
         if (tipoApuesta === "monedas") {
-            // LÓGICA DE MONEDAS TRADICIONAL
             if (opcionReal.tipo === 'exacto') {
                 balanceMonedas = montoApuesta * 3; puntosAsignados = 20;
                 mensajeResultado = `¡QUÉ ANIMAL! Acertaste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 3} monedas.`;
@@ -1298,31 +1280,25 @@ app.post('/api/timba/procesar', async (req, res) => {
                 mensajeResultado = `¡ERRASTE! El partido terminó ${golesLReal}-${golesVReal} y elegiste ${opcionReal.label}.\nPerdiste: ${montoApuesta} monedas.`;
             }
 
-            // Aplicamos balance directo a la cuenta
             await pool.query(
                 `UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3`, 
                 [balanceMonedas, puntosAsignados, usuario_id]
             );
 
         } else {
-            // 🃏 LÓGICA DE LA TIMBA DE CROMOS
-            // Traemos los datos de la carta arriesgada para saber su rareza
             const cardQuery = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugadorIdApostado]);
             const cromoApostado = cardQuery.rows[0];
 
             if (opcionReal.tipo === 'exacto') {
-                // ACIERTO EXACTO: Se destruye la repetida pero la banca te regala un cromo de RAREZA SUPERIOR
                 await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
                 
                 let rarezaPremio = "especial";
                 if (cromoApostado.rareza === "especial" || cromoApostado.rareza === "rara") rarezaPremio = "epica";
                 else if (cromoApostado.rareza === "epica" || cromoApostado.rareza === "legendaria") rarezaPremio = "legendaria";
 
-                // Buscamos un cromo aleatorio de esa rareza alta
                 const poolPremio = await pool.query("SELECT id, nombre FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaPremio]);
                 const cromoGanado = poolPremio.rows[0];
 
-                // Lo inyectamos en su progreso
                 const checkProg = await pool.query("SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, cromoGanado.id]);
                 if (checkProg.rows.length > 0) {
                     await pool.query("UPDATE usuario_progreso SET cantidad = cantidad + 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, cromoGanado.id]);
@@ -1336,7 +1312,6 @@ app.post('/api/timba/procesar', async (req, res) => {
                 mensajeResultado = `🔥 ¡PRO DISPARO! Arriesgaste a ${cromoApostado.nombre.toUpperCase()} y pegaste el resultado exacto (${golesLReal}-${golesVReal}).\n\n🎁 ¡LA BANCA TE REGALA A: ${cromoGanado.nombre.toUpperCase()} [${rarezaPremio.toUpperCase()}]!`;
 
             } else {
-                // ERRASTE O COINCIDIÓ SOLO EL SIGNO: En cromos, para balancear el juego, si no es exacto, perdiste la carta
                 await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
                 mensajeResultado = `❌ ¡CROMO PERDIDO! El partido terminó ${golesLReal}-${golesVReal} y tu opción fue ${opcionReal.label}.\nPerdiste 1 copia de ${cromoApostado.nombre.toUpperCase()} de tu álbum.`;
             }
@@ -1345,9 +1320,12 @@ app.post('/api/timba/procesar', async (req, res) => {
         const userCheck = await pool.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
         delete apuestasActivasServidor[usuario_id];
 
+        // ✨ CORRECCIÓN CLAVE: Devolvemos siempre golesLReal y golesVReal para limpiar el undefined
         return res.json({
             ok: true,
             mensajeResultado,
+            golesLReal: golesLReal,
+            golesVReal: golesVReal,
             datos: userCheck.rows[0]
         });
 
