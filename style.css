@@ -3,7 +3,7 @@
    ======================================================================== */
 :root {
     --bg-principal: #070a0f;
-    --bg-card: rgba(18, 24, 38, 0.92);
+    --bg-card: rgba(18, 24, 38, 0.72); /* Sutilmente más translúcido para el efecto vidrio */
     --bg-card-solid: #121826;
     --dorado: #ffb100;
     --celeste: #00ccff;
@@ -28,7 +28,6 @@
    🖼️ REPARACIÓN DE RUTAS DE IMÁGENES (.JPG RE-FIX)
    ======================================================================== */
 body.ambiente-mundial {
-    /* Agregamos el punto relativo './' para asegurar que Render encuentre la carpeta static */
     background: linear-gradient(rgba(7, 10, 15, 0.85), rgba(7, 10, 15, 0.85)), url('./static/fondo.jpg') no-repeat center center fixed;
     background-size: cover;
     color: var(--texto);
@@ -148,15 +147,16 @@ input:focus, .select-estadio-custom:focus {
    👤 ACCESO Y PANELES MUNDIALISTAS (SCOREBOARD)
    ======================================================================== */
 .login-card-estadio {
-    background: var(--bg-card);
-    border: 2px solid #232d45;
+    background: linear-gradient(135deg, rgba(18, 24, 38, 0.85) 0%, rgba(10, 14, 23, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     padding: 30px;
     border-radius: 16px;
     width: 100%;
     max-width: 400px;
     text-align: center;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 20px 45px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 .login-card-estadio h2 {
     font-family: 'Oswald', sans-serif;
@@ -181,10 +181,10 @@ input:focus, .select-estadio-custom:focus {
     box-shadow: 0 4px 0 #00b35f;
 }
 
-/* Tablero de Estado de Transmisión Directa (Scoreboard de TV) */
+/* Tablero de Estado de Transmisión Directa (Scoreboard de TV PREMIUM) */
 .header-status-scoreboard {
-    background: #090d16;
-    border: 3px solid #1f293d;
+    background: linear-gradient(90deg, rgba(9, 13, 22, 0.85) 0%, rgba(18, 24, 38, 0.85) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-radius: 12px;
     display: flex;
     align-items: center;
@@ -194,7 +194,9 @@ input:focus, .select-estadio-custom:focus {
     max-width: 900px;
     box-sizing: border-box;
     margin-bottom: 20px;
-    box-shadow: 0 8px 0 #04060a;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 .stat-box-tv {
     display: flex;
@@ -218,9 +220,9 @@ input:focus, .select-estadio-custom:focus {
 .valor-rojo { color: var(--rojo); }
 
 .btn-logout-kick {
-    background: #1a2233;
+    background: rgba(26, 34, 51, 0.6);
     color: var(--rojo);
-    border: 1px solid var(--rojo);
+    border: 1px solid rgba(255, 51, 68, 0.4);
     padding: 6px 14px;
     font-family: inherit;
     font-weight: 700;
@@ -231,6 +233,7 @@ input:focus, .select-estadio-custom:focus {
 .btn-logout-kick:hover {
     background: var(--rojo);
     color: #fff;
+    box-shadow: 0 0 10px rgba(255, 51, 68, 0.4);
 }
 
 /* Navegación del Estadio */
@@ -243,9 +246,9 @@ input:focus, .select-estadio-custom:focus {
 }
 .btn-modulo-match {
     flex: 1;
-    background: #121826;
+    background: linear-gradient(180deg, rgba(25, 35, 56, 0.6) 0%, rgba(18, 24, 38, 0.8) 100%);
     color: #64748b;
-    border: 2px solid #1f293d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     padding: 14px;
     font-family: 'Oswald', sans-serif;
     font-size: 1.2rem;
@@ -253,12 +256,12 @@ input:focus, .select-estadio-custom:focus {
     border-radius: 10px;
     cursor: pointer;
     text-transform: uppercase;
-    box-shadow: 0 4px 0 #090d16;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     transition: all 0.15s ease;
 }
 .btn-modulo-match:hover {
     color: #fff;
-    background: #1a2233;
+    background: rgba(26, 34, 51, 0.8);
 }
 .btn-modulo-match.activo {
     background: var(--celeste);
@@ -270,15 +273,17 @@ input:focus, .select-estadio-custom:focus {
 .modulo-contenido { display: none; width: 100%; max-width: 900px; }
 .modulo-contenido.activo { display: block; }
 
+/* 💎 CAJA DE MÓDULO REMASTERIZADA (GLASSMORPHISM PREMIUM) */
 .caja-modulo-estadio {
-    background: var(--bg-card);
+    background: linear-gradient(135deg, rgba(14, 22, 38, 0.75) 0%, rgba(8, 12, 20, 0.9) 100%) !important;
     border-radius: 20px;
     padding: 25px;
-    border: 2px solid #232d45;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     box-sizing: border-box;
     width: 100%;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ========================================================================
@@ -291,7 +296,8 @@ input:focus, .select-estadio-custom:focus {
     position: relative;
     overflow: hidden;
     margin-bottom: 20px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 .banner-tienda { background: url('static/sobres.jpg') no-repeat center center; background-size: cover; }
 .banner-penales { background: url('static/penales.jpg') no-repeat center center; background-size: cover; }
@@ -300,7 +306,7 @@ input:focus, .select-estadio-custom:focus {
 .overlay-banner-texto {
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(90deg, rgba(9,13,22,0.95) 30%, rgba(9,13,22,0.4) 100%);
+    background: linear-gradient(90deg, rgba(7, 10, 15, 0.95) 30%, rgba(7, 10, 15, 0.3) 100%);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -322,7 +328,7 @@ input:focus, .select-estadio-custom:focus {
 }
 
 /* ========================================================================
-   🛍️ 4. CONTENEDORES TIENDA Y RECOMPENSAS
+   🛍️ 4. CONTENEDORES TIENDA Y RECOMPENSAS (TARJETAS GLOW)
    ======================================================================== */
 .contenedor-tienda-cofres {
     display: flex;
@@ -331,21 +337,29 @@ input:focus, .select-estadio-custom:focus {
     flex-wrap: wrap;
 }
 .tarjeta-cofre-match {
-    background: #0f1322;
-    border: 2px solid #1f293d;
+    background: linear-gradient(180deg, rgba(16, 24, 43, 0.5) 0%, rgba(9, 13, 22, 0.85) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
     border-radius: 14px;
     padding: 20px;
     width: 240px;
     text-align: center;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-    transition: transform 0.2s ease, border-color 0.2s;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.25s, box-shadow 0.25s;
 }
 .tarjeta-cofre-match:hover {
     transform: translateY(-5px);
-    border-color: var(--celeste);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6) !important;
 }
+
+/* Iluminación interactiva de bordes según cofre */
+.tarjeta-cofre-match.plata:hover { border-color: #cbd5e1 !important; box-shadow: 0 0 15px rgba(203, 213, 225, 0.15) !important; }
+.tarjeta-cofre-match.oro:hover { border-color: var(--dorado) !important; box-shadow: 0 0 15px rgba(255, 177, 0, 0.2) !important; }
+.tarjeta-cofre-match.legendario:hover { border-color: #f97316 !important; box-shadow: 0 0 15px rgba(249, 115, 22, 0.2) !important; }
+
 .tarjeta-cofre-match h3 {
     font-family: 'Oswald', sans-serif;
     margin: 0 0 10px 0;
@@ -392,7 +406,7 @@ input:focus, .select-estadio-custom:focus {
 .seccion-sobre-abierto-arena {
     margin-top: 30px;
     padding: 20px;
-    background: #090d16;
+    background: rgba(5, 8, 14, 0.6);
     border-radius: 16px;
     border: 2px dashed #1f293d;
 }
@@ -512,16 +526,16 @@ input:focus, .select-estadio-custom:focus {
     width: 100%;
 }
 .custom-scrollbar-paises::-webkit-scrollbar { height: 6px; }
-.custom-scrollbar-paises::-webkit-scrollbar-track { background: #090d16; border-radius: 10px; }
+.custom-scrollbar-paises::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 10px; }
 .custom-scrollbar-paises::-webkit-scrollbar-thumb { background: #232d45; border-radius: 10px; }
 
 .btn-pais {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #0f1322;
+    background: rgba(15, 19, 34, 0.6);
     color: #64748b;
-    border: 2px solid #1f293d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     padding: 8px 14px;
     font-size: 0.95rem;
     font-weight: 700;
@@ -531,7 +545,7 @@ input:focus, .select-estadio-custom:focus {
     flex-shrink: 0;
     transition: all 0.15s;
 }
-.btn-pais:hover { background: #161c30; color: #fff; }
+.btn-pais:hover { background: rgba(22, 28, 48, 0.8); color: #fff; }
 .btn-pais.activo {
     background: var(--celeste);
     color: #000;
@@ -539,16 +553,16 @@ input:focus, .select-estadio-custom:focus {
     box-shadow: 0 0 12px rgba(0,204,255,0.4);
 }
 .btn-pais.pais-completo {
-    border: 2px solid var(--dorado) !important;
-    background: linear-gradient(180deg, #241d08 0%, #0f0d05 100%) !important;
+    border: 1px solid var(--dorado) !important;
+    background: linear-gradient(180deg, rgba(36, 29, 8, 0.8) 0%, rgba(15, 13, 5, 0.9) 100%) !important;
     color: var(--dorado) !important;
     animation: brilloOro 2s infinite ease-in-out;
 }
 
 /* Scoreboard del Progreso */
 .progreso-album-scoreboard {
-    background: #090d16;
-    border: 2px solid #1f293d;
+    background: rgba(5, 8, 14, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 15px;
     margin-bottom: 20px;
@@ -584,11 +598,14 @@ input:focus, .select-estadio-custom:focus {
 .juego-penales-principal { flex: 2; }
 .panel-lateral-ranking-tv {
     flex: 1;
-    background: var(--bg-card);
-    border: 2px solid #232d45;
+    background: linear-gradient(135deg, rgba(14, 22, 38, 0.75) 0%, rgba(8, 12, 20, 0.9) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 20px;
     padding: 20px;
     box-sizing: border-box;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
 }
 .titulo-tabla-tv {
     font-family: 'Oswald', sans-serif;
@@ -599,8 +616,8 @@ input:focus, .select-estadio-custom:focus {
     letter-spacing: 0.5px;
 }
 .tabla-ranking-stadium { width: 100%; border-collapse: collapse; font-size: 1.05rem; }
-.tabla-ranking-stadium th { background: #090d16; color: #64748b; padding: 10px; font-weight: 700; text-transform: uppercase; }
-.tabla-ranking-stadium td { padding: 12px 10px; border-bottom: 1px solid #1f293d; text-align: center; font-weight: 700; }
+.tabla-ranking-stadium th { background: rgba(0,0,0,0.3); color: #64748b; padding: 10px; font-weight: 700; text-transform: uppercase; }
+.tabla-ranking-stadium td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); text-align: center; font-weight: 700; }
 
 .tabla-ranking-stadium tr:nth-child(1) td:nth-child(1) { color: #ffcc00; font-size: 1.4rem; }
 .tabla-ranking-stadium tr:nth-child(2) td:nth-child(1) { color: #cbd5e1; font-size: 1.3rem; }
@@ -639,14 +656,15 @@ input:focus, .select-estadio-custom:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #090d16;
-    border: 2px solid var(--dorado);
+    background: rgba(5, 8, 14, 0.6);
+    border: 1px solid rgba(255, 177, 0, 0.3);
     border-radius: 16px;
     padding: 20px;
     width: 100%;
     max-width: 550px;
     margin: 0 auto;
     box-sizing: border-box;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 .bando-equipo-stadium {
     flex: 1;
@@ -699,9 +717,9 @@ input:focus, .select-estadio-custom:focus {
     margin-top: 15px;
 }
 .btn-opcion-resultado {
-    background: #0f1322;
+    background: rgba(15, 19, 34, 0.6);
     color: #fff;
-    border: 2px solid var(--celeste) !important;
+    border: 1px solid var(--celeste) !important;
     font-family: 'Oswald', sans-serif;
     font-size: 1.4rem !important;
     padding: 8px !important;
@@ -709,15 +727,15 @@ input:focus, .select-estadio-custom:focus {
     box-shadow: 0 4px 0 #0088cc !important;
 }
 .btn-opcion-resultado:hover {
-    background: #161c30;
+    background: rgba(22, 30, 48, 0.8);
     box-shadow: 0 0 12px rgba(0,204,255,0.4) !important;
 }
 
 /* Historial inferior estilo Monitor de Apuestas */
 .historial-timba-banca-tv {
     margin-top: 25px;
-    background: #090d16;
-    border: 2px solid #1f293d;
+    background: rgba(5, 8, 14, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 15px;
     width: 100%;
@@ -735,7 +753,7 @@ input:focus, .select-estadio-custom:focus {
     font-size: 1.05rem;
     font-weight: 700;
     padding: 8px 12px;
-    border-bottom: 1px solid #1f293d;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -790,7 +808,7 @@ input:focus, .select-estadio-custom:focus {
         gap: 10px;
         padding: 15px;
     }
-    .stat-box-tv { width: 100%; flex-direction: row; justify-content: space-between; border-bottom: 1px solid #1f293d; padding: 4px 0; }
+    .stat-box-tv { width: 100%; flex-direction: row; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; }
     .btn-logout-kick { width: 100%; margin-top: 5px; padding: 8px; }
     
     .nav-modulos-estadio {
@@ -837,13 +855,10 @@ input:focus, .select-estadio-custom:focus {
 /* ========================================================================
    🔥 CLASES ACTIVADORAS DE VISIBILIDAD (EL MOTOR VISUAL)
    ======================================================================== */
-
-/* Fuerza a la interfaz a mostrarse en vertical cuando el JS da el visto bueno */
 #interfaz-juego.mostrar {
     display: flex !important;
 }
 
-/* Por si las dudas, aseguramos que el login se vea si no hay sesión */
 #seccion-login {
     display: block;
     margin: 20px auto;
