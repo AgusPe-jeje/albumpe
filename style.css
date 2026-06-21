@@ -825,3 +825,18 @@ input:focus, .select-estadio-custom:focus {
     0%, 100% { box-shadow: 0 0 5px rgba(255,177,0,0.2); } 
     50% { box-shadow: 0 0 20px rgba(255,177,0,0.55); } 
 }
+
+/* ========================================================================
+   🔥 CLASES ACTIVADORAS DE VISIBILIDAD (EL MOTOR VISUAL)
+   ======================================================================== */
+
+/* Fuerza a la interfaz a mostrarse en vertical cuando el JS da el visto bueno */
+#interfaz-juego.mostrar {
+    display: flex !important;
+}
+
+/* Por si las dudas, aseguramos que el login se vea si no hay sesión */
+#seccion-login {
+    display: block;
+    margin: 20px auto;
+}
