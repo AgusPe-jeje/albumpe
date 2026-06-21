@@ -101,9 +101,32 @@
                     </div>
                 </div>
 
+                <!-- Loot del sobre estilo Pack Opening de FIFA -->
                 <div class="seccion-sobre-abierto-arena">
-                    <div class="titulo-sobre-loot">✨ ¡Recompensas Obtenidas! ✨</div>
-                    <div id="grid-sobre-abierto"></div>
+                    <div class="titulo-sobre-loot">✨ APERTURA DE PACK MUNDIALISTA ✨</div>
+                    
+                    <!-- 🎬 CONTENEDOR DE LA CINEMÁTICA EN VIVO -->
+                    <div id="contenedor-pack-opening" class="pack-opening-escenario" style="display: none;">
+                        <div class="luces-estadio-efecto"></div>
+                        
+                        <!-- 💡 PANEL DE PISTAS (FIFA STYLE) -->
+                        <div id="panel-pistas-fifa" class="pistas-pack-container">
+                            <div class="pista-bloque" id="pista-bandera">?</div>
+                            <div class="pista-bloque" id="pista-posicion">?</div>
+                            <div class="pista-bloque" id="pista-rareza">?</div>
+                        </div>
+
+                        <!-- 🃏 LUGAR DONDE APARECE LA CARTA ACTUAL -->
+                        <div id="pantalla-carta-presentada" class="carta-presentada-wrapper"></div>
+
+                        <!-- 🕹️ CONTROL PARA AVANZAR -->
+                        <button type="button" id="btn-siguiente-carta-pack" class="btn-estadio btn-next-pack-card" onclick="mostrarSiguienteCartaSecuencia()">
+                            SIGUIENTE CARTA ▶
+                        </button>
+                    </div>
+
+                    <!-- 🗂️ GRILLA FINAL (Oculta durante la animación, se llena al terminar) -->
+                    <div id="grid-sobre-abierto" style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 20px;"></div>
                 </div>
             </div>
         </div>
