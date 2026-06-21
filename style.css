@@ -179,25 +179,24 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
 .inf-cen { bottom: 0; left: 33.33%; }
 .inf-der { bottom: 0; left: 66.66%; }
 
-/* El contenedor del balón tiene que tener más prioridad de capa */
 #balon-animado {
     position: absolute;
     bottom: 20px;
     left: 50px;
-    width: 55px;
-    height: 55px;
-    z-index: 10; /* <--- Capa más alta para que quede arriba */
+    /* Forzamos el tamaño real aquí ignorando el tamaño de la imagen original */
+    width: 100px !important; 
+    height: 100px !important;
+    z-index: 10;
     transition: transform 0.5s ease-out;
 }
 
-/* El arquero (guante) se queda en una capa inferior */
 #arquero-animado {
     position: absolute;
     top: 90px;
     left: 45px;
-    width: 70px;
-    height: 70px;
-    z-index: 5;  /* <--- Capa más baja que el balón */
+    width: 120px !important;
+    height: 120px !important;
+    z-index: 5;
     transition: transform 0.5s ease-out;
 }
 
