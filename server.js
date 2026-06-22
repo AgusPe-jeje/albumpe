@@ -1382,13 +1382,6 @@ const VALOR_STATS_RAREZA = {
     'legendaria': 96
 };
 
-// Selecciones disponibles para el fixture automático de las llaves
-const SELECCIONES_BOTS = [
-    "Francia", "Brasil", "Alemania", "España", "Italia", "Inglaterra", 
-    "Países Bajos", "Portugal", "Uruguay", "Croacia", "Bélgica", "Marruecos", 
-    "Japón", "Senegal", "Estados Unidos", "Colombia", "México"
-];
-
 // Mezclador de arrays auxiliar para las ternas aleatorias
 function mezclarArray(arr) {
     return arr.sort(() => Math.random() - 0.5);
