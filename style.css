@@ -398,3 +398,34 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
         margin-top: 5px;
     }
 }
+
+/* ========================================================================
+   ❓ BOTÓN DE AYUDA PREMIUM (ESTILO SCOREBOARD TV)
+   ======================================================================== */
+.btn-ayuda-arena {
+    background: rgba(14, 165, 233, 0.15) !important; /* Celeste HUD de transmisión */
+    border: 2px solid var(--celeste) !important;
+    color: var(--celeste) !important;
+    font-family: 'Oswald', sans-serif !important;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 6px 15px;
+    margin-right: 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+}
+
+/* Efecto al pasar el cursor (Hover) */
+.btn-ayuda-arena:hover {
+    background: var(--celeste) !important;
+    color: #000 !important; /* Contraste oscuro cuando se ilumina */
+    box-shadow: 0 0 15px var(--celeste);
+    transform: scale(1.05);
+}
+
+/* Efecto al hacer clic (Active) */
+.btn-ayuda-arena:active {
+    transform: scale(0.95);
+}
