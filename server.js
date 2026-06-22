@@ -17,7 +17,7 @@ app.use(express.json());
 /* ========================================================================
    🛠️ CONFIGURACIÓN DE MODO MANTENIMIENTO / MODO SOLO YO
    ======================================================================== */
-const MODO_MANTENIMIENTO = true; 
+const MODO_MANTENIMIENTO = false; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
@@ -73,7 +73,7 @@ pool.query('SELECT NOW()', (err, res) => {
 
 async function inicializarTablas() {
     try {
-        // 1. Tabla de Usuarios 
+        // 1. Tabla de Usuarios (Sincronizada con el MiniMundial)
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -84,7 +84,9 @@ async function inicializarTablas() {
             tiros_hoy INTEGER DEFAULT 10,
             ip_registro VARCHAR(45) DEFAULT '',
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            timbas_hoy INTEGER DEFAULT 10
+            timbas_hoy INTEGER DEFAULT 10,
+            copas_mundiales INTEGER DEFAULT 0, -- 🔥 Agregado para el MiniMundial
+            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL -- 🔥 Cooldown de 3hs
         )`);
 
         // 2. Tabla de Jugadores
@@ -1363,6 +1365,213 @@ app.post('/api/timba/procesar', async (req, res) => {
     } catch (err) {
         console.error(err);
         return res.status(500).json({ ok: false, mensaje: "Error en DB al procesar." });
+    }
+});
+
+/* ========================================================================
+   🏆 MÓDULO MINIMUNDIAL - ENGINE DE SIMULACIÓN Y CONFIGURACIÓN
+   ======================================================================== */
+const COOLDOWN_MUNDIAL_MS = 3 * 60 * 60 * 1000; // 3 Horas reglamentarias
+
+// Mapa de poder según la rareza de las figuritas apostadas
+const VALOR_STATS_RAREZA = {
+    'comun': 60,
+    'especial': 68,
+    'rara': 75,
+    'epica': 85,
+    'legendaria': 96
+};
+
+// Selecciones disponibles para el fixture automático de las llaves
+const SELECCIONES_BOTS = [
+    "Francia", "Brasil", "Alemania", "España", "Italia", "Inglaterra", 
+    "Países Bajos", "Portugal", "Uruguay", "Croacia", "Bélgica", "Marruecos", 
+    "Japón", "Senegal", "Estados Unidos", "Colombia", "México"
+];
+
+// Mezclador de arrays auxiliar para las ternas aleatorias
+function mezclarArray(arr) {
+    return arr.sort(() => Math.random() - 0.5);
+}
+
+// A. ENDPOINT: Verificar si el usuario puede jugar y cuántas copas lleva
+app.get('/api/mundial/estado/:usuarioId', async (req, res) => {
+    const usuarioId = req.params.usuarioId;
+    try {
+        const userCheck = await pool.query("SELECT copas_mundiales, ultima_timba_mundial FROM usuarios WHERE id = $1", [usuarioId]);
+        if (userCheck.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+
+        const user = userCheck.rows[0];
+        const ahora = new Date();
+        let tiempoRestante = 0;
+
+        if (user.ultima_timba_mundial) {
+            const ultimaVez = new Date(user.ultima_timba_mundial);
+            const transcurrido = ahora - ultimaVez;
+            if (transcurrido < COOLDOWN_MUNDIAL_MS) {
+                tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
+            }
+        }
+
+        return res.json({
+            copas: user.copas_mundiales,
+            siguienteIn: tiempoRestante
+        });
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
+    }
+});
+
+// B. ENDPOINT: Preparar Torneo, validar requerimientos y devolver rivales
+app.post('/api/mundial/preparar', async (req, res) => {
+    const { usuario_id } = req.body;
+    try {
+        // 1. Validar cooldown de tiempo
+        const userCheck = await pool.query("SELECT ultima_timba_mundial FROM usuarios WHERE id = $1", [usuario_id]);
+        if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
+
+        if (userCheck.rows[0].ultima_timba_mundial) {
+            const transcurrido = new Date() - new Date(userCheck.rows[0].ultima_timba_mundial);
+            if (transcurrido < COOLDOWN_MUNDIAL_MS) {
+                const faltanteMs = COOLDOWN_MUNDIAL_MS - transcurrido;
+                const minutos = Math.ceil(faltanteMs / 60 / 1000);
+                return res.json({ ok: false, mensaje: `⏳ El vestuario está cerrado. Podés jugar otro Mundial en ${minutos} minutos.` });
+            }
+        }
+
+        // 2. Validar que tenga como mínimo 3 cartas obtenidas
+        const countCheck = await pool.query("SELECT COUNT(*) FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 0", [usuario_id]);
+        if (parseInt(countCheck.rows[0].count) < 3) {
+            return res.json({ ok: false, mensaje: "❌ Requisito insuficiente: Necesitás al menos 3 jugadores desbloqueados en tu álbum para competir." });
+        }
+
+        // 3. Generar la terna de 3 selecciones aleatorias para que elija el cliente
+        // Mezclamos la lista global de selecciones que traías en tu script del backend
+        const listaClonada = [...SELECCIONES_BOTS];
+        const ternaElegible = mezclarArray(listaClonada).slice(0, 3);
+        
+        // Buscamos un rival random de clasificación que no esté en la terna
+        let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
+        while (ternaElegible.includes(rivalClasificacion)) {
+            rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
+        }
+
+        return res.json({
+            ok: true,
+            terna: ternaElegible,
+            rivalClasificacion: rivalClasificacion
+        });
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// C. ENDPOINT: Simular Torneo Completo (Clasificación + Llaves de playoffs)
+app.post('/api/mundial/jugar', async (req, res) => {
+    const { usuario_id, seleccionElegida, rivalClasificacion, jugadorIds } = req.body;
+
+    if (!jugadorIds || jugadorIds.length !== 3) {
+        return res.status(400).json({ ok: false, mensaje: "Debés alinear exactamente 3 jugadores." });
+    }
+
+    try {
+        // 1. Verificar stock real de los jugadores enviados
+        const jCheck = await pool.query(
+            "SELECT j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2) AND up.cantidad > 0",
+            [usuario_id, jugadorIds]
+        );
+
+        if (jCheck.rows.length !== 3) {
+            return res.json({ ok: false, mensaje: "❌ Uno o más jugadores seleccionados no están disponibles en tu inventario." });
+        }
+
+        // 2. Calcular las estrellas del equipo según promedio de rareza
+        const sumaStats = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0);
+        const promedio = sumaStats / 3;
+        
+        let estrellas = 1;
+        if (promedio >= 90) estrellas = 5;
+        else if (promedio >= 79) estrellas = 4;
+        else if (promedio >= 70) estrellas = 3;
+        else if (promedio >= 62) estrellas = 2;
+
+        // Base probabilística base de victoria por cada estrella (62% a 88%)
+        const chanceVictoria = 0.56 + (estrellas * 0.065); 
+
+        // 3. SIMULACIÓN FASE 1: Partido único de Clasificación
+        if (Math.random() > chanceVictoria) {
+            // Perdió clasificación: se quema el cooldown y queda afuera
+            await pool.query("UPDATE usuarios SET ultima_timba_mundial = NOW() WHERE id = $1", [usuario_id]);
+            return res.json({
+                ok: true,
+                progreso: { ganoClasificacion: false },
+                mensaje: `❌ Fuiste eliminado en la Clasificación por ${rivalClasificacion}. Volvé a intentarlo en 3 horas.`
+            });
+        }
+
+        // 4. SIMULACIÓN FASE 2: Play-offs Estilo Bracket (Octavos, Cuartos, Semi, Final)
+        // Filtramos competidores para armar el cuadro limpio
+        let botsRestantes = SELECCIONES_BOTS.filter(s => s !== seleccionElegida);
+        botsRestantes = mezclarArray(botsRestantes);
+
+        const rivalOctavos = botsRestantes[0];
+        const rivalCuartos = botsRestantes[1];
+        const rivalSemi = botsRestantes[2];
+        const rivalFinal = botsRestantes[3];
+
+        const llavesTorneo = [
+            { ronda: "Octavos de Final", rival: rivalOctavos },
+            { ronda: "Cuartos de Final", rival: rivalCuartos },
+            { ronda: "Semifinal", rival: rivalSemi },
+            { ronda: "Gran Final del Mundo", rival: rivalFinal }
+        ];
+
+        let faseAlcanzada = "Clasificación";
+        let campeon = true;
+        let bitacoraPartidos = [];
+
+        for (let llave of llavesTorneo) {
+            faseAlcanzada = llave.ronda;
+            // Simulamos el partido de la llave
+            if (Math.random() <= chanceVictoria) {
+                bitacoraPartidos.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅" });
+            } else {
+                campeon = false;
+                bitacoraPartidos.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌" });
+                break; // Queda eliminado en esta instancia
+            }
+        }
+
+        // 5. Procesar Recompensas en caso de coronarse Campeón
+        const ahora = new Date();
+        if (campeon) {
+            // Suma 5000 de oro, +1 copa y 50 pts de ranking extra por la hazaña
+            await pool.query(
+                "UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
+                [ahora, usuario_id]
+            );
+        } else {
+            // Solo actualiza el timestamp para bloquear el reintento por 3 horas
+            await pool.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
+        }
+
+        // Buscamos los datos finales actualizados de la billetera para refrescar la UI al cliente
+        const userFinal = await pool.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
+
+        return res.json({
+            ok: true,
+            progreso: {
+                ganoClasificacion: true,
+                campeon: campeon,
+                faseAlcanzada: faseAlcanzada,
+                estrellasCalculadas: estrellas,
+                bitacora: bitacoraPartidos
+            },
+            datosActualizados: userFinal.rows[0]
+        });
+
+    } catch (err) {
+        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 

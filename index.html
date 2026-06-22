@@ -50,7 +50,11 @@
             </div>
             <div class="stat-box-tv">
                 <span class="stat-label">🏆 COPAS</span>
-                <span id="lbl-ranking" class="stat-valor valor-rojo">0</span>
+                <span id="lbl-copas-mundiales" class="stat-valor valor-rojo">0</span>
+            </div>
+            <div class="stat-box-tv" style="display:none;">
+                <!-- Mantenemos lbl-ranking oculto por compatibilidad con tus scripts viejos de penales/timba -->
+                <span id="lbl-ranking">0</span>
             </div>
             <button class="btn-logout-kick" onclick="cerrarSesionLocal()">🚪 SALIR</button>
         </div>
@@ -61,12 +65,13 @@
             <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)">📖 MI ÁLBUM</button>
             <button class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)">⚽ PENALES</button>
             <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)">🎰 TIMBA</button>
+            <button class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)">🏆 MUNDIAL</button>
         </nav>
 
         <!-- 🏢 CONTENEDOR DE MODOS ACTIVOS -->
         <section style="width: 100%; max-width: 900px; box-sizing: border-box;">
 
-            <!-- 🛍️ MÓDULO TIENDA con Pack Opening Semitransparente -->
+            <!-- 🛍️ MÓDULO TIENDA -->
             <div id="modulo-sobres" class="modulo-contenido activo">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-tienda">
@@ -124,7 +129,6 @@
             <!-- 📖 MÓDULO ÁLBUM -->
             <div id="modulo-album" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
-                    <h2 class="subtitulo-modulo-tv">📖 TU ÁLBUM MUNDIAL</h2>
                     <div class="progreso-album-scoreboard">
                         <div class="progreso-texto-tv">
                             <span>📖 Progreso del Álbum:</span>
@@ -139,7 +143,7 @@
                 </div>
             </div>
 
-            <!-- ⚽ MÓDULO PENALES (6 DIRECCIONES) -->
+            <!-- ⚽ MÓDULO PENALES -->
             <div id="modulo-penales" class="modulo-contenido">
                 <div class="contenedor-penales-layout-estadio">
                     <div class="caja-modulo-estadio juego-penales-principal">
@@ -223,6 +227,69 @@
                             <button type="button" id="btn-preparar-apuesta" onclick="prepararOpcionesApuesta()" class="btn-estadio btn-bet-action">🎲 VER OPCIONES DE PRONÓSTICO</button>
                             <div id="contenedor-opciones-goles" class="grid-opciones-goles-match" style="display: none;"></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 🏆 MÓDULO MINIMUNDIAL (NUEVO) -->
+            <div id="modulo-minimundial" class="modulo-contenido">
+                <div class="caja-modulo-estadio">
+                    <div class="banner-modulo-imagen banner-casino" style="background-color: #0d233a;">
+                        <div class="overlay-banner-texto">
+                            <h2>🏆 EL COLISEO DEL MINIMUNDIAL</h2>
+                            <p>Superá la clasificación, armá tu tridente táctico y competí en las llaves por la copa mundial.</p>
+                        </div>
+                    </div>
+
+                    <!-- FASE 1: INSCRIPCIÓN Y COOLDOWN -->
+                    <div id="fase-inscripcion-mundial" class="inputs-apuesta-timba-stadium" style="text-align: center; padding: 20px;">
+                        <div id="cronometro-mundial" class="banca-reloj-status" style="margin-bottom: 15px;">⏱️ Verificando estado del vestuario...</div>
+                        <h3 class="label-tv">ELIGE TU SELECCIÓN PARA COMPETIR</h3>
+                        <p style="color: #bbb; font-size: 0.95rem; margin-bottom: 15px;">Te aparecerán 3 países aleatorios autorizados por la FIFA para este certamen.</p>
+                        
+                        <div id="zona-eleccion-pais-mundial" style="margin: 20px 0;"></div>
+                        
+                        <button type="button" id="btn-preparar-mundial" onclick="prepararInscripcionMundial()" class="btn-estadio btn-bet-action" style="max-width: 320px; margin: 0 auto;">
+                            🏆 INICIAR INSCRIPCIÓN
+                        </button>
+                    </div>
+
+                    <!-- FASE 2: DRAFT DE JUGADORES (ALINEACIÓN) -->
+                    <div id="fase-draft-mundial" style="display: none; padding: 15px;">
+                        <div class="arena-versus-scoreboard" style="margin-bottom: 20px;">
+                            <div class="bando-equipo-stadium local">
+                                <span class="bandera-flag">🛡️</span>
+                                <span id="lbl-tu-seleccion-mundial" class="nombre-seleccion">-</span>
+                            </div>
+                            <div class="vs-circulo-match" style="font-size: 1rem; width: 60px; height: 60px;">VS CLASIF</div>
+                            <div class="bando-equipo-stadium visitante">
+                                <span class="bandera-flag">🤖</span>
+                                <span id="lbl-rival-clasificacion-mundial" class="nombre-seleccion">-</span>
+                            </div>
+                        </div>
+
+                        <div class="banca-reloj-status" id="lbl-estrellas-equipo-mundial" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">
+                            ⭐ (0/5 Estrellas)
+                        </div>
+
+                        <h3 class="label-tv" style="margin-bottom: 10px; text-align: center;">SELECCIONÁ 3 JUGADORES DE TU INVENTARIO:</h3>
+                        <div class="grid-album-match" id="grid-cartas-draft-mundial" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
+
+                        <button type="button" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">
+                            ⚔️ SIMULAR PARTIDO DE CLASIFICACIÓN
+                        </button>
+                    </div>
+
+                    <!-- FASE 3: FIXTURE DE LLAVES (PLAYOFF BRACKET VISUAL) -->
+                    <div id="fase-fixture-mundial" style="display: none; padding: 15px;">
+                        <h2 class="subtitulo-modulo-tv" style="text-align: center; color: var(--dorado);">📊 BITÁCORA DE CRUCES Y RESULTADOS</h2>
+                        <p style="text-align: center; color: #aaa; margin-bottom: 25px;">Debajo verás la simulación automática de tu llave de Octavos hasta donde llegó tu equipo.</p>
+                        
+                        <div id="lista-cruces-mundial-simulacion" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px;"></div>
+
+                        <button type="button" onclick="cambiarModulo('modulo-minimundial')" class="btn-estadio btn-next-shot" style="width: 100%;">
+                            🔄 VOLVER AL VESTUARIO
+                        </button>
                     </div>
                 </div>
             </div>

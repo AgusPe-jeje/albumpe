@@ -268,3 +268,100 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
 
 @keyframes rotarLucesSobre { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes entradaFIFA { 0% { opacity: 0; transform: translateX(-150px) scale(0.6) rotate(-15deg); filter: blur(5px) brightness(2); } 100% { opacity: 1; transform: translateX(0) scale(1.1) rotate(0deg); filter: blur(0) brightness(1); } }
+
+/* ========================================================================
+   🏆 ESTILOS PREMIUM PARA EL COLISEO DEL MINIMUNDIAL
+   ======================================================================== */
+
+/* Contenedor del mazo de cartas disponibles en el Draft */
+#grid-cartas-draft-mundial {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    gap: 15px !important;
+    scrollbar-width: thin;
+    scrollbar-color: var(--celeste) rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbars personalizadas para Webkit (Chrome/Safari) en el Draft */
+#grid-cartas-draft-mundial::-webkit-scrollbar {
+    width: 6px;
+}
+#grid-cartas-draft-mundial::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+}
+#grid-cartas-draft-mundial::-webkit-scrollbar-thumb {
+    background: var(--celeste);
+    border-radius: 4px;
+}
+
+/* ✨ Carta seleccionada en el Draft */
+.carta-clash.activo-draft {
+    transform: scale(0.96) translateY(2px);
+    filter: brightness(1.15);
+    box-shadow: 0 0 20px var(--verde-match), inset 0 0 15px rgba(0, 255, 136, 0.3) !important;
+    animation: pulsoDraft SELECCIONADO 1.5s infinite ease-in-out;
+}
+
+/* Efecto hover interactivo dentro del menú de Draft */
+#grid-cartas-draft-mundial .carta-clash:not(.activo-draft):hover {
+    border-color: var(--celeste) !important;
+    box-shadow: 0 0 15px rgba(0, 204, 255, 0.3) !important;
+}
+
+/* 📊 Estructura de filas para la bitácora de Play-offs */
+#lista-cruces-mundial-simulacion .item-historial-partido {
+    background: linear-gradient(90deg, rgba(16, 24, 43, 0.6) 0%, rgba(9, 13, 22, 0.8) 100%);
+    border-left: 5px solid #232d45;
+    padding: 14px 20px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    font-size: 1.1rem;
+    transition: all 0.25s ease;
+    animation: entradaFixture 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+/* Animación en cascada para la salida de los partidos simulados */
+#lista-cruces-mundial-simulacion .item-historial-partido:nth-child(1) { animation-delay: 0.1s; }
+#lista-cruces-mundial-simulacion .item-historial-partido:nth-child(2) { animation-delay: 0.3s; }
+#lista-cruces-mundial-simulacion .item-historial-partido:nth-child(3) { animation-delay: 0.5s; }
+#lista-cruces-mundial-simulacion .item-historial-partido:nth-child(4) { animation-delay: 0.7s; }
+
+/* ========================================================================
+   🎬 ANIMACIONES MECÁNICAS
+   ======================================================================== */
+@keyframes pulsoDraft {
+    0%, 100% { border-color: var(--verde-match); }
+    50% { border-color: #ffffff; box-shadow: 0 0 25px var(--verde-match), inset 0 0 10px rgba(0, 255, 136, 0.5) !important; }
+}
+
+@keyframes entradaFixture {
+    from {
+        opacity: 0;
+        transform: translateX(-25px);
+        filter: blur(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+        filter: blur(0);
+    }
+}
+
+/* 📱 Ajustes Adaptativos para Celulares */
+@media (max-width: 768px) {
+    #grid-cartas-draft-mundial {
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 8px !important;
+    }
+    #lista-cruces-mundial-simulacion .item-historial-partido {
+        font-size: 0.95rem;
+        padding: 10px 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    #lista-cruces-mundial-simulacion .item-historial-partido b {
+        align-self: flex-end;
+    }
+}
