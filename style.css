@@ -377,3 +377,24 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
     0% { opacity: 0; transform: translateX(-80px) scale(0.6) rotate(-10deg); filter: blur(3px) brightness(2); } 
     100% { opacity: 1; transform: translateX(0) scale(1) rotate(0deg); filter: blur(0) brightness(1); } 
 }
+
+/* 🚪 Botón Salir Premium Agrandado */
+.btn-logout-premium {
+    padding: 10px 22px !important;
+    font-size: 1.1rem !important;
+    font-family: 'Oswald', sans-serif !important;
+    letter-spacing: 0.5px;
+    border-width: 2px !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 10px rgba(255, 51, 68, 0.15);
+}
+
+@media (max-width: 768px) {
+    .btn-logout-premium {
+        width: 100% !important;
+        padding: 12px !important;
+        font-size: 1.1rem !important;
+        margin-top: 5px;
+    }
+}
