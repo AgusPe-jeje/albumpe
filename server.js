@@ -1422,12 +1422,12 @@ app.get('/api/mundial/estado/:usuarioId', async (req, res) => {
     }
 });
 
-// B. ENDPOINT: Preparar Torneo, filtrar países con stock >= 3 y dar terna
+// B. ENDPOINT: Preparar Torneo, filtrar países con stock >= 3 y verificar 500 monedas
 app.post('/api/mundial/preparar', async (req, res) => {
     const { usuario_id } = req.body;
     try {
         // 1. Validar cooldown de tiempo
-        const userCheck = await pool.query("SELECT ultima_timba_mundial FROM usuarios WHERE id = $1", [usuario_id]);
+        const userCheck = await pool.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
 
         if (userCheck.rows[0].ultima_timba_mundial) {
@@ -1435,6 +1435,11 @@ app.post('/api/mundial/preparar', async (req, res) => {
             if (transcurrido < COOLDOWN_MUNDIAL_MS) {
                 return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Vestuario cerrado.` });
             }
+        }
+
+        // 🔥 NUEVA VALIDACIÓN: Verificar si tiene las 500 monedas para la inscripción
+        if (userCheck.rows[0].monedas < 500) {
+            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción al MiniMundial cuesta 500 monedas." });
         }
 
         // 2. Buscar qué países tienen como mínimo 3 cartas obtenidas en su inventario
@@ -1453,10 +1458,8 @@ app.post('/api/mundial/preparar', async (req, res) => {
             return res.json({ ok: false, mensaje: "❌ Requisito insuficiente: Necesitás tener al menos 3 jugadores de un mismo país desbloqueados para poder inscribirte." });
         }
 
-        // 3. Tomar un máximo de 3 países aleatorios de los que sí cumple el requisito
         const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
         
-        // Elegir un rival random de clasificación que no sea de su terna
         let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
         while (ternaFiltrada.includes(rivalClasificacion)) {
             rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
@@ -1548,17 +1551,20 @@ app.post('/api/mundial/jugar', async (req, res) => {
             }
         }
 
-        // 5. Procesar Recompensas en caso de coronarse Campeón
+        // 5. Procesar Recompensas y cobrar inscripción de 500 monedas
         const ahora = new Date();
         if (campeon) {
-            // Suma 5000 de oro, +1 copa y 50 pts de ranking extra por la hazaña
+            // Resta 500 de inscripción y suma 5000 por campeonar (+4500 netos)
             await pool.query(
-                "UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
+                "UPDATE usuarios SET monedas = monedas - 500 + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
                 [ahora, usuario_id]
             );
         } else {
-            // Solo actualiza el timestamp para bloquear el reintento por 3 horas
-            await pool.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
+            // Pierde el torneo: Resta las 500 monedas de la inscripción y activa cooldown
+            await pool.query(
+                "UPDATE usuarios SET monedas = monedas - 500, ultima_timba_mundial = $1 WHERE id = $2",
+                [ahora, usuario_id]
+            );
         }
 
         // Buscamos los datos finales actualizados de la billetera para refrescar la UI al cliente
