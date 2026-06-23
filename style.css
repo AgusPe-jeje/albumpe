@@ -26,7 +26,7 @@ body.ambiente-mundial {
     background: linear-gradient(rgba(7, 10, 15, 0.85), rgba(7, 10, 15, 0.85)), url('./static/fondo.jpg') no-repeat center center fixed;
     background-size: cover;
     color: var(--texto);
-    font-family: 'Khand', sans-serif;
+    font-family: 'Khand', 'Oswald', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     margin: 0; 
     padding: 20px;
     display: flex; 
