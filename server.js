@@ -17,7 +17,7 @@ app.use(express.json());
 /* ========================================================================
    🛠️ CONFIGURACIÓN DE MODO MANTENIMIENTO / MODO SOLO YO
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
@@ -575,6 +575,23 @@ async function inicializarTablas() {
                     ['Guillermo Varela', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_varela.jpg', 'rara'],
                     ['Federico Viñas', 'Uruguay', 'uru', 'Delantero', 'fotos/uru_viñas.jpg', 'rara'],
 
+                    // --- TURQUÍA ---
+                    ['Yunus Akgun', 'Turquía', 'tur', 'Delantero', 'fotos/tur_akgun.jpg', 'comun'],
+                    ['Kerem Akturkoglu', 'Turquía', 'tur', 'Delantero', 'fotos/tur_akturkoglu.jpg', 'epica'],
+                    ['Kaan Ayhan', 'Turquía', 'tur', 'Defensor', 'fotos/tur_ayhan.jpg', 'comun'],
+                    ['Abdulkerim Bardakci', 'Turquía', 'tur', 'Defensor', 'fotos/tur_bardakci.jpg', 'comun'],
+                    ['Ugurcan Cakir', 'Turquía', 'tur', 'Arquero', 'fotos/tur_cakir.jpg', 'comun'],
+                    ['Zeki Celik', 'Turquía', 'tur', 'Defensor', 'fotos/tur_celik.jpg', 'comun'],
+                    ['Merih Demiral', 'Turquía', 'tur', 'Defensor', 'fotos/tur_demiral.jpg', 'rara'],
+                    ['Irfan Can Kahveci', 'Turquía', 'tur', 'Mediocampista', 'fotos/tur_kahveci.jpg', 'comun'],
+                    ['Arda Guler', 'Turquía', 'tur', 'Mediocampista', 'fotos/tur_guler.jpg', 'epica'],
+                    ['Orkun Kokcu', 'Turquía', 'tur', 'Mediocampista', 'fotos/tur_kokcu.jpg', 'rara'],
+                    ['Mert Muldur', 'Turquía', 'tur', 'Defensor', 'fotos/tur_muldur.jpg', 'comun'],
+                    ['Caglar Soyuncu', 'Turquía', 'tur', 'Defensor', 'fotos/tur_soyuncu.jpg', 'rara'],
+                    ['Can Uzun', 'Turquía', 'tur', 'Delantero', 'fotos/tur_uzun.jpg', 'comun'],
+                    ['Kenan Yildiz', 'Turquía', 'tur', 'Delantero', 'fotos/tur_yildiz.jpg', 'rara'],
+                    ['Baris Alper Yilmaz', 'Turquía', 'tur', 'Mediocampista', 'fotos/tur_yilmaz.jpg', 'comun'],
+
                     // --- UZBEKISTÁN ---
                     ['Khojiakbar Alijonov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_alijonov.jpg', 'comun'],
                     ['Khusniddin Aliqulov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_aliqulov.jpg', 'rara'],
@@ -891,21 +908,25 @@ app.get('/api/album/:usuarioId', async (req, res) => {
 app.post('/api/comprar-sobre', async (req, res) => {
     const { usuario_id, tipoCofre } = req.body;
 
+    // 💰 BALANCEO POR DEFECTO: COFRE DE ORO (Ahora mucho más desafiante)
     let costo = 250;
-    let probLegendaria = 0.05; 
-    let probEpica = 0.15;      
-    let probEspecial = 0.30;   
+    let probLegendaria = 0.015; // 📉 Bajó de 5% a 1.5% (¡Un verdadero logro sacarla!)
+    let probEpica = 0.10;       // 📉 Bajó de 15% a 10%
+    let probRara = 0.25;        // 🛠️ Cambiado de 'especial' a 'rara' (Alineado con tus inserts)
 
+    // 🥈 BALANCEO COFRE DE PLATA
     if (tipoCofre === 'plata') {
         costo = 100;
-        probLegendaria = 0.005; 
-        probEpica = 0.05;       
-        probEspecial = 0.20;    
-    } else if (tipoCofre === 'legendario') {
+        probLegendaria = 0.001; // 📉 Bajó de 0.5% a 0.1% (Casi imposible, pura timba)
+        probEpica = 0.03;       // 📉 Bajó de 5% a 3%
+        probRara = 0.15;    
+    } 
+    // 👑 BALANCEO COFRE LEGENDARIO (Garantiza buen loot, pero la Legendaria se respeta)
+    else if (tipoCofre === 'legendario') {
         costo = 500;
-        probLegendaria = 0.25;  
-        probEpica = 0.40;       
-        probEspecial = 0.35;    
+        probLegendaria = 0.08;  // 📉 Bajó de 25% a 8% (Sigue siendo la mejor opción, pero exclusiva)
+        probEpica = 0.30;       // 📉 Bajó de 40% a 30%
+        probRara = 0.40;    
     }
 
     try {
@@ -924,20 +945,31 @@ app.post('/api/comprar-sobre', async (req, res) => {
             let rand = Math.random();
             let rarezaElegida = 'comun';
 
-            if (rand < probLegendaria) rarezaElegida = 'legendaria';
-            else if (rand < probLegendaria + probEpica) rarezaElegida = 'epica';
-            else if (rand < probLegendaria + probEpica + probEspecial) rarezaElegida = 'especial';
+            // Algoritmo de descarte acumulativo matemático
+            if (rand < probLegendaria) {
+                rarezaElegida = 'legendaria';
+            } else if (rand < probLegendaria + probEpica) {
+                rarezaElegida = 'epica';
+            } else if (rand < probLegendaria + probEpica + probRara) {
+                rarezaElegida = 'rara'; // 🛠️ Sincronizado con la base de datos
+            }
 
             let poolFiltrado = todosLosJugadores.filter(j => j.rareza === rarezaElegida);
-            if (poolFiltrado.length === 0) poolFiltrado = todosLosJugadores.filter(j => j.rareza === 'comun');
+            
+            // Si por algún motivo el pool de esa rareza está vacío, cae en común para no romper el bucle
+            if (poolFiltrado.length === 0) {
+                poolFiltrado = todosLosJugadores.filter(j => j.rareza === 'comun');
+            }
             
             let elegido = poolFiltrado[Math.floor(Math.random() * poolFiltrado.length)];
             sobreAbierto.push({ ...elegido });
         }
 
+        // 💳 Deducción de Oro y guardado en Neon
         const nuevoOro = usuario.monedas - costo;
         await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
 
+        // 🃏 Inserción/Actualización del inventario de los usuarios
         for (let jugador of sobreAbierto) {
             const progCheck = await pool.query(
                 "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", 
@@ -1659,9 +1691,9 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     activo: true,       // true = encendido | false = apagado
     tipo: "video",      // "texto" | "imagen" | "video"
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
-    texto: "Prendete a los nuevos torneos en vivo. No te olvides de timbear.",
+    texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo.",
     urlImagen: "https://proyectoalbum.onrender.com/assets/novedad.png", 
-    urlVideo: "https://www.youtube.com/embed/a15c6b8oIPE" 
+    urlVideo: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
 };
 
 // Endpoint público para que el juego consulte el anuncio
