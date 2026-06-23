@@ -448,32 +448,76 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
 }
 
 /* ========================================================================
-   📱 REINGENIERÍA EXCLUSIVA RESPONSIVA PARA CELULARES (MÁXIMO 768px)
+   📱 REINGENIERÍA EXCLUSIVA RESPONSIVA PARA CELULARES (MÁXIMO 768px) - FIXED
    ======================================================================== */
 @media (max-width: 768px) {
-    body { padding: 10px; }
-    .titulo-copa-pe { font-size: 2.1rem; }
+    body { padding: 8px; }
+    .titulo-copa-pe { font-size: 2rem; }
     
-    /* Marcador de Estado: se apila en vertical simulando renglones HUD */
-    .header-status-scoreboard { flex-direction: column; gap: 10px; padding: 15px; }
-    .stat-box-tv { width: 100%; flex-direction: row; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 6px 0; }
+    /* 📊 MARCADOR DE ESTADO: Ahora es un Grid limpio de 2x2 para que no se pise nada */
+    .header-status-scoreboard { 
+        display: grid !important; 
+        grid-template-columns: repeat(2, 1fr) !important; 
+        gap: 12px !important; 
+        padding: 12px !important; 
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
     
-    /* Navegación Modular: Rejilla simétrica de 3 columnas */
-    .nav-modulos-estadio { display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 6px; }
-    .btn-modulo-match { padding: 10px 4px; font-size: 0.95rem; white-space: nowrap; }
+    /* Cada estadística ocupa su celda prolija con contenido justificado */
+    .stat-box-tv { 
+        width: 100% !important; 
+        flex-direction: column !important; 
+        align-items: center !important;
+        justify-content: center !important; 
+        border-bottom: none !important;
+        background: rgba(15, 23, 42, 0.5);
+        padding: 6px !important;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-sizing: border-box !important;
+    }
+    .stat-label { font-size: 0.75rem; margin-bottom: 2px; }
+    .stat-valor { font-size: 1.25rem !important; }
     
-    /* Tienda y Cofres */
-    .contenedor-tienda-cofres { flex-direction: column; align-items: center; }
-    .tarjeta-cofre-match { width: 100%; max-width: 320px; }
+    /* 🧭 MENÚ MODULAR: Cambia a Flex con Scroll Horizontal Infinito. 
+       ¡Ideal para que entren los 5 botones prolijos en una sola fila deslizable! */
+    .nav-modulos-estadio { 
+        display: flex !important; 
+        flex-direction: row !important; 
+        overflow-x: auto !important; 
+        white-space: nowrap !important;
+        gap: 8px !important; 
+        width: 100% !important;
+        padding: 5px 0 10px 0 !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .nav-modulos-estadio::-webkit-scrollbar { display: none; } /* Oculta barra molesta */
+    
+    .btn-modulo-match { 
+        flex: 0 0 auto !important; /* Evita que el celular achique los botones */
+        padding: 10px 16px !important; 
+        font-size: 0.95rem !important; 
+    }
+    
+    /* 🛍️ TIENDA Y CONTENEDORES */
+    .contenedor-tienda-cofres { flex-direction: column; align-items: center; width: 100%; }
+    .tarjeta-cofre-match { width: 100%; max-width: 100%; box-sizing: border-box; }
+    
+    /* Ajuste de Banners para que respiren los textos */
+    .banner-modulo-imagen { height: 160px !important; }
+    .overlay-banner-texto { padding-left: 15px !important; padding-right: 15px !important; }
+    .overlay-banner-texto h2 { font-size: 1.6rem !important; }
+    .overlay-banner-texto p { font-size: 0.95rem !important; }
 
-    /* Animaciones y Escenario de Aperturas */
+    /* 🎬 APERTURA DE SOBRES */
     .pack-opening-escenario { min-height: 320px; padding: 15px; }
     .pistas-pack-container { gap: 6px !important; width: 100% !important; box-sizing: border-box !important; justify-content: center !important; }
     .pista-bloque { min-width: 0 !important; flex: 1 !important; max-width: 85px !important; font-size: 1.1rem !important; padding: 6px 8px !important; white-space: nowrap !important; }
     .carta-presentada-wrapper { min-height: 180px; margin-bottom: 15px; }
     .carta-clash.caminante-entrada { animation: entradaFIFAMovil 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards !important; }
 
-    /* Cuadrículas e Inventario del Álbum: Clavado en 3 columnas puras */
+    /* 🃏 GRILLAS DE CROMOS (Álbum e Inventario) */
     .grid-album-match, .grid-album, .grid-sobre, #grid-sobre-abierto, #grid-cartas-draft-mundial { 
         grid-template-columns: repeat(3, 1fr) !important; 
         gap: 8px !important; 
@@ -483,21 +527,18 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
     .rareza-vertical { font-size: 0.5rem; left: 3px; bottom: 6px; padding: 3px 1px; }
     .badge-repetidas { font-size: 0.75rem; padding: 1px 5px; }
 
-    /* Juego de Penales Adaptado */
+    /* ⚽ ARCO DE PENALES */
     .contenedor-penales-layout-estadio { flex-direction: column; gap: 15px; }
     .arco-futbol-stadium { width: 100% !important; max-width: 340px !important; height: 160px !important; border-width: 4px !important; margin: 15px auto !important; }
     #arquero-animado { font-size: 1.6rem !important; top: 45px !important; margin-left: -13px !important; }
     #balon-animado { font-size: 1.3rem !important; bottom: 10px !important; margin-left: -10px !important; }
 
-    /* Casino y Fixture del Mundial */
-    .bandera-flag { font-size: 2.6rem; }
-    .nombre-seleccion { font-size: 1.1rem; }
+    /* 🎰 TIMBA Y FIXTURE */
     .grid-opciones-goles-match { grid-template-columns: repeat(2, 1fr); }
-    
     #lista-cruces-mundial-simulacion .item-historial-partido { font-size: 0.95rem; padding: 10px 12px; flex-direction: column; align-items: flex-start; gap: 6px; }
     #lista-cruces-mundial-simulacion .item-historial-partido b { align-self: flex-end; }
     
-    /* Botonera de Salida */
+    /* 🚪 BOTÓN SALIR RESPONSIVO */
     .btn-logout-premium { width: 100% !important; padding: 12px !important; font-size: 1.1rem !important; margin-top: 5px; }
 }
 
