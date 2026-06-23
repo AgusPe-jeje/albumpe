@@ -447,6 +447,15 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
     border: 1px solid rgba(14, 165, 233, 0.3);
 }
 
+/* Control de tamaño para los emojis renderizados por Twemoji */
+img.emoji {
+    height: 1.2em;
+    width: 1.2em;
+    margin: 0 .05em 0 .1em;
+    vertical-align: -0.1em;
+    display: inline-block;
+}
+
 /* ========================================================================
    📱 REINGENIERÍA EXCLUSIVA RESPONSIVA PARA CELULARES (MÁXIMO 768px) - FIXED
    ======================================================================== */
