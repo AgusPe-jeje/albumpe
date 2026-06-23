@@ -143,6 +143,25 @@
                             <div id="barra-progreso-llenado" class="progreso-barra-estadio-llenado"></div>
                         </div>
                     </div>
+
+                    <!-- 🔥 NUEVO: CONTENEDOR DE FILTROS AVANZADOS -->
+                    <div class="contenedor-filtros-album">
+                        <div class="grupo-filtro">
+                            <span class="filtro-label">🔍 ESTADO:</span>
+                            <button class="btn-filtro-tv activo" onclick="filtrarAlbumPorEstado('todas', this)">TODAS</button>
+                            <button class="btn-filtro-tv" onclick="filtrarAlbumPorEstado('desbloqueadas', this)">🔓 PEGADAS</button>
+                            <button class="btn-filtro-tv" onclick="filtrarAlbumPorEstado('pendientes', this)">⏳ FALTANTES</button>
+                        </div>
+                        <div class="grupo-filtro">
+                            <span class="filtro-label">💎 RAREZA:</span>
+                            <button class="btn-filtro-tv activo" onclick="filtrarAlbumPorRareza('todas', this)">TODAS</button>
+                            <button class="btn-filtro-tv f-comun" onclick="filtrarAlbumPorRareza('comun', this)">COMÚN</button>
+                            <button class="btn-filtro-tv f-rara" onclick="filtrarAlbumPorRareza('rara', this)">RARA</button>
+                            <button class="btn-filtro-tv f-epica" onclick="filtrarAlbumPorRareza('epica', this)">ÉPICA</button>
+                            <button class="btn-filtro-tv f-legendaria" onclick="filtrarAlbumPorRareza('legendaria', this)">LEGENDARIA</button>
+                        </div>
+                    </div>
+
                     <div id="selector-paises" class="custom-scrollbar-paises"></div>
                     <div class="grid-album-match" id="contenedor-grid-album"></div>
                 </div>
