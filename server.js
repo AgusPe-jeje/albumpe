@@ -17,7 +17,7 @@ app.use(express.json());
 /* ========================================================================
    🛠️ CONFIGURACIÓN DE MODO MANTENIMIENTO / MODO SOLO YO
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
@@ -1341,9 +1341,9 @@ app.post('/api/timba/procesar', async (req, res) => {
                     await pool.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [oroPremio, puntosAsignados, usuario_id]);
 
                     if (opcionReal.tipo === 'exacto') {
-                        mensajeResultado = `👑 ¡DIOS SANTO PE! Apostaste a ${cromoApostado.nombre.toUpperCase()} Legendario y la clavaste al ángulo (${golesLReal}-${golesVReal}).\n\n💰 ¡LA CASA TE PAGA 🪙10.000 MONEDAS!`;
+                        mensajeResultado = `👑 ¡DIOS SANTO PE! Apostaste a ${cromoApostado.nombre.toUpperCase()} Legendario y la clavaste al ángulo (${golesLReal}-${golesVReal}).\n\n💰 ¡LA CASA TE PAGA 🪙2.500 MONEDAS!`;
                     } else {
-                        mensajeResultado = `💰 ¡BIEN AHÍ! Acertaste el ganador con tu Legendario (${golesLReal}-${golesVReal}).\n\n🎁 ¡Te llevás 🪙5.000 monedas!`;
+                        mensajeResultado = `💰 ¡BIEN AHÍ! Acertaste el ganador con tu Legendario (${golesLReal}-${golesVReal}).\n\n🎁 ¡Te llevás 🪙1.000 monedas!`;
                     }
 
                 } else {
