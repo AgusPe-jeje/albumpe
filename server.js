@@ -1692,7 +1692,7 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     tipo: "video",      // "texto" | "imagen" | "video"
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
     texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo.",
-    urlImagen: "https://proyectoalbum.onrender.com/assets/novedad.png", 
+    urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
     urlVideo: "https://www.youtube.com/embed/a15c6b8oIPE" 
 };
 
