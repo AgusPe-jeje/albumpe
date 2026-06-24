@@ -1931,7 +1931,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         if (sala.estado !== 'esperando') return res.json({ ok: false, mensaje: "🚫 Sala cerrada o ya simulada." });
 
         const participantesQuery = await pool.query(
-            `SELECT sp.usuario_id, u.username, sp.seleccion, sp.carta_apuesta_id
+            `SELECT sp.usuario_id, u.username, sp.seleccion 
              FROM sala_participantes sp
              JOIN usuarios u ON sp.usuario_id = u.id
              WHERE sp.sala_id = $1`, [sala_id]
@@ -1941,7 +1941,6 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             id: p.usuario_id,
             username: p.username,
             seleccion: p.seleccion,
-            cartaApuestaId: p.carta_apuesta_id,
             esBot: false
         }));
 
@@ -1953,23 +1952,30 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             let paisBot = PAISES_BOTS_BACKUP[botIdx % PAISES_BOTS_BACKUP.length];
             let yaExiste = competidores.some(c => c.seleccion.toUpperCase() === paisBot.toUpperCase());
             if (!yaExiste) {
-                competidores.push({ id: null, username: `🤖 Bot ${paisBot}`, seleccion: paisBot, cartaApuestaId: null, esBot: true });
+                competidores.push({ id: null, username: `🤖 Bot ${paisBot}`, seleccion: paisBot, esBot: true });
             }
             botIdx++;
         }
 
-        // 📋 EXTRACCIÓN SIMPLE DE LOS NOMBRES DE CARTAS EN JUEGO
-        let textoCartasApostadas = [];
-        for (let comp of competidores) {
-            if (!comp.esBot && comp.cartaApuestaId) {
-                const cardNameQuery = await pool.query("SELECT nombre FROM jugadores WHERE id = $1", [comp.cartaApuestaId]);
-                if (cardNameQuery.rows.length > 0) {
-                    textoCartasApostadas.push(`${comp.username.toUpperCase()} arriesga a: 🃏 ${cardNameQuery.rows[0].nombre.toUpperCase()}`);
+        competidores = mezclarArray(competidores);
+
+        // 📋 1. REMOCIÓN PREVIA DE APUESTAS (Ambos arriesgan y pierden de entrada)
+        const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
+        
+        if (modalidadSala === 'carta') {
+            // Quitamos 1 carta aleatoria (o la seleccionada si guardás el ID en la sala) del inventario de cada jugador real en la sala
+            for (let jugadorReal of competidores.filter(c => !c.esBot)) {
+                // Buscamos una carta cualquiera que tenga para descontarle
+                const cartaCheck = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 0 LIMIT 1", [jugadorReal.id]);
+                if (cartaCheck.rows.length > 0) {
+                    await pool.query(
+                        "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
+                        [jugadorReal.id, cartaCheck.rows[0].id]
+                    );
                 }
             }
         }
 
-        competidores = mezclarArray(competidores);
         let bitacoraPartidosPlana = [];
 
         // 2. SIMULACIÓN DE CUARTOS DE FINAL (Enumerados)
@@ -2028,6 +2034,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             ganadorUsername: finalCruce.ganador.username
         });
 
+        // 🎁 5. RECOMPENSAS FINALES Y POZOS
         let datosPremio = { 
             ganoBot: true, 
             ganador_username: campeonMundial.username, 
@@ -2038,32 +2045,30 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         
         if (!campeonMundial.esBot) {
             datosPremio.ganoBot = false;
-            const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
 
             if (modalidadSala === 'oro') {
                 await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [sala.pozo_total, campeonMundial.id]);
             } else if (modalidadSala === 'carta') {
+                // Buscamos un cromo Épico o Legendario de recompensa
                 const lootPremio = await pool.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza IN ('epica', 'legendaria') ORDER BY RANDOM() LIMIT 1");
                 const cartaRecompensa = lootPremio.rows[0];
+                
+                // Se le adjudica la nueva carta obtenida
                 await pool.query(
                     `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) 
                      ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + 1`,
                     [campeonMundial.id, cartaRecompensa.id]
                 );
+                
                 datosPremio.nombreCartaPremio = `${cartaRecompensa.nombre} (${cartaRecompensa.rareza.toUpperCase()})`;
             }
         }
 
         await pool.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id]);
 
-        // 🔥 Almacenamos el texto de las apuestas de forma ultra simple en el caché caliente
-        BITACORAS_SALA_CACHE[sala_id] = { 
-            bitacora: bitacoraPartidosPlana, 
-            premio: datosPremio, 
-            apuestasTexto: textoCartasApostadas 
-        };
+        BITACORAS_SALA_CACHE[sala_id] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
 
-        return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio, apuestasTexto: textoCartasApostadas });
+        return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
 
     } catch (err) {
         console.error("❌ Error en simulación:", err);
@@ -2071,20 +2076,42 @@ app.post('/api/multijugador/jugar', async (req, res) => {
     }
 });
 
+// ========================================================================
+// 💥 ENDPOINT ESPEJO EXCLUSIVO PARA CONSULTA DEL INVITADO (EVITA PANTALLA NEGRA)
+// ========================================================================
 app.get('/api/multijugador/resultado-invitado/:sala_id', async (req, res) => {
     const { sala_id } = req.params;
     try {
+        const salaQuery = await pool.query("SELECT estado, tipo_apuesta, pozo_total FROM mundial_salas WHERE id = $1", [sala_id]);
+        if (salaQuery.rows.length === 0) return res.json({ ok: false, mensaje: "Sala no encontrada." });
+        
+        const sala = salaQuery.rows[0];
+
+        // 🛡️ Buscamos los datos unificados guardados calientes en memoria
         const datosCache = BITACORAS_SALA_CACHE[sala_id];
         if (datosCache) {
             return res.json({
                 ok: true,
                 bitacora: datosCache.bitacora,
-                premio: datosCache.premio,
-                apuestasTexto: datosCache.apuestasTexto // Viaja limpio el array de textos
+                premio: datosCache.premio
             });
         }
-        return res.json({ ok: false, mensaje: "⏳ Esperando procesamiento final..." });
+
+        // Si la sala ya terminó pero la memoria se barrió, evitamos romper el frente mandando un array estructurado
+        if (sala.estado === 'finalizado') {
+            return res.json({
+                ok: true,
+                bitacora: [
+                    { ronda: "Torneo Concluido", local: "Arena Online", visitante: "Estadio", golesLocal: 0, golesVisitante: 0, ganadorUsername: "Finalizado" }
+                ],
+                premio: { ganoBot: false, ganador_username: "Completado", pozo: sala.pozo_total, tipo_apuesta: sala.tipo_apuesta }
+            });
+        }
+
+        return res.json({ ok: false, mensaje: "⏳ Esperando el procesamiento del silbatazo inicial del host..." });
+
     } catch (err) {
+        console.error("❌ Error en consulta espejo de invitado:", err);
         return res.status(500).json({ ok: false, error: err.message });
     }
 });
