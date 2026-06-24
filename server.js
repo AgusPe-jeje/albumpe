@@ -26,9 +26,11 @@ function generarCodigoSala() {
 }
 
 /* ========================================================================
-   🛠️ CONFIGURACIÓN DE MODO MANTENIMIENTO / MODO SOLO YO
+   🛠️ CONFIGURACIÓN DE MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
+// 👥 Agregá o sacá acá los usuarios permitidos en minúscula para las pruebas
+const TESTERS_PERMITIDOS = ["aguspe", "tintin"]; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
@@ -36,32 +38,33 @@ app.use((req, res, next) => {
     }
 
     // A. Permitimos descargar los archivos estáticos para que cargue la interfaz visual
-    if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png'))) {
+    if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg'))) {
         return next();
     }
 
-    // B. Filtro estricto para las rutas de autenticación
+    // B. Filtro estricto para las rutas de autenticación (Login)
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
-        // Solo dejamos que avance al endpoint real si el usuario es exactamente el tuyo
-        if (username && username.toLowerCase() === "aguspe") {
+        
+        // Si el usuario está logueado e ingresa un nombre autorizado, pasa de largo
+        if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
             return next();
         }
+        
         // Si es cualquier otra cuenta, rebota acá antes de tocar Neon
         return res.status(503).json({ 
-            error: "🛠️ La Arena está en mantenimiento por reformas de infraestructura. ¡Volvé más tarde! 🏗️" 
+            error: "🚧 La Arena está en mantenimiento por reformas de infraestructura. ¡Volvé más tarde, pa! 🏗️" 
         });
     }
 
-    // Bloqueamos el registro por completo para que nadie intente crearse cuentas clones mientras probás
+    // Bloqueamos el registro por completo para que nadie intente crearse cuentas mientras probás
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
-            error: "🛠️ La Arena está en mantenimiento. El registro de nuevas cuentas está cerrado por el momento." 
+            error: "🚧 La Arena está en mantenimiento. El registro de nuevas cuentas está cerrado por el momento." 
         });
     }
 
-    // C. Si la petición ya viene de adentro del juego (figuritas, timba, penales), dejamos pasar
-    // porque tus amigos nunca van a poder pasar de la pantalla de Login para generar estas llamadas.
+    // C. Si la petición viene de adentro (APIs internas), dejamos pasar
     next();
 });
 
@@ -1705,45 +1708,65 @@ app.post('/api/mundial/jugar', async (req, res) => {
 });
 
 app.post('/api/multijugador/crear', async (req, res) => {
-    const { usuario_id, apuesta_oro, seleccion, jugador_ids } = req.body;
+    const { usuario_id, tipo_apuesta, apuesta_oro, carta_apuesta_id, seleccion, jugador_ids } = req.body;
 
-    // Validar que el draft tenga 3 jugadores
     if (!jugador_ids || jugador_ids.length !== 3) {
         return res.json({ ok: false, mensaje: "❌ Debés seleccionar 3 jugadores para tu plantel." });
     }
 
     try {
-        // 1. Verificar si el usuario tiene el oro suficiente para la apuesta
         const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
-
         const monedasActuales = userCheck.rows[0].monedas;
-        if (monedasActuales < apuesta_oro) {
-            return res.json({ ok: false, mensaje: `🪙 No tenés suficiente Oro. Crear esta sala cuesta ${apuesta_oro} monedas.` });
+
+        let pozo_inicial = 0;
+        let nuevoOro = monedasActuales;
+
+        // Validaciones según el tipo de bardo que elijan jugar
+        if (tipo_apuesta === 'oro') {
+            if (monedasActuales < apuesta_oro) {
+                return res.json({ ok: false, mensaje: `🪙 No tenés suficiente Oro. Cuesta ${apuesta_oro} monedas.` });
+            }
+            nuevoOro = monedasActuales - apuesta_oro;
+            pozo_inicial = apuesta_oro;
+        } else if (tipo_apuesta === 'carta') {
+            if (!carta_apuesta_id) return res.json({ ok: false, mensaje: "❌ Debés elegir qué figurita vas a apostar." });
+            
+            // Verificar si el usuario realmente tiene duplicados de esa carta
+            const cromoCheck = await pool.query(
+                "SELECT obtenido FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
+                [usuario_id, carta_apuesta_id]
+            );
+            if (cromoCheck.rows.length === 0 || cromoCheck.rows[0].obtenido <= 1) {
+                return res.json({ ok: false, mensaje: "🃏 No podés apostar esa carta si no tenés repetidas." });
+            }
+            
+            // Descontamos un cromo del inventario en Neon
+            await pool.query(
+                "UPDATE usuario_progreso SET obtenido = obtenido - 1 WHERE usuario_id = $1 AND jugador_id = $2",
+                [usuario_id, carta_apuesta_id]
+            );
         }
 
-        // 2. Generar código único de sala
         let codigo = generarCodigoSala();
         
-        // 3. Insertar la sala en la base de datos
         const nuevaSala = await pool.query(
-            `INSERT INTO mundial_salas (codigo_sala, creador_id, apuesta_oro, pozo_total, estado) 
-             VALUES ($1, $2, $3, $4, 'esperando') RETURNING id`,
-            [codigo, usuario_id, apuesta_oro, apuesta_oro]
+            `INSERT INTO mundial_salas (codigo_sala, creador_id, tipo_apuesta, apuesta_oro, pozo_total, estado) 
+             VALUES ($1, $2, $3, $4, $5, 'esperando') RETURNING id`,
+            [codigo, usuario_id, tipo_apuesta, tipo_apuesta === 'oro' ? apuesta_oro : 0, pozo_inicial]
         );
         
         const salaId = nuevaSala.rows[0].id;
 
-        // 4. Meter al creador como el primer participante
         await pool.query(
             `INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids) 
              VALUES ($1, $2, $3, $4)`,
             [salaId, usuario_id, seleccion, jugador_ids]
         );
 
-        // 5. Cobrar el oro de la apuesta al creador
-        const nuevoOro = monedasActuales - apuesta_oro;
-        await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
+        if (tipo_apuesta === 'oro') {
+            await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
+        }
 
         return res.json({
             ok: true,

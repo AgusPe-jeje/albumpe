@@ -301,9 +301,27 @@
                     <div id="multi-menu-inicial" style="text-align: center; margin-top: 20px;">
                         <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto 20px; border: 1px solid #1a2436;">
                             <h3>🆕 CREAR NUEVA SALA</h3>
-                            <label>Apuesta de Oro:</label>
-                            <input type="number" id="multi-input-apuesta" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            <button class="btn-estadio" onclick="abrirDraftMulti(true)">Crear Sala</button>
+                            
+                            <label>Modalidad del torneo:</label>
+                            <select id="multi-select-tipo-apuesta" onchange="conmutarInputsMultiUI()" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b; text-align: center;">
+                                <option value="amistoso">🤝 AMISTOSO (Gratis)</option>
+                                <option value="oro">🪙 TIMBA POR ORO</option>
+                                <option value="carta">🃏 APOSTAR FIGURITA REPETIDA</option>
+                            </select>
+
+                            <!-- Caja de Oro (Se oculta si es amistoso/carta) -->
+                            <div id="multi-wrapper-oro" style="display: none;">
+                                <label>Apuesta de Oro:</label>
+                                <input type="number" id="multi-input-apuesta" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
+                            </div>
+
+                            <!-- Caja de Cartas Repetidas (Se oculta si es amistoso/oro) -->
+                            <div id="multi-wrapper-carta" style="display: none;">
+                                <label>Elegí el Cromo a arriesgar:</label>
+                                <select id="multi-select-carta-apuesta" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b;"></select>
+                            </div>
+
+                            <button class="btn-estadio" style="margin-top: 10px;" onclick="abrirDraftMulti(true)">Crear Sala</button>
                         </div>
 
                         <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; border: 1px solid #1a2436;">
