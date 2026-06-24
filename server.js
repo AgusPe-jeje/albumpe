@@ -1728,6 +1728,30 @@ app.post('/api/multijugador/preparar-draft', async (req, res) => {
     }
 });
 
+// Endpoint para obtener o actualizar el estado de confirmaciones entre fases
+app.post('/api/multijugador/sala/avanzar-fase', async (req, res) => {
+    const { sala_id, usuario_id, fase_actual } = req.body;
+    const cache = BITACORAS_SALA_CACHE[sala_id];
+    
+    if (!cache) return res.json({ ok: false, mensaje: "Sala no encontrada." });
+
+    if (!cache.confirmacionesAvanzar[fase_actual]) {
+        cache.confirmacionesAvanzar[fase_actual] = new Set();
+    }
+    
+    cache.confirmacionesAvanzar[fase_actual].add(usuario_id);
+
+    // Cantidad de usuarios reales en la sala
+    const usuariosReales = cache.competidores.filter(c => !c.esBot).length;
+    const listos = cache.confirmacionesAvanzar[fase_actual].size;
+
+    return res.json({
+        ok: true,
+        todosListos: listos >= usuariosReales,
+        faltaConfirmar: usuariosReales - listos
+    });
+});
+
 app.post('/api/multijugador/crear', async (req, res) => {
     const { usuario_id, seleccion, jugador_ids, tipo_apuesta, apuesta_oro, carta_apuesta_id } = req.body;
 
@@ -1754,16 +1778,17 @@ app.post('/api/multijugador/crear', async (req, res) => {
             nuevoOroCreador = monedasActuales - montoApuesta;
             pozoInicial = montoApuesta;
         } else if (modalidad === 'carta') {
+            if (!carta_apuesta_id) return res.json({ ok: false, mensaje: "🃏 Falta especificar la carta a apostar." });
             const miCromoRepetido = await pool.query(
-                "SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1",
-                [usuario_id]
+                "SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2 AND cantidad > 1",
+                [usuario_id, carta_apuesta_id]
             );
             if (miCromoRepetido.rows.length === 0) {
-                return res.json({ ok: false, mensaje: "🃏 No podés crear la sala porque no tenés cartas repetidas para arriesgar." });
+                return res.json({ ok: false, mensaje: "🃏 No podés crear la sala porque no tenés esta carta repetida para arriesgar." });
             }
             await pool.query(
                 "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, miCromoRepetido.rows[0].jugador_id]
+                [usuario_id, carta_apuesta_id]
             );
         }
 
@@ -1780,11 +1805,11 @@ app.post('/api/multijugador/crear', async (req, res) => {
         const sala_id = salaResult.rows[0].id;
 
         const insertParticipanteQuery = `
-            INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids)
-            VALUES ($1, $2, $3, $4);
+            INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids, carta_apuesta_id)
+            VALUES ($1, $2, $3, $4, $5);
         `;
         const arrayFormateado = `{${jugador_ids.join(',')}}`; 
-        await pool.query(insertParticipanteQuery, [sala_id, usuario_id, seleccion, arrayFormateado]);
+        await pool.query(insertParticipanteQuery, [sala_id, usuario_id, seleccion, arrayFormateado, carta_apuesta_id || null]);
 
         return res.json({
             ok: true,
@@ -1848,8 +1873,8 @@ app.post('/api/multijugador/unirse', async (req, res) => {
 
         const arrayFormateadoPostgres = `{${jugador_ids.join(',')}}`;
         await pool.query(
-            `INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids) VALUES ($1, $2, $3, $4)`,
-            [sala.id, usuario_id, seleccion, arrayFormateadoPostgres]
+            `INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids, carta_apuesta_id) VALUES ($1, $2, $3, $4, $5)`,
+            [sala.id, usuario_id, seleccion, arrayFormateadoPostgres, carta_apuesta_id || null]
         );
 
         return res.json({
@@ -1874,9 +1899,10 @@ app.get('/api/multijugador/sala/:codigo', async (req, res) => {
         const sala = salaQuery.rows[0];
 
         const participantesQuery = await pool.query(
-            `SELECT sp.usuario_id, u.username, sp.seleccion 
+            `SELECT sp.usuario_id, u.username, sp.seleccion, j.nombre as nombre_carta
              FROM sala_participantes sp
              JOIN usuarios u ON sp.usuario_id = u.id
+             LEFT JOIN jugadores j ON sp.carta_apuesta_id = j.id
              WHERE sp.sala_id = $1`, [sala.id]
         );
 
@@ -1906,9 +1932,10 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         if (sala.estado !== 'esperando') return res.json({ ok: false, mensaje: "🚫 Sala cerrada o ya simulada." });
 
         const participantesQuery = await pool.query(
-            `SELECT sp.usuario_id, u.username, sp.seleccion 
+            `SELECT sp.usuario_id, u.username, sp.seleccion, sp.carta_apuesta_id, j.nombre as nombre_carta
              FROM sala_participantes sp
              JOIN usuarios u ON sp.usuario_id = u.id
+             LEFT JOIN jugadores j ON sp.carta_apuesta_id = j.id
              WHERE sp.sala_id = $1`, [sala_id]
         );
         
@@ -1916,6 +1943,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             id: p.usuario_id,
             username: p.username,
             seleccion: p.seleccion,
+            cartaNombre: p.nombre_carta,
             esBot: false
         }));
 
@@ -1927,116 +1955,116 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             let paisBot = PAISES_BOTS_BACKUP[botIdx % PAISES_BOTS_BACKUP.length];
             let yaExiste = competidores.some(c => c.seleccion.toUpperCase() === paisBot.toUpperCase());
             if (!yaExiste) {
-                competidores.push({ id: null, username: `🤖 Bot ${paisBot}`, seleccion: paisBot, esBot: true });
+                competidores.push({ id: null, username: `🤖 Bot ${paisBot}`, seleccion: paisBot, cartaNombre: null, esBot: true });
             }
             botIdx++;
         }
 
         competidores = mezclarArray(competidores);
-
         const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
-        
-        if (modalidadSala === 'carta') {
-            for (let jugadorReal of competidores.filter(c => !c.esBot)) {
-                const cartaCheck = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 0 LIMIT 1", [jugadorReal.id]);
-                if (cartaCheck.rows.length > 0) {
-                    await pool.query(
-                        "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                        [jugadorReal.id, cartaCheck.rows[0].id]
-                    );
-                }
-            }
+
+        // Estructura limpia de textos de contexto de modalidad
+        let contextoModalidad = `Modalidad: Competencia amistosa estándar de la Arena.`;
+        if (modalidadSala === 'oro') {
+            contextoModalidad = `Modalidad: Timba por Oro. Pozo acumulado de 🪙 ${sala.pozo_total} monedas.`;
+        } else if (modalidadSala === 'carta') {
+            let lineasCartas = competidores.filter(c => !c.esBot).map(c => `• ${c.username.toUpperCase()} arriesgó a: ${c.cartaNombre ? c.cartaNombre.toUpperCase() : 'Cromo Desconocido'}`);
+            contextoModalidad = `Modalidad: Duelo de Muerte Súbita.\n${lineasCartas.join('\n')}`;
         }
 
         let bitacoraPartidosPlana = [];
 
-        // Cuartos de Final
+        // 🏆 SIMULACIÓN COMPLETA UNIFICADA
         let ganadoresCuartos = [];
         let numeroPartido = 1;
         for (let i = 0; i < 8; i += 2) {
             let cruce = simularPartidoEliminatorio(competidores[i], competidores[i+1]);
             bitacoraPartidosPlana.push({
-                ronda: `Cuartos de Final (${numeroPartido}/4)`,
-                local: cruce.local.seleccion,
-                visitante: cruce.visitante.seleccion,
-                golesLocal: cruce.golesL,
-                golesVisitante: cruce.golesV,
-                penalesLocal: cruce.penalesL,
-                penalesVisitante: cruce.penalesV,
-                definicionPenales: cruce.definicionPenales,
-                ganadorUsername: cruce.ganador.username
+                ronda: "cuartos",
+                rondaLabel: `Cuartos de Final (${numeroPartido}/4)`,
+                local: cruce.local.seleccion, localUser: cruce.local.username, localEsBot: cruce.local.esBot,
+                visitante: cruce.visitante.seleccion, visitanteUser: cruce.visitante.username, visitanteEsBot: cruce.visitante.esBot,
+                golesLocalReal: cruce.golesL, golesVisitanteReal: cruce.golesV,
+                penalesLocal: cruce.penalesL, penalesVisitante: cruce.penalesV,
+                definicionPenales: cruce.definicionPenales, ganadorUsername: cruce.ganador.username
             });
             ganadoresCuartos.push(cruce.ganador);
             numeroPartido++;
         }
 
-        // Semifinales
-        let numeroSemi = 1;
         let ganadoresSemis = [];
+        let numeroSemi = 1;
         for (let i = 0; i < 4; i += 2) {
             let cruce = simularPartidoEliminatorio(ganadoresCuartos[i], ganadoresCuartos[i+1]);
             bitacoraPartidosPlana.push({
-                ronda: `Semifinal (${numeroSemi}/2)`,
-                local: cruce.local.seleccion,
-                visitante: cruce.visitante.seleccion,
-                golesLocal: cruce.golesL,
-                golesVisitante: cruce.golesV,
-                penalesLocal: cruce.penalesL,
-                penalesVisitante: cruce.penalesV,
-                definicionPenales: cruce.definicionPenales,
-                ganadorUsername: cruce.ganador.username
+                ronda: "semis",
+                rondaLabel: `Semifinal (${numeroSemi}/2)`,
+                local: cruce.local.seleccion, localUser: cruce.local.username, localEsBot: cruce.local.esBot,
+                visitante: cruce.visitante.seleccion, visitanteUser: cruce.visitante.username, visitanteEsBot: cruce.visitante.esBot,
+                golesLocalReal: cruce.golesL, golesVisitanteReal: cruce.golesV,
+                penalesLocal: cruce.penalesL, penalesVisitante: cruce.penalesV,
+                definicionPenales: cruce.definicionPenales, ganadorUsername: cruce.ganador.username
             });
             ganadoresSemis.push(cruce.ganador);
             numeroSemi++;
         }
 
-        // Gran Final
         let finalCruce = simularPartidoEliminatorio(ganadoresSemis[0], ganadoresSemis[1]);
         const campeonMundial = finalCruce.ganador;
         
         bitacoraPartidosPlana.push({
-            ronda: "Gran Final",
-            local: finalCruce.local.seleccion,
-            visitante: finalCruce.visitante.seleccion,
-            golesLocal: finalCruce.golesL,
-            golesVisitante: finalCruce.golesV,
-            penalesLocal: finalCruce.penalesL,
-            penalesVisitante: finalCruce.penalesV,
-            definicionPenales: finalCruce.definicionPenales,
-            ganadorUsername: finalCruce.ganador.username
+            ronda: "final",
+            rondaLabel: "Gran Final",
+            local: finalCruce.local.seleccion, localUser: finalCruce.local.username, localEsBot: finalCruce.local.esBot,
+            visitante: finalCruce.visitante.seleccion, visitanteUser: finalCruce.visitante.username, visitanteEsBot: finalCruce.visitante.esBot,
+            golesLocalReal: finalCruce.golesL, golesVisitanteReal: finalCruce.golesV,
+            penalesLocal: finalCruce.penalesL, penalesVisitante: finalCruce.penalesV,
+            definicionPenales: finalCruce.definicionPenales, ganadorUsername: finalCentralYAnálisis(finalCruce, modalidadSala)
         });
 
+        // Análisis táctico de Crónica Definitiva
+        function finalCentralYAnálisis(cruce, mod) {
+            if (cruce.ganador.esBot) return cruce.ganador.username;
+            let tactica = `El DT ${cruce.ganador.username.toUpperCase()} planteó un partido estratégico controlando el mediocampo con sus figuras de rareza premium. Su delantera rompió el arco rival en momentos clave, asegurando la Copa y coronando una campaña impecable.`;
+            return `${cruce.ganador.username} | ANALISIS: ${tactica}`;
+        }
+
         let datosPremio = { 
-            ganoBot: true, 
-            ganador_username: campeonMundial.username, 
+            ganoBot: campeonMundial.esBot, 
+            ganador_username: campeonMundial.username.split(" | ANALISIS:")[0], 
             pozo: sala.pozo_total, 
             tipo_apuesta: sala.tipo_apuesta,
-            nombreCartaPremio: null 
+            nombreCartaPremio: null,
+            cronicaAnalisis: campeonMundial.username.includes(" | ANALISIS:") ? campeonMundial.username.split(" | ANALISIS: ")[1] : "La Inteligencia Artificial dominó tácticamente y se quedó con el trofeo."
         };
         
         if (!campeonMundial.esBot) {
-            datosPremio.ganoBot = false;
-
             if (modalidadSala === 'oro') {
                 await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [sala.pozo_total, campeonMundial.id]);
             } else if (modalidadSala === 'carta') {
                 const lootPremio = await pool.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza IN ('epica', 'legendaria') ORDER BY RANDOM() LIMIT 1");
                 const cartaRecompensa = lootPremio.rows[0];
-                
                 await pool.query(
                     `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) 
                      ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + 1`,
                     [campeonMundial.id, cartaRecompensa.id]
                 );
-                
                 datosPremio.nombreCartaPremio = `${cartaRecompensa.nombre} (${cartaRecompensa.rareza.toUpperCase()})`;
             }
         }
 
         await pool.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id]);
-        BITACORAS_SALA_CACHE[sala_id] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
+        
+        // Inicializar objeto caché maestro interactivo
+        BITACORAS_SALA_CACHE[sala_id] = { 
+            bitacora: bitacoraPartidosPlana, 
+            premio: datosPremio,
+            contextoModalidad,
+            competidores,
+            confirmacionesAvanzar: { cuartos: new Set(), semis: new Set(), final: new Set() }
+        };
 
-        return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
+        return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio, contextoModalidad });
 
     } catch (err) {
         console.error("❌ Error en simulación:", err);
@@ -2047,34 +2075,17 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 app.get('/api/multijugador/resultado-invitado/:sala_id', async (req, res) => {
     const { sala_id } = req.params;
     try {
-        const salaQuery = await pool.query("SELECT estado, tipo_apuesta, pozo_total FROM mundial_salas WHERE id = $1", [sala_id]);
-        if (salaQuery.rows.length === 0) return res.json({ ok: false, mensaje: "Sala no encontrada." });
-        
-        const sala = salaQuery.rows[0];
         const datosCache = BITACORAS_SALA_CACHE[sala_id];
-
         if (datosCache) {
             return res.json({
                 ok: true,
                 bitacora: datosCache.bitacora,
-                premio: datosCache.premio
+                premio: datosCache.premio,
+                contextoModalidad: datosCache.contextoModalidad
             });
         }
-
-        if (sala.estado === 'finalizado') {
-            return res.json({
-                ok: true,
-                bitacora: [
-                    { ronda: "Torneo Concluido", local: "Arena Online", visitante: "Estadio", golesLocal: 0, golesVisitante: 0, ganadorUsername: "Finalizado" }
-                ],
-                premio: { ganoBot: false, ganador_username: "Completado", pozo: sala.pozo_total, tipo_apuesta: sala.tipo_apuesta }
-            });
-        }
-
-        return res.json({ ok: false, mensaje: "⏳ Esperando el procesamiento del silbatazo inicial del host..." });
-
+        return res.json({ ok: false, mensaje: "⏳ Esperando el procesamiento del host..." });
     } catch (err) {
-        console.error("❌ Error en consulta espejo de invitado:", err);
         return res.status(500).json({ ok: false, error: err.message });
     }
 });
