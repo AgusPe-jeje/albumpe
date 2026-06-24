@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); // ✨ Migrado a PostgreSQL para Neon
 const path = require('path');
+const BITACORAS_SALA_CACHE = {};
 
 const app = express();
 // ✨ Clave para leer la IP real del cliente detrás del proxy de Render
@@ -1958,6 +1959,9 @@ app.get('/api/multijugador/sala/:codigo', async (req, res) => {
     }
 });
 
+// ========================================================================
+// 🏆 DISPARADOR DEL HOST: SIMULA EL TORNEO Y GUARDA EN MEMORIA
+// ========================================================================
 app.post('/api/multijugador/jugar', async (req, res) => {
     const { sala_id, usuario_id } = req.body;
     try {
@@ -1997,7 +2001,6 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 
         competidores = mezclarArray(competidores);
 
-        // 🔥 CRUCIAL: Array secuencial plano para evitar desincronizaciones en el cliente
         let bitacoraPartidosPlana = [];
 
         // 1. SIMULACIÓN DE CUARTOS DE FINAL
@@ -2052,7 +2055,6 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             ganadorUsername: finalCruce.ganador.username
         });
 
-        // 🎁 CONTROL DE PREMIOS EN BASE DE DATOS
         let datosPremio = { ganoBot: true, ganador_username: campeonMundial.username, pozo: sala.pozo_total, tipo_apuesta: sala.tipo_apuesta };
         
         if (!campeonMundial.esBot) {
@@ -2073,11 +2075,53 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 
         await pool.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id]);
 
-        // Retornamos el formato exacto que espera el frente
+        // 🔥 ALIMENTAMOS EL CACHÉ GLOBAL ANTES DEL RETURN PARA QUE EL INVITADO PUEDA LEERLO
+        BITACORAS_SALA_CACHE[sala_id] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
+
         return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
 
     } catch (err) {
         console.error("❌ Error en simulación:", err);
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ========================================================================
+// 💥 ENDPOINT ESPEJO EXCLUSIVO PARA CONSULTA DEL INVITADO (EVITA PANTALLA NEGRA)
+// ========================================================================
+app.get('/api/multijugador/resultado-invitado/:sala_id', async (req, res) => {
+    const { sala_id } = req.params;
+    try {
+        const salaQuery = await pool.query("SELECT estado, tipo_apuesta, pozo_total FROM mundial_salas WHERE id = $1", [sala_id]);
+        if (salaQuery.rows.length === 0) return res.json({ ok: false, mensaje: "Sala no encontrada." });
+        
+        const sala = salaQuery.rows[0];
+
+        // 🛡️ Buscamos los datos unificados guardados calientes en memoria
+        const datosCache = BITACORAS_SALA_CACHE[sala_id];
+        if (datosCache) {
+            return res.json({
+                ok: true,
+                bitacora: datosCache.bitacora,
+                premio: datosCache.premio
+            });
+        }
+
+        // Si la sala ya terminó pero la memoria se barrió, evitamos romper el frente mandando un array estructurado
+        if (sala.estado === 'finalizado') {
+            return res.json({
+                ok: true,
+                bitacora: [
+                    { ronda: "Torneo Concluido", local: "Arena Online", visitante: "Estadio", golesLocal: 0, golesVisitante: 0, ganadorUsername: "Finalizado" }
+                ],
+                premio: { ganoBot: false, ganador_username: "Completado", pozo: sala.pozo_total, tipo_apuesta: sala.tipo_apuesta }
+            });
+        }
+
+        return res.json({ ok: false, mensaje: "⏳ Esperando el procesamiento del silbatazo inicial del host..." });
+
+    } catch (err) {
+        console.error("❌ Error en consulta espejo de invitado:", err);
         return res.status(500).json({ ok: false, error: err.message });
     }
 });
