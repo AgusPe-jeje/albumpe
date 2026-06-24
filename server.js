@@ -1749,42 +1749,52 @@ app.post('/api/multijugador/preparar-draft', async (req, res) => {
    🏆 MÓDULO MULTIJUGADOR REFORMADO (AMISTOSO, ORO, CARTAS)
    ======================================================================== */
 app.post('/api/multijugador/crear', async (req, res) => {
-    const { usuario_id, tipo_apuesta, apuesta_oro, carta_apuesta_id, seleccion, jugador_ids } = req.body;
+    const { usuario_id, seleccion, jugador_ids, tipo_apuesta, apuesta_oro, carta_apuesta_id } = req.body;
 
-    if (!jugador_ids || jugador_ids.length !== 3) {
-        return res.json({ ok: false, mensaje: "❌ Debés seleccionar 3 jugadores para tu plantel." });
-    }
+    // Generamos un código de 6 caracteres alfanuméricos
+    const codigo_sala = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     try {
-        const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-        if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
-        const monedasActuales = userCheck.rows[0].monedas;
+        // 1. Insertamos primero la sala en mundial_salas
+        // NOTA: Asegurate de que los nombres de las columnas coincidan con tu Neon
+        const insertSalaQuery = `
+            INSERT INTO mundial_salas (codigo_sala, creador_id, apuesta_oro)
+            VALUES ($1, $2, $3)
+            RETURNING id;
+        `;
+        const salaResult = await pool.query(insertSalaQuery, [codigo_sala, usuario_id, apuesta_oro || 0]);
+        const sala_id = salaResult.rows[0].id;
 
-        let pozo_inicial = 0;
-        let nuevoOro = monedasActuales;
+        // 2. Ahora insertamos al creador como el primer participante en sala_participantes
+        // Guardamos el array de jugadores convirtiéndolo a texto para formato Postgres de array, o JSON
+        const insertParticipanteQuery = `
+            INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids)
+            VALUES ($1, $2, $3, $4);
+        `;
+        // Si tu columna jugador_ids es un array de enteros (integer[]), pasás string format: '{1,2,3}'
+        const arrayFormateado = `{${jugador_ids.join(',')}}`; 
+        
+        await pool.query(insertParticipanteQuery, [sala_id, usuario_id, seleccion, arrayFormateado]);
 
-        if (tipo_apuesta === 'oro') {
-            if (monedasActuales < apuesta_oro) {
-                return res.json({ ok: false, mensaje: `🪙 No tenés suficiente Oro. Cuesta ${apuesta_oro} monedas.` });
-            }
-            nuevoOro = monedasActuales - apuesta_oro;
-            pozo_inicial = apuesta_oro;
-        } else if (tipo_apuesta === 'carta') {
-            if (!carta_apuesta_id) return res.json({ ok: false, mensaje: "❌ Debés elegir qué figurita vas a apostar." });
-            
-            const cromoCheck = await pool.query(
-                "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, carta_apuesta_id]
-            );
-            if (cromoCheck.rows.length === 0 || cromoCheck.rows[0].cantidad <= 1) {
-                return res.json({ ok: false, mensaje: "🃏 No podés apostar esa carta si no tenés repetidas." });
-            }
-            
-            await pool.query(
-                "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, carta_apuesta_id]
-            );
-        }
+        // Si todo anduvo joya, respondemos al frontend para que rompa el spinner
+        return res.json({
+            ok: true,
+            sala_id: sala_id,
+            codigo_sala: codigo_sala,
+            mensaje: "Sala creada con éxito en la Arena."
+        });
+
+    } catch (error) {
+        // 🔥 CLAVE: Si la base de datos rechaza el INSERT, este log te va a decir CUAL columna falló
+        console.error("❌ ERROR CRÍTICO DE NEON:", error.message);
+        
+        // Le avisamos al frontend para que oculte el spinner y te muestre el error en un alert
+        return res.status(500).json({ 
+            ok: false, 
+            mensaje: `Error de Base de Datos: ${error.message}` 
+        });
+    }
+});
 
         let codigo = generarCodigoSala();
         
