@@ -1796,40 +1796,6 @@ app.post('/api/multijugador/crear', async (req, res) => {
     }
 });
 
-        let codigo = generarCodigoSala();
-        
-        const nuevaSala = await pool.query(
-            `INSERT INTO mundial_salas (codigo_sala, creador_id, tipo_apuesta, apuesta_oro, pozo_total, estado) 
-             VALUES ($1, $2, $3, $4, $5, 'esperando') RETURNING id`,
-            [codigo, usuario_id, tipo_apuesta, tipo_apuesta === 'oro' ? apuesta_oro : 0, pozo_inicial]
-        );
-        
-        const salaId = nuevaSala.rows[0].id;
-
-        await pool.query(
-            `INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids) 
-             VALUES ($1, $2, $3, $4)`,
-            [salaId, usuario_id, seleccion, jugador_ids]
-        );
-
-        if (tipo_apuesta === 'oro') {
-            await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
-        }
-
-        return res.json({
-            ok: true,
-            mensaje: "🎉 ¡Sala creada con éxito!",
-            codigo_sala: codigo,
-            sala_id: salaId,
-            monedasActualizadas: nuevoOro
-        });
-
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
 app.post('/api/multijugador/unirse', async (req, res) => {
     const { usuario_id, codigo_sala, seleccion, jugador_ids } = req.body;
 
