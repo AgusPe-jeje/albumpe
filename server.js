@@ -1997,30 +1997,62 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 
         competidores = mezclarArray(competidores);
 
-        let bitacoraMundial = { cuartos: [], semis: [], final: null, campeon: null };
+        // 🔥 CRUCIAL: Array secuencial plano para evitar desincronizaciones en el cliente
+        let bitacoraPartidosPlana = [];
 
-        // CUARTOS
+        // 1. SIMULACIÓN DE CUARTOS DE FINAL
         let ganadoresCuartos = [];
         for (let i = 0; i < 8; i += 2) {
             let cruce = simularPartidoEliminatorio(competidores[i], competidores[i+1]);
-            bitacoraMundial.cuartos.push(cruce);
+            bitacoraPartidosPlana.push({
+                ronda: "Cuartos de Final",
+                local: cruce.local.seleccion,
+                visitante: cruce.visitante.seleccion,
+                golesLocal: cruce.golesL,
+                golesVisitante: cruce.golesV,
+                penalesLocal: cruce.penalesL,
+                penalesVisitante: cruce.penalesV,
+                definicionPenales: cruce.definicionPenales,
+                ganadorUsername: cruce.ganador.username
+            });
             ganadoresCuartos.push(cruce.ganador);
         }
 
-        // SEMIS
+        // 2. SIMULACIÓN DE SEMIFINALES
         let ganadoresSemis = [];
         for (let i = 0; i < 4; i += 2) {
             let cruce = simularPartidoEliminatorio(ganadoresCuartos[i], ganadoresCuartos[i+1]);
-            bitacoraMundial.semis.push(cruce);
+            bitacoraPartidosPlana.push({
+                ronda: "Semifinal",
+                local: cruce.local.seleccion,
+                visitante: cruce.visitante.seleccion,
+                golesLocal: cruce.golesL,
+                golesVisitante: cruce.golesV,
+                penalesLocal: cruce.penalesL,
+                penalesVisitante: cruce.penalesV,
+                definicionPenales: cruce.definicionPenales,
+                ganadorUsername: cruce.ganador.username
+            });
             ganadoresSemis.push(cruce.ganador);
         }
 
-        // FINAL
+        // 3. SIMULACIÓN DE LA GRAN FINAL
         let finalCruce = simularPartidoEliminatorio(ganadoresSemis[0], ganadoresSemis[1]);
-        bitacoraMundial.final = finalCruce;
         const campeonMundial = finalCruce.ganador;
-        bitacoraMundial.campeon = campeonMundial;
+        
+        bitacoraPartidosPlana.push({
+            ronda: "Gran Final",
+            local: finalCruce.local.seleccion,
+            visitante: finalCruce.visitante.seleccion,
+            golesLocal: finalCruce.golesL,
+            golesVisitante: finalCruce.golesV,
+            penalesLocal: finalCruce.penalesL,
+            penalesVisitante: finalCruce.penalesV,
+            definicionPenales: finalCruce.definicionPenales,
+            ganadorUsername: finalCruce.ganador.username
+        });
 
+        // 🎁 CONTROL DE PREMIOS EN BASE DE DATOS
         let datosPremio = { ganoBot: true, ganador_username: campeonMundial.username, pozo: sala.pozo_total, tipo_apuesta: sala.tipo_apuesta };
         
         if (!campeonMundial.esBot) {
@@ -2041,7 +2073,8 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 
         await pool.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id]);
 
-        return res.json({ ok: true, bitacora: bitacoraMundial, premio: datosPremio });
+        // Retornamos el formato exacto que espera el frente
+        return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
 
     } catch (err) {
         console.error("❌ Error en simulación:", err);
