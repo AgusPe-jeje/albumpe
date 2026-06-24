@@ -9,15 +9,18 @@
 </head>
 <body class="ambiente-mundial">
     
+    <!-- PANTALLA DE CARGA GLOBAL -->
     <div id="pantalla-carga">
         <div class="spinner-arena"></div>
         <div id="texto-carga-dinamico" class="texto-carga">Conectando con la Arena...</div>
     </div>     
 
+    <!-- HEADER PRINCIPAL -->
     <header class="header-principal-mundial">
         <h1 class="titulo-copa-pe">🏆 ÁLBUM MUNDIAL PE 🏆</h1>
     </header>
 
+    <!-- FORMULARIO DE ACCESO (LOGIN / REGISTRO) -->
     <div id="seccion-login" class="login-card-estadio">
         <h2>ACCESO A LA ARENA</h2>
         <div class="wrapper-inputs-estadio">
@@ -31,8 +34,10 @@
         </div>
     </div>
 
+    <!-- INTERFAZ PRINCIPAL DEL JUEGO -->
     <main id="interfaz-juego" style="display: none;">
         
+        <!-- PANEL DE ESTADO SUPERIOR (HUD SCOREBOARD) -->
         <div class="header-status-scoreboard">
             <div class="stat-box-tv">
                 <span class="stat-label">👤 JUGADOR</span>
@@ -54,6 +59,7 @@
             <button class="btn-logout-kick btn-logout-premium" onclick="cerrarSesionLocal()">🚪 SALIR</button>
         </div>
 
+        <!-- PESTAÑAS DE NAVEGACIÓN -->
         <nav class="nav-modulos-estadio">
             <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)">🛍️ TIENDA</button>
             <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)">📖 MI ÁLBUM</button>
@@ -63,8 +69,10 @@
             <button class="btn-modulo-match" style="border-color: var(--dorado); color: var(--dorado);" onclick="cambiarModulo('modulo-mundial-multi', this)">👥 MULTIJUGADOR</button>
         </nav>
 
+        <!-- SECCIÓN DE MÓDULOS DINÁMICOS -->
         <section style="width: 100%; max-width: 900px; box-sizing: border-box;">
 
+            <!-- MÓDULO 1: TIENDA DE SOBRES (COFRES) -->
             <div id="modulo-sobres" class="modulo-contenido activo">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-tienda">
@@ -111,6 +119,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 2: ÁLBUM COLECTOR INTERACTIVO -->
             <div id="modulo-album" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="progreso-album-scoreboard">
@@ -145,6 +154,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 3: MINIJUEGO DE PENALES LOCAL -->
             <div id="modulo-penales" class="modulo-contenido">
                 <div class="contenedor-penales-layout-estadio">
                     <div class="caja-modulo-estadio juego-penales-principal">
@@ -185,6 +195,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 4: CASINO / TIMBA DE LA BANKA -->
             <div id="modulo-timba" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-casino">
@@ -230,6 +241,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 5: COLISEO DEL MUNDIAL (UN JUGADOR) -->
             <div id="modulo-minimundial" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-mundial">
@@ -294,10 +306,14 @@
                 </div>
             </div>
 
+            <!-- ========================================================================
+               👥 MÓDULO 6: ENGINE MULTIJUGADOR REFORMADO CON BOTONES DE ESCAPE (FIX COMPLETO)
+               ======================================================================== -->
             <div id="modulo-mundial-multi" class="modulo-contenido" style="display: none;">
                 <div class="caja-modulo-estadio">
                     <h2 class="titulo-modulo" style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">🏆 MINI-MUNDIAL MULTIJUGADOR</h2>
                     
+                    <!-- 1. MENÚ INICIAL: CREAR SALA O INGRESAR CÓDIGO -->
                     <div id="multi-menu-inicial" style="text-align: center; margin-top: 20px;">
                         <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto 20px; border: 1px solid #1a2436;">
                             <h3>🆕 CREAR NUEVA SALA</h3>
@@ -329,11 +345,17 @@
                         </div>
                     </div>
 
+                    <!-- 2. FASE INSCRIPCIÓN: LISTADO DE PAÍSES ASIGNADOS -->
                     <div id="multi-fase-inscripcion" style="display: none; text-align: center; padding: 20px;">
                         <h3 style="color: var(--celeste);">ELEGÍ TU PAÍS PARA EL TORNEO ONLINE</h3>
                         <div id="multi-zona-eleccion-pais" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
+                        
+                        <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); max-width: 250px; margin: 15px auto 0;">
+                            ❌ ABANDONAR INSCRIPCIÓN
+                        </button>
                     </div>
 
+                    <!-- 3. FASE DRAFT: TABLERO DE SELECCIÓN DE LAS 3 CARTAS -->
                     <div id="multi-fase-draft" style="display: none; padding: 15px;">
                         <div class="arena-versus-scoreboard" style="margin-bottom: 20px;">
                             <div class="bando-equipo-stadium local">
@@ -350,11 +372,18 @@
                             ⭐ (0/5 Estrellas)
                         </div>
                         <div class="grid-cartas-draft-mundial" id="multi-grid-cartas-draft" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
-                        <button type="button" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">
-                            ⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO
-                        </button>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <button type="button" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">
+                                ⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO
+                            </button>
+                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">
+                                ↩️ CAMBIAR SELECCIÓN / SALIR
+                            </button>
+                        </div>
                     </div>
 
+                    <!-- 4. LOBBY DE ESPERA ACTIVO (POLLING RUNNING) -->
                     <div id="multi-lobby-espera" style="display: none; text-align: center;">
                         <div style="background: #0b111e; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 20px; border: 2px solid var(--dorado);">
                             <span style="font-size: 1.1rem; color: #64748b;">CÓDIGO DE SALA:</span>
@@ -365,10 +394,14 @@
                         <h4 style="color: var(--celeste); margin-bottom: 15px;">👥 JUGADORES CONECTADOS (<span id="lobby-cnt-jugadores">0</span>/8)</h4>
                         <div id="lobby-lista-participantes" style="max-width: 500px; margin: 0 auto 20px; display: flex; flex-direction: column; gap: 8px;"></div>
 
-                        <button id="multi-btn-iniciar-fixture" class="btn-estadio btn-modulo-match" style="display: none; margin: 0 auto;" onclick="lanzarSimulacionMulti()">🔥 ¡LARGAR MUNDIAL! 🔥</button>
-                        <p id="multi-txt-espera-host" style="color: #64748b; font-style: italic;">Esperando que el creador inicie el torneo...</p>
+                        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 350px; margin: 0 auto;">
+                            <button id="multi-btn-iniciar-fixture" class="btn-estadio btn-modulo-match" style="display: none; margin: 0 auto; width: 100%;" onclick="lanzarSimulacionMulti()">🔥 ¡LARGAR MUNDIAL! 🔥</button>
+                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">🚪 ABANDONAR SALA ACTIVA</button>
+                        </div>
+                        <p id="multi-txt-espera-host" style="color: #64748b; font-style: italic; margin-top: 10px;">Esperando que el creador inicie el torneo...</p>
                     </div>
 
+                    <!-- 5. TRANSMISIÓN EN VIVO DEL FIXTURE MULTIJUGADOR -->
                     <div id="multi-pantalla-fixture" style="display: none;">
                         <h3 style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">📊 TRANSMISIÓN EN VIVO MULTIJUGADOR</h3>
                         <div id="multi-cronologia-goles" style="max-width: 600px; margin: 0 auto; min-height: 300px; padding: 10px;"></div>
@@ -379,6 +412,7 @@
         </section>
     </main>
 
+    <!-- MODAL DE AYUDA Y REGLAS -->
     <div id="modal-ayuda-juego" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
         <div style="background: #0b111e; border: 2px solid var(--dorado); width: 100%; max-width: 600px; padding: 25px; border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;">
             <h2 style="color: var(--dorado); font-family: 'Oswald'; text-align: center; margin-top: 0; font-size: 1.8rem; border-bottom: 1px solid #1a2436; padding-bottom: 10px;">🏟️ REGLAS DE LA ARENA</h2>
@@ -393,6 +427,7 @@
         </div>
     </div>
 
+    <!-- BANNER DE ANUNCIOS Y NOVEDADES GLOBAL -->
     <div id="modalAnuncioGlobal" class="modal-anuncio-overlay">
         <div class="modal-anuncio-content">
             <button class="btn-cerrar-anuncio" onclick="cerrarAnuncioGlobal()">✕ CERRAR</button>
@@ -401,6 +436,7 @@
         </div>
     </div>
 
+    <!-- PARSEO SEGURO DE EMOJIS (TWEMOJI) -->
     <script src="https://unpkg.com/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
     <script>
     window.addEventListener('DOMContentLoaded', () => {
