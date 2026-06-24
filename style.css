@@ -626,3 +626,26 @@ img.emoji {
     0% { opacity: 0; transform: translateX(-80px) scale(0.6) rotate(-10deg); filter: blur(3px) brightness(2); } 
     100% { opacity: 1; transform: translateX(0) scale(1) rotate(0deg); filter: blur(0) brightness(1); } 
 }
+
+/* Adaptación para celulares */
+@media (max-width: 768px) {
+    .contenedor-filtros-album { padding: 10px; gap: 10px; }
+    .grupo-filtro { gap: 6px; }
+    .btn-filtro-tv { padding: 5px 8px; font-size: 0.8rem; }
+    .filtro-label { width: 100%; margin-bottom: 2px; }
+}
+
+.grid-cartas-draft-mundial {
+    display: flex;
+    flex-wrap: wrap;       /* 🔥 Esto es lo que rompe la verticalidad */
+    justify-content: center;
+    gap: 10px;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+}
+
+.carta-clash {
+    width: 80px;           /* Ajustá el ancho a tu gusto */
+    flex: 0 0 auto;        /* Evita que se estiren */
+}
