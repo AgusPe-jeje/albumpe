@@ -1249,7 +1249,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                      document.getElementById(`zona-entretiempo-${idUnico}`).style.display = "none";
                      segundoVirtual += 3;
                      rearrancarReloj();
-                 }, 15000);
+                 }, 5000);
                  return;
              }
 
