@@ -34,7 +34,7 @@ function generarCodigoSala() {
    ======================================================================== */
 const MODO_MANTENIMIENTO = false; 
 // 👥 Agregá o sacá acá los usuarios permitidos en minúscula para las pruebas
-const TESTERS_PERMITIDOS = ["aguspe", "tintin"]; 
+const TESTERS_PERMITIDOS = ["aguspe", "evevea"]; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
