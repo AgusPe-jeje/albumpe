@@ -486,17 +486,21 @@
     </main>
 
     <!-- MODAL DE AYUDA Y REGLAS -->
-    <div id="modal-ayuda-juego" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+<   div id="modal-ayuda-juego" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
         <div style="background: #0b111e; border: 2px solid var(--dorado); width: 100%; max-width: 600px; padding: 25px; border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;">
             <h2 style="color: var(--dorado); font-family: 'Oswald'; text-align: center; margin-top: 0; font-size: 1.8rem; border-bottom: 1px solid #1a2436; padding-bottom: 10px;">🏟️ REGLAS DE LA ARENA</h2>
             
-            <div style="color: #fff; font-size: 1rem; line-height: 1.6; display: flex; flex-direction: column; gap: 15px; margin-top: 15px; font-family: system-ui, sans-serif;">
+            <div style="color: #fff; font-size: 0.95rem; line-height: 1.6; display: flex; flex-direction: column; gap: 15px; margin-top: 15px; font-family: system-ui, sans-serif;">
                 <p><strong>🛍️ SOBRES:</strong> Conseguí cartas Comunes, Raras, Épicas y Legendarias en la tienda para completar tu colección.</p>
-                <p><strong>⚽ PENALES:</strong> Patea al arco para ganar Oro y subir en el Ranking. Consume energía.</p>
-                <p><strong>🎰 TIMBA:</strong> Arriesgá tus monedas o duplicados pronosticando marcadores reales de simulaciones.</p>
-                <p><strong>🏆 MUNDIAL:</strong> Armá plantillas y competí por la Copa en torneos individuales o comunitarios.</p>
+                <p><strong>⚽ PENALES:</strong> Patea al arco para ganar Oro y subir en el Ranking. Consume energía de tu cuenta.</p>
+                
+                <p><strong>🏆 MINI-MUNDIAL MULTI:</strong> Armá tu terna de 3 jugadores y desafiá a otro usuario online. Podés jugar en modo <i>Amistoso</i>, por <i>Oro</i> o por <i>Cartas</i>. <b>¡Ojo!</b> La inscripción en el Draft es gratuita: los aranceles o cromos repetidos se debitan de forma atómica recién cuando el Host inicia el fixture.</p>
+                
+                <p><strong>💸 MERCADO DE PASES P2P:</strong> Publicá tus cromos repetidos al precio de Oro que quieras en la vitrina internacional. Las ofertas tienen una <b>duración estricta de 24 horas</b>. Si nadie compra tu cromo en ese plazo, el sistema en background lo retira de exposición y te devuelve la carta automáticamente a tu stock.</p>
+                
+                <p><strong>🎰 TIMBA:</strong> Arriesgá tus recursos pronosticando marcadores reales de simulaciones veloces.</p>
             </div>
-            <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio btn-next-shot" style="width: 100%; margin-top: 20px; background: var(--rojo); border-color: var(--rojo);">❌ CERRAR GUÍA</button>
+            <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio btn-next-shot" style="width: 100%; margin-top: 25px; background: var(--rojo); border-color: var(--rojo); cursor: pointer; font-weight: bold;">❌ CERRAR GUÍA</button>
         </div>
     </div>
 
