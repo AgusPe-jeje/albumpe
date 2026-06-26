@@ -2182,7 +2182,7 @@ async function comprarCartaMercado(ofertaId) {
     }
 }
 
-// Ejecuta la adquisición de una carta expuesta
+// Ejecuta la adquisición de una carta expuesta actualizando el Oro al instante
 async function comprarCartaMercado(ofertaId) {
     try {
         const res = await fetch('/api/mercado/comprar', {
@@ -2194,13 +2194,48 @@ async function comprarCartaMercado(ofertaId) {
 
         if (data.ok) {
             alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador}. El Oro fue transferido.`);
-            cargarAlbumLocal(); // Actualiza el álbum nativo
-            // 🔥 CORREGIDO: Redirección limpia al módulo del mercado sin ternario confuso
-            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+            
+            // 1. Descontamos el oro en la variable local del Front de forma inmediata
+            // Buscamos el precio de la oferta en el grid para saber cuánto restar (o lo asumimos del flujo)
+            const tarjetaOferta = document.querySelector(`button[onclick="comprarCartaMercado(${ofertaId})"]`);
+            if (tarjetaOferta) {
+                const contenedorPrecio = tarjetaOferta.parentElement.querySelector('div');
+                // Extrae el número del texto "🪙 500"
+                const precioGastado = parseInt(contenedorPrecio.innerText.replace(/[^0-9]/g, ''));
+                if (!isNaN(precioGastado) && usuarioActual) {
+                    usuarioActual.monedas -= precioGastado;
+                }
+            }
+
+            // 2. 🔥 ACTUALIZACIÓN DE INTERFAZ: Sincroniza el balance visual de oro
+            // Si tenés una función nativa que dibuja el perfil/monedas, llamala acá. Por ejemplo:
+            if (typeof cargarDatosUsuario === "function") {
+                cargarDatosUsuario(); // Si así se llama tu función de cabecera
+            } else if (typeof actualizarPerfilUI === "function") {
+                actualizarPerfilUI();
+            } else {
+                // Parche directo al DOM por si no tenés función global:
+                // Buscamos el elemento que muestra las monedas (cambiá "txt-monedas" por el ID real que uses)
+                const elMonedas = document.getElementById("usuario-monedas") || document.getElementById("txt-monedas");
+                if (elMonedas && usuarioActual) {
+                    elMonedas.innerHTML = `🪙 ${usuarioActual.monedas}`;
+                }
+            }
+
+            // 3. Sincroniza el álbum nativo (añade la carta al inventario local)
+            cargarAlbumLocal(); 
+            
+            // 4. Refresca la vitrina del mercado para que desaparezca la oferta que compraste
+            setTimeout(() => { 
+                obtenerOfertasMercado();
+                cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); 
+            }, 500);
+
         } else {
             alert(data.mensaje);
         }
     } catch (err) {
         console.error(err);
+        alert("❌ Ocurrió un problema de red al procesar el fichaje.");
     }
 }
