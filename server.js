@@ -32,7 +32,7 @@ function generarCodigoSala() {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 // 👥 Agregá o sacá acá los usuarios permitidos en minúscula para las pruebas
 const TESTERS_PERMITIDOS = ["aguspe", "evevea"]; 
 
@@ -1491,11 +1491,10 @@ app.get('/api/mundial/estado/:usuarioId', async (req, res) => {
     }
 });
 
-// B. ENDPOINT: Preparar Torneo, filtrar países con stock >= 3 y verificar 500 monedas
+// B. ENDPOINT: Preparar Torneo actualizando el costo a 1500 de Oro
 app.post('/api/mundial/preparar', async (req, res) => {
     const { usuario_id } = req.body;
     try {
-        // 1. Validar cooldown de tiempo
         const userCheck = await pool.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
 
@@ -1506,12 +1505,11 @@ app.post('/api/mundial/preparar', async (req, res) => {
             }
         }
 
-        // 🪙 VALIDACIÓN DE ORO
-        if (userCheck.rows[0].monedas < 500) {
-            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción al MiniMundial cuesta 500 monedas." });
+        // 🪙 VALIDACIÓN DE ORO CAMBIADA A 1500
+        if (userCheck.rows[0].monedas < 1500) {
+            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción al MiniMundial cuesta 1.500 monedas." });
         }
 
-        // 2. Buscar qué países tienen como mínimo 3 cartas obtenidas en su inventario
         const paisesValidosQuery = await pool.query(`
             SELECT j.pais 
             FROM usuario_progreso up 
@@ -1527,8 +1525,8 @@ app.post('/api/mundial/preparar', async (req, res) => {
             return res.json({ ok: false, mensaje: "❌ Requisito insuficiente: Necesitás tener al menos 3 jugadores de un mismo país desbloqueados para poder inscribirte." });
         }
 
-        // 🔥 CRUNCH AL EXPLOIT: Quitamos las 500 monedas Y activamos las 3 horas de Cooldown de una sola vez
-        const nuevoOro = userCheck.rows[0].monedas - 500;
+        // 🔥 DEBITAMOS LOS 1500 DE UNA ACÁ
+        const nuevoOro = userCheck.rows[0].monedas - 1500;
         await pool.query(
             "UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", 
             [nuevoOro, usuario_id]
@@ -1726,19 +1724,20 @@ app.post('/api/mundial/jugar', async (req, res) => {
 
         // 6. Guardar base de datos y otorgar premios si corresponde
         const ahora = new Date();
-        const COSTO_INSCRIPCION = 1500; // Tarifa oficial de entrada
 
+        // 🔥 REPARADO: Quitamos el "COSTO_INSCRIPCION = 1500" que te cobraba doble.
+        // Ahora solo SUMA el premio si salís Campeón, o no toca tus monedas si perdés (porque ya pagaste 500 al preparar)
         if (campeon) {
-            // Resta el costo real ($1) y suma los 5.000 de premio
+            // Suma los 5.000 de premio limpios, la copa y el ranking
             await pool.query(
-                "UPDATE usuarios SET monedas = monedas - $1 + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $2 WHERE id = $3",
-                [COSTO_INSCRIPCION, ahora, usuario_id] // $1 es COSTO_INSCRIPCION, $2 es ahora, $3 es usuario_id
+                "UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
+                [ahora, usuario_id]
             );
         } else {
-            // Resta el costo real ($1) puro por quedar afuera
+            // Si perdés, no te saca más monedas. Solo refresca el timestamp por seguridad
             await pool.query(
-                "UPDATE usuarios SET monedas = monedas - $1, ultima_timba_mundial = $2 WHERE id = $3", 
-                [COSTO_INSCRIPCION, ahora, usuario_id] // $1 es COSTO_INSCRIPCION, $2 es ahora, $3 es usuario_id
+                "UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", 
+                [ahora, usuario_id]
             );
         }
 
