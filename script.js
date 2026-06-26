@@ -1427,7 +1427,6 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            // 1. 🔥 CORREGIDO: Le pegamos al endpoint de consulta que tiene las reglas de Neon
             const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`);
             const data = await res.json();
 
@@ -1440,28 +1439,24 @@ async function abrirDraftMulti(esCreador) {
                 return alert("🚫 Esta sala ya cerró o el torneo ya arrancó.");
             }
 
-            // Mapeamos la modalidad real para las fases siguientes
             window.multiTipoApuestaActual = data.tipo_apuesta ? data.tipo_apuesta.toLowerCase() : 'amistoso';
 
-            // 2. 🔥 ARMADO DEL CARTEL CON DATOS REALES VIGENTES
             let cartelAdvertencia = "";
 
             if (window.multiTipoApuestaActual === 'amistoso') {
                 cartelAdvertencia = `🏟️ ¿Querés unirte a la Sala ${cod}?\n\n🔹 Modalidad: AMISTOSO\n🔸 No se arriesgan recursos. ¡Puro juego para foguear el plantel!`;
             } else if (window.multiTipoApuestaActual === 'oro') {
-                cartelAdvertencia = `🪙 ¡ATENCIÓN JUGADOR!\n\nLa Sala ${cod} exige una entrada de: 🪙${data.apuesta_oro || 0} monedas de Oro.\n⚠️ El monto se debitará de tu cuenta al confirmar tu planilla final en el Draft. ¿Querés continuar?`;
+                cartelAdvertencia = `🪙 ¡ATENCIÓN JUGADOR!\n\nLa Sala ${cod} exige una entrada de: 🪙${data.apuesta_oro || 0} monedas de Oro.\n⚠️ El monto se debitará de tu cuenta al iniciar la simulación si confirmás tu plantilla. ¿Querés continuar?`;
             } else if (window.multiTipoApuestaActual === 'carta') {
-                cartelAdvertencia = `🚨 ¡CUIDADO CRACK!\n\nLa Sala ${cod} es una contienda: POR CARTAS REPETIDAS.\n⚠️ Deberás seleccionar un cromo de tu inventario para poner en juego antes de entrar a la cancha. Si perdés, no vuelve. ¿Te la bancás?`;
+                cartelAdvertencia = `🚨 ¡CUIDADO CRACK!\n\nLa Sala ${cod} es una contienda: POR CARTAS REPETIDAS.\n⚠️ Se descontará automáticamente un cromo repetido de tu stock al dar el silbatazo inicial. Si perdés, no vuelve. ¿Te la bancás?`;
             }
 
             ocultarCarga();
 
-            // 3. Freno de mano: si toca "Cancelar", clavamos el flujo acá y no gasta nada
             if (!confirm(cartelAdvertencia)) {
                 return;
             }
 
-            // 4. Si dio "Aceptar", traemos de fondo el ID real de la sala para el Polling
             const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`);
             const dataSala = await resSala.json();
             if (dataSala.ok) {
@@ -1479,9 +1474,8 @@ async function abrirDraftMulti(esCreador) {
         window.multiTipoApuestaActual = selectTipo ? selectTipo.value.toLowerCase() : 'amistoso';
     }
 
-    // Si pasó los filtros o es host, entramos al vestuario
     document.getElementById("multi-menu-inicial").style.display = "none";
-    document.getElementById("multi-fase-indigo" ? "multi-fase-inscripcion" : "multi-fase-inscripcion").style.display = "block";
+    document.getElementById("multi-fase-inscripcion").style.display = "block";
     prepararInscripcionMundialMulti();
 }
 
@@ -1528,29 +1522,9 @@ function iniciarDraftJugadoresMundialMulti(paisElegido) {
      document.getElementById("multi-fase-draft").style.display = "block";
      document.getElementById("multi-lbl-tu-seleccion").innerText = paisElegido.toUpperCase();
 
+     // Limpieza de selectores manuales obsoletos: El backend resuelve el cobro solo
      const wrapperApuestaInvitado = document.getElementById("multi-wrapper-apuesta-invitado");
-
-     if (window.multiTipoApuestaActual === 'carta' && !multiEsCreador) {
-          if (wrapperApuestaInvitado) wrapperApuestaInvitado.style.display = "block";
-          const selectCromo = document.getElementById("multi-select-carta-apuesta-invitado");
-          if (selectCromo) {
-              selectCromo.innerHTML = "";
-              const repetidas = albumCompleto.filter(f => f.obtenido > 1);
-              if (repetidas.length === 0) {
-                  const opt = document.createElement("option");
-                  opt.value = ""; opt.innerText = "❌ No tenés cartas repetidas para arriesgar";
-                  selectCromo.appendChild(opt);
-              } else {
-                  repetidas.forEach(figu => {
-                      const opt = document.createElement("option"); opt.value = figu.id;
-                      opt.innerText = `🃏 ${figu.nombre.toUpperCase()} (Tenes ${figu.obtenido})`;
-                      selectCromo.appendChild(opt);
-                  });
-              }
-          }
-     } else {
-          if (wrapperApuestaInvitado) wrapperApuestaInvitado.style.display = "none";
-     }
+     if (wrapperApuestaInvitado) wrapperApuestaInvitado.style.display = "none";
      
      actualizarEstrellasVisualesDraftMulti();
      renderizarGridCartasDisponiblesDraftMulti(paisElegido);
@@ -1603,29 +1577,21 @@ function actualizarEstrellasVisualesDraftMulti() {
 
 async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores) {
     if (arrayIdsJugadores.length !== 3) return alert("❌ Debés alinear exactamente 3 jugadores.");
-     let cartaIdSeleccionada = null;
-
-     if (window.multiTipoApuestaActual === 'carta') {
-         const idSelect = multiEsCreador ? "multi-select-carta-apuesta" : "multi-select-carta-apuesta-invitado";
-         const selectElement = document.getElementById(idSelect);
-         cartaIdSeleccionada = selectElement ? selectElement.value : null;
-         if (!cartaIdSeleccionada) return alert("❌ Debés elegir tu cromo a arriesgar.");
-         window.multiMiCartaApostadaTexto = selectElement.options[selectElement.selectedIndex].text;
-     } else { window.multiMiCartaApostadaTexto = null; }
+    
+    window.multiMiCartaApostadaTexto = "Cromo repetido de tu stock";
 
     mostrarCarga("Enviando planilla de vestuarios a la Arena Online...");
     let url = `${URL_BASE}/multijugador/crear`;
     let cuerpo = {
         usuario_id: usuarioActual.id, seleccion: paisElegido, jugador_ids: arrayIdsJugadores,
-        tipo_apuesta: window.multiTipoApuestaActual, apuesta_oro: multiApuestaFijada,
-        carta_apuesta_id: cartaIdSeleccionada ? parseInt(cartaIdSeleccionada) : null
+        tipo_apuesta: window.multiTipoApuestaActual, apuesta_oro: multiApuestaFijada
     };
 
     if (!multiEsCreador) {
         url = `${URL_BASE}/multijugador/unirse`;
         cuerpo = {
             usuario_id: usuarioActual.id, seleccion: paisElegido, jugador_ids: arrayIdsJugadores,
-            codigo_sala: multiCodigoSala, carta_apuesta_id: cartaIdSeleccionada ? parseInt(cartaIdSeleccionada) : null
+            codigo_sala: multiCodigoSala
         };
     }
 
@@ -1636,11 +1602,7 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
         const data = await res.json();
 
         if (!data.ok) { ocultarCarga(); return alert(data.mensaje); }
-        if (data.monedasActualizadas !== undefined) {
-            usuarioActual.monedas = data.monedasActualizadas;
-            actualizarInterfazUI();
-        }
-
+        
         multiSalaId = data.sala_id;
         if (data.codigo_sala) multiCodigoSala = data.codigo_sala;
 
@@ -1678,10 +1640,9 @@ async function actualizarLobbyEnVivo() {
         }
 
         if (infoSalaBox) {
-            let detalle = `🪙 MODALIDAD: TIMBA POR ORO`;
+            let detalle = `🪙 MODALIDAD: TIMBA POR ORO\n⚠️ El Oro se debitará de tu cuenta al presionar 'Iniciar'.`;
             if (window.multiTipoApuestaActual === 'carta') {
-                 let miCartaInfo = window.multiMiCartaApostadaTexto || "Seleccionada en Vestuario";
-                 detalle = `🃏 DUELO DE CARTAS REPETIDAS\n⚠️ ¡Muerte Súbita! El perdedor descarta.\n\n🔒 TU APUESTA: ${miCartaInfo.toUpperCase()}`;
+                 detalle = `🃏 DUELO DE CARTAS REPETIDAS\n⚠️ ¡Muerte Súbita! Se descontará una carta repetida de tu stock al arrancar.\n\n🔒 TU APUESTA: CRÓMICA AUTOMÁTICA`;
             } else if (window.multiTipoApuestaActual === 'amistoso') { detalle = `🤝 MODALIDAD: AMISTOSO ONLINE`; }
             
             infoSalaBox.innerHTML = `<div style="background:rgba(11,17,30,0.8); padding:12px; border-radius:8px; border:1px solid var(--dorado); text-align:center; font-weight:bold; color:var(--dorado); margin-bottom:15px; font-family:'Oswald'; white-space:pre-line;">${detalle}</div>`;
@@ -1691,7 +1652,7 @@ async function actualizarLobbyEnVivo() {
         if (txtPozo) {
             if (window.multiTipoApuestaActual === 'carta') txtPozo.innerText = `🎰 Pozo: 1 Cromo Épico/Leg Mínimo`;
             else if (window.multiTipoApuestaActual === 'amistoso') txtPozo.innerText = `⚽ Modo de Práctica`;
-            else txtPozo.innerText = `💰 Pozo Actual: ${data.pozo_total} Oro`;
+            else txtPozo.innerText = `💰 Pozo Estimado: ${data.apuesta_oro * 2} Oro`;
         }
         
         document.getElementById("lobby-cnt-jugadores").innerText = data.participantes.length;
@@ -1765,8 +1726,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         const rondaNombre = partido.ronda || `PARTIDO #${index + 1}`;
         const golesLocalDefinitivos = partido.golesLocal || 0; 
         const golesVisitanteDefinitivos = partido.golesVisitante || 0;
-        
-        // Traemos las incidencias que viajan desde tu base de datos / backend
         const incidenciasDelPartido = partido.incidencias || {};
 
         secuenciaPromesas = secuenciaPromesas.then(() => {
@@ -1797,12 +1756,10 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  let gL_act = 0; 
                  let gV_act = 0;
 
-                 // MODIFICACIÓN: Avanza de a 5 minutos cada 400ms para estirar el drama y hacerlo épico
                  const timerMulti = setInterval(() => {
                      minVirtual += 5; 
                      if (minVirtual > 90) minVirtual = 90;
 
-                     // Los goles van cayendo de forma escalonada e inteligente a lo largo del tiempo
                      if (minVirtual >= 15) {
                           if (gL_act < golesLocalDefinitivos && Math.random() < 0.2) {
                                gL_act++;
@@ -1819,7 +1776,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                           gV_act = golesVisitanteDefinitivos; 
                      }
 
-                     // Pintamos tiempos y marcadores actualizados
                      if (document.getElementById(`multi-reloj-${index}`)) {
                           document.getElementById(`multi-reloj-${index}`).innerText = `⏱️ MINUTO ${minVirtual.toString().padStart(2,'0')}:00`;
                      }
@@ -1827,35 +1783,33 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                           document.getElementById(`multi-score-${index}`).innerText = `${gL_act} - ${gV_act}`;
                      }
 
-                     // Evaluamos e inyectamos los textos del servidor (PostgreSQL) en vivo
                      if (incidenciasDelPartido[minVirtual]) {
                           document.getElementById(`multi-log-vivo-${index}`).innerText = incidenciasDelPartido[minVirtual];
                      }
 
                      if (minVirtual >= 90) {
-                         clearInterval(timerMulti);
-                         
-                         if (partido.definicionPenales && document.getElementById(`multi-penales-box-${index}`)) {
-                              document.getElementById(`multi-penales-box-${index}`).style.display = "block";
-                              document.getElementById(`multi-penales-box-${index}`).innerText = `💥 TANDA DE PENALES POR LA INMORTALIDAD: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
-                         }
-                         
-                         bloquePartido.style.borderColor = "var(--verde-match)";
-                         const finTexto = document.createElement("div"); 
-                         finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:5px;";
-                         finTexto.innerText = `🏆 GANADOR: ${partido.ganadorUsername.toUpperCase()} ✅`;
-                         bloquePartido.appendChild(finTexto);
-                         
-                         document.getElementById(`multi-log-vivo-${index}`).innerText = "🏁 El árbitro pita el final del encuentro. Planillas guardadas con éxito.";
-                         resolveCruce(); 
+                          clearInterval(timerMulti);
+                          
+                          if (partido.definicionPenales && document.getElementById(`multi-penales-box-${index}`)) {
+                               document.getElementById(`multi-penales-box-${index}`).style.display = "block";
+                               document.getElementById(`multi-penales-box-${index}`).innerText = `💥 TANDA DE PENALES POR LA INMORTALIDAD: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
+                          }
+                          
+                          bloquePartido.style.borderColor = "var(--verde-match)";
+                          const finTexto = document.createElement("div"); 
+                          finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:5px;";
+                          finTexto.innerText = `🏆 GANADOR: ${partido.ganadorUsername.toUpperCase()} ✅`;
+                          bloquePartido.appendChild(finTexto);
+                          
+                          document.getElementById(`multi-log-vivo-${index}`).innerText = "🏁 El árbitro pita el final del encuentro. Planillas guardadas con éxito.";
+                          resolveCruce(); 
                      }
                  }, 400);
             });
         });
     });
 
-    // Cierre limpio de los premios y reset del lobby
-    secuenciaPromesas.then(() => {
+     secuenciaPromesas.then(() => {
           const bloquePremio = document.createElement("div");
           bloquePremio.style.cssText = "text-align:center; margin-top:25px; padding:15px; background:rgba(0,255,136,0.05); border:2px dashed var(--dorado); border-radius:10px;";
           let textoPremio = `👑 ¡Fin de la transmisión!\n🎁 El torneo ha concluido exitosamente.`;
@@ -1863,11 +1817,36 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
           if (premio && !premio.ganoBot) {
                if (premio.tipo_apuesta === 'oro') {
                     textoPremio = `🏆 ¡FIN DEL TORNEO! 🏆\n👑 Campeón: ${premio.ganador_username.toUpperCase()}\n🎁 ¡Se lleva 🪙 ${premio.pozo} de Oro!`;
+                    
+                    // 🔥 PARCHE MATEMÁTICO CORREGIDO: Ajustamos el HUD según los débitos reales de la Opción A
+                    if (usuarioActual) {
+                        if (premio.ganador_username.toLowerCase() === usuarioActual.username.toLowerCase()) {
+                            // Sumamos la ganancia neta (la entrada del rival) ya que la suya se debitó en backend
+                            usuarioActual.monedas += (premio.pozo / 2); 
+                        } else {
+                            // Restamos una entrada neta porque no se le había cobrado en el Draft
+                            usuarioActual.monedas -= (premio.pozo / 2); 
+                        }
+                        const elMonedas = document.getElementById("lbl-monedas");
+                        if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
+                    }
+
                } else if (premio.tipo_apuesta === 'carta') {
                     textoPremio = `🏆 ¡FIN DEL TORNEO! 🏆\n👑 Campeón: ${premio.ganador_username.toUpperCase()}\n\n🎉 ¡Conservás tu cromo y ganaste a:\n🌟 [ ${premio.nombreCartaPremio || 'Jugador Épico'} ]!\n\n💀 Los perdedores perdieron su cromo permanentemente.`;
                }
           } else if (premio && premio.ganoBot) {
+               // 🔥 CORREGIDO: Cambiado 'prempeón' por 'premio' para evitar el crash en consola
                textoPremio = premio.tipo_apuesta === 'carta' ? `🤖 ¡El torneo fue conquistado por un Bot (${premio.ganador_username.toUpperCase()})!\n\n💀 Ambos jugadores perdieron sus cartas permanentemente.` : `🤖 ¡Torneo conquistado por un Bot (${premio.ganador_username.toUpperCase()})!\n💸 El pozo se disolvió.`;
+               
+               if (premio.tipo_apuesta === 'oro' && usuarioActual) {
+                    usuarioActual.monedas -= (premio.pozo / 2);
+                    const elMonedas = document.getElementById("lbl-monedas");
+                    if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
+               }
+          }
+          
+          if (premio && (premio.tipo_apuesta === 'carta' || premio.tipo_apuesta === 'oro') && typeof actualizarInterfazUI === 'function') {
+               actualizarInterfazUI();
           }
           
           bloquePremio.innerHTML = `<h3 style="color:var(--dorado); font-family:'Oswald';">🏁 CRÓNICA DEFINITIVA</h3><p style="color:#fff; font-weight:bold; white-space:pre-line;">${textoPremio}</p><button type="button" id="btn-regresar-limpio-multi" class="btn-estadio" style="width:80%; margin-top:15px; background:var(--celeste);">🔄 REGRESAR A LA HOME</button>`;
@@ -1877,13 +1856,12 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
               document.getElementById("multi-pantalla-fixture").style.display = "none";
               document.getElementById("multi-menu-inicial").style.display = "block";
               if (document.getElementById("modulo-mundial-multi")) document.getElementById("modulo-mundial-multi").style.display = "block";
-              liberarNavegacionArenaUI(); multiSalaId = null; multiCodigoSala = null; multiEsCreador = false;
+              liberarNavegacionArenaUI(); multiSalaId = null; multiCodigoSala = null; multiEsCreador = false; jugadoresSeleccionadosDraft = [];
               const btnTienda = document.querySelector("button[onclick*='modulo-sobres']"); cambiarModulo('modulo-sobres', btnTienda);
           };
     });
 };
 
-// Función auxiliar interna exclusiva para dar flash visual en los gritos de gol del multi
 function inyectarGritoGolMulti(index, mensajeTexto) {
      const logView = document.getElementById(`multi-log-vivo-${index}`);
      if (!logView) return;
