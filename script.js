@@ -1973,11 +1973,17 @@ async function cargarRankingMundialesLocal() {
      } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
 }
 
+// Variable global temporal para retener los datos del informe que vienen de Neon
+let datosInformeParcheCache = null;
+
 async function iniciarControladorAnunciosSeguro() {
     try {
         const res = await fetch(`${URL_BASE}/anuncio-actual`);
         const anuncio = await res.json();
         if (!anuncio || !anuncio.activo) return;
+
+        // 🔥 NUEVO: Guardamos el objeto informe (si es que existe en la respuesta del backend)
+        datosInformeParcheCache = anuncio.informe || null;
 
         const modal = document.getElementById('modalAnuncioGlobal');
         const tituloHtml = document.getElementById('anuncioTitulo');
@@ -2002,9 +2008,52 @@ async function iniciarControladorAnunciosSeguro() {
     } catch (err) { console.error("Error en banner de novedades:", err); }
 }
 
+// 🔥 ACTUALIZADO: Al cerrar el banner principal, abre el segundo modal de inmediato
 function cerrarAnuncioGlobal() {
     const modal = document.getElementById('modalAnuncioGlobal');
-    if (modal) { modal.style.display = "none"; document.getElementById('anuncioCuerpo').innerHTML = ""; }
+    if (modal) { 
+        modal.style.display = "none"; 
+        document.getElementById('anuncioCuerpo').innerHTML = ""; 
+    }
+
+    // 🎯 ENGANCHE SECUENCIAL: Si habia un informe guardado, lo renderizamos ahora
+    if (datosInformeParcheCache) {
+        abrirInformeActualizacionUI(datosInformeParcheCache);
+    }
+}
+
+// 🔥 NUEVA FUNCIÓN: Inyecta los cambios y levanta el cartel técnico del parche
+function abrirInformeActualizacionUI(info) {
+    const elVersion = document.getElementById("informe-txt-version");
+    const elFecha = document.getElementById("informe-txt-fecha");
+    const contenedorCambios = document.getElementById("informe-lista-cambios");
+    
+    if (elVersion) elVersion.innerText = info.version || "v2.0";
+    if (elFecha) elFecha.innerText = info.fecha || "Reciente";
+    
+    if (contenedorCambios) {
+        contenedorCambios.innerHTML = "";
+        if (Array.isArray(info.cambios)) {
+            info.cambios.forEach(cambio => {
+                const p = document.createElement("p");
+                p.style.margin = "0";
+                // Reemplaza los asteriscos ** por etiquetas bold doradas con tus variables de CSS
+                p.innerHTML = cambio.replace(/\*\*(.*?)\*\*/g, '<b style="color:var(--dorado);">$1</b>');
+                contenedorCambios.appendChild(p);
+            });
+        }
+    }
+    
+    // Mostramos el modal secundario que creamos en el HTML
+    const modalParche = document.getElementById("modal-informe-parche");
+    if (modalParche) modalParche.style.display = "flex";
+}
+
+// 🔥 NUEVA FUNCIÓN: Cierra definitivamente el informe de parche
+function cerrarInformeParche() {
+    const modalParche = document.getElementById("modal-informe-parche");
+    if (modalParche) modalParche.style.display = "none";
+    datosInformeParcheCache = null; // Limpiamos la caché por el resto de la sesión del cliente
 }
 
 // Función para abrir la interfaz del Bot en el Front
