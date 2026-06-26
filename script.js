@@ -2159,7 +2159,7 @@ async function obtenerOfertasMercado() {
     }
 }
 
-// 🔥 UNIFICADA Y REPARADA: Procesa la compra usando la respuesta directa del Backend
+// Procesa la compra usando la respuesta directa del Backend y actualiza el HUD real
 async function comprarCartaMercado(ofertaId) {
     try {
         const res = await fetch('/api/mercado/comprar', {
@@ -2177,11 +2177,10 @@ async function comprarCartaMercado(ofertaId) {
                 usuarioActual.monedas = data.nuevoOro;
             }
 
-            // 2. Buscamos el elemento visual donde mostrás tus monedas y lo actualizamos al vuelo
-            // (Revisá si usás "usuario-monedas", "nav-monedas", o "monedas-usuario" en tu HTML)
-            const elMonedas = document.getElementById("usuario-monedas") || document.getElementById("txt-monedas") || document.querySelector(".monedas-contador");
+            // 2. 🔥 REPARADO: Clava el nuevo valor directamente en tu Scoreboard del HUD real
+            const elMonedas = document.getElementById("lbl-monedas");
             if (elMonedas && data.nuevoOro !== undefined) {
-                elMonedas.innerHTML = `🪙 ${data.nuevoOro}`;
+                elMonedas.innerText = data.nuevoOro;
             }
 
             // 3. Ejecutamos tus funciones globales de refresco de UI si existen por seguridad
@@ -2191,11 +2190,8 @@ async function comprarCartaMercado(ofertaId) {
             // 4. Sincroniza el inventario local de pases
             cargarAlbumLocal(); 
             
-            // 5. Refresca la vitrina del mercado
-            setTimeout(() => { 
-                obtenerOfertasMercado();
-                cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); 
-            }, 500);
+            // 5. Refresca la vitrina del mercado al instante
+            obtenerOfertasMercado();
 
         } else {
             alert(data.mensaje);
