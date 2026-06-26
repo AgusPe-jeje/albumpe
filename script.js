@@ -1600,24 +1600,36 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
     window.multiMiCartaApostadaTexto = "Cromo repetido de tu stock";
 
     mostrarCarga("Enviando planilla de vestuarios a la Arena Online...");
-    let url = `${URL_BASE}/multijugador/crear`;
+    
+    // 🔥 REPARADO: Se agregó '/api' a las rutas de crear y unirse
+    let url = `${URL_BASE}/api/multijugador/crear`;
     let cuerpo = {
-        usuario_id: usuarioActual.id, seleccion: paisElegido, jugador_ids: arrayIdsJugadores,
-        tipo_apuesta: window.multiTipoApuestaActual, apuesta_oro: multiApuestaFijada
+        seleccion: paisElegido, 
+        jugador_ids: arrayIdsJugadores,
+        tipo_apuesta: window.multiTipoApuestaActual, 
+        apuesta_oro: multiApuestaFijada
     };
 
     if (!multiEsCreador) {
-        url = `${URL_BASE}/multijugador/unirse`;
+        url = `${URL_BASE}/api/multijugador/unirse`;
         cuerpo = {
-            usuario_id: usuarioActual.id, seleccion: paisElegido, jugador_ids: arrayIdsJugadores,
+            seleccion: paisElegido, 
+            jugador_ids: arrayIdsJugadores,
             codigo_sala: multiCodigoSala
         };
     }
 
     try {
         const res = await fetch(url, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo)
+            method: 'POST', 
+            headers: { 
+                'Content-Type': 'application/json',
+                // 🔥 REPARADO: Inyección obligatoria del token para que el server te deje pasar
+                'Authorization': `Bearer ${localStorage.getItem('token_arena')}`
+            }, 
+            body: JSON.stringify(cuerpo) // El server saca tu usuario_id del token, no hace falta en el body
         });
+        
         const data = await res.json();
 
         if (!data.ok) { ocultarCarga(); return alert(data.mensaje); }
