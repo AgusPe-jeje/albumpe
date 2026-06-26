@@ -1944,7 +1944,7 @@ function abrirMercadoBot(listaTusRepetidas) {
             
             <div id="zona-seleccion-bot" style="margin: 15px 0; text-align: left;">
                  <label style="color: #fff; font-size: 0.85rem; font-weight: bold;">Elegí tus 3 cartas a sacrificar:</label>
-                 <div id="lista-checks-repetidas" style="max-height: 150px; min-height: 60px; overflow-y: auto; background: #020617; padding: 10px; border-radius: 6px; margin-top: 5px;">
+                 <div id="lista-checks-repetidas" style="max-height: 200px; min-height: 60px; overflow-y: auto; background: #020617; padding: 10px; border-radius: 6px; margin-top: 5px;">
                  </div>
             </div>
 
@@ -1960,20 +1960,19 @@ function abrirMercadoBot(listaTusRepetidas) {
 
     let contadorRepetidas = 0;
     
-    // 1. Renderizar repetidas si existen
     listaTusRepetidas.forEach(jugador => {
          if (jugador.obtenido > 1) {
               contadorRepetidas++;
+              // 🔥 FIX DE ESTILOS: Usamos flexbox horizontal para que la casilla y el texto queden perfectos
               listaCheckboxes.innerHTML += `
-                   <label style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 5px; cursor: pointer; text-align: left; width: 100%;">
-                        <input type="checkbox" class="check-cromo-bot" value="${jugador.id}" style="margin-right: 8px;">
-                        ${jugador.nombre} (${jugador.rareza.toUpperCase()}) - Repetidas: [${jugador.obtenido - 1}]
+                   <label style="display: flex; align-items: center; gap: 10px; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 8px; cursor: pointer; text-align: left; width: 100%;">
+                        <input type="checkbox" class="check-cromo-bot" value="${jugador.id}" style="width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
+                        <span style="flex-grow: 1;">${jugador.nombre} (${jugador.rareza.toUpperCase()}) - Repetidas: [${jugador.obtenido - 1}]</span>
                    </label>
               `;
          }
     });
 
-    // 2. 🔥 PARCHE SEGURO: Si no hay repetidas, aplicamos flex solo para centrar el mensaje de error
     if (contadorRepetidas === 0) {
          listaCheckboxes.style.display = "flex";
          listaCheckboxes.style.flexDirection = "column";
@@ -1991,11 +1990,9 @@ function abrirMercadoBot(listaTusRepetidas) {
          btnTrato.style.cursor = "not-allowed";
          btnTrato.innerText = "⛔ SIN ELEMENTOS PARA INTERCAMBIAR";
     } else {
-         // Si tiene repetidas, nos aseguramos de que use la visualización en bloque estándar
          listaCheckboxes.style.display = "block";
     }
 
-    // 3. Evento de envío
     document.getElementById("btn-ejecutar-trato").onclick = async () => {
          const seleccionados = Array.from(document.querySelectorAll('.check-cromo-bot:checked')).map(cb => parseInt(cb.value));
 
@@ -2019,7 +2016,7 @@ function abrirMercadoBot(listaTusRepetidas) {
               if (data.ok) {
                    document.getElementById("resultado-trato-bot").style.color = "var(--verde-match)";
                    document.getElementById("resultado-trato-bot").innerHTML = `
-                        🎉 ${data.mensaje}<br>
+                        🎉 ${data.mensaje || '¡Trato hecho!'}<br>
                         🌟 CROMO RECIBIDO: <span style="color: var(--dorado);">${data.cartaGanada.nombre} [${data.cartaGanada.rareza}]</span>
                    `;
                    setTimeout(() => { 
@@ -2027,8 +2024,9 @@ function abrirMercadoBot(listaTusRepetidas) {
                        cambiarModulo('modulo-album', null);
                    }, 2000);
               } else {
+                   // 🔥 FIX UNDEFINED: Si no viene data.mensaje, lee data.error o tira un mensaje genérico
                    document.getElementById("resultado-trato-bot").style.color = "var(--rojo)";
-                   document.getElementById("resultado-trato-bot").innerText = data.mensaje;
+                   document.getElementById("resultado-trato-bot").innerText = data.mensaje || data.error || "❌ La Arena rechazó el intercambio.";
                    document.getElementById("btn-ejecutar-trato").disabled = false;
               }
          } catch (err) {
