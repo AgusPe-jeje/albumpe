@@ -1,7 +1,7 @@
 /* ========================================================================
    🎯 1. CONFIGURACIÓN, INSTANCIAS Y VARIABLES DE ESTADO GLOBAL
    ======================================================================== */
-(function() {
+
 const URL_RENDER_SERVICIO = "https://albumpe.onrender.com";
 const URL_BASE = `${URL_RENDER_SERVICIO}/api`;
 
@@ -26,35 +26,7 @@ let multiCodigoSala = null;
 let multiEsCreador = false;
 let multiIntervaloLobby = null;
 let multiApuestaFijada = 0;
-let tieneEnergiaTimba = true;
-let penalEnCurso = false; // Candado de animación
 window.multiTipoApuestaActual = 'amistoso'; // Opciones: 'amistoso', 'oro', 'carta'
-
-window.cambiarModulo = cambiarModulo;
-    window.abrirModalAyuda = abrirModalAyuda;
-    window.cerrarModalAyuda = cerrarModalAyuda;
-    window.autenticarUsuario = autenticarUsuario;
-    window.cerrarSesionLocal = cerrarSesionLocal;
-    window.comprarSobreEspecifico = comprarSobreEspecifico;
-    window.mostrarSiguienteCartaSecuencia = mostrarSiguienteCartaSecuencia;
-    window.iniciarDueloLocal = iniciarDueloLocal;
-    window.ejecutarPenalLocal = ejecutarPenalLocal;
-    window.conmutarControlesTimbaUI = conmutarControlesTimbaUI;
-    window.prepararOpcionesApuesta = prepararOpcionesApuesta;
-    window.prepararInscripcionMundial = prepararInscripcionMundial;
-    window.ejecutarTorneoMundial = ejecutarTorneoMundial;
-    window.abrirDraftMulti = abrirDraftMulti;
-    window.lanzarSimulacionMulti = lanzarSimulacionMulti;
-    window.cancelarMundialMultiLobby = cancelarMundialMultiLobby;
-    window.conmutarInputsMultiUI = conmutarInputsMultiUI;
-    window.cerrarAnuncioGlobal = cerrarAnuncioGlobal;
-    window.cerrarInformeParche = cerrarInformeParche;
-    window.publicarCartaMercado = publicarCartaMercado;
-    window.comprarCartaMercado = comprarCartaMercado;
-    window.seleccionarQuiniela = seleccionarQuiniela;
-    window.enviarBoletaQuiniela = enviarBoletaQuiniela;
-
-})();
 
 // Mapeos Estáticos de Diseño y Lógica de Puntos
 const MAPA_PUNTOS_RAREZA = { 
@@ -634,14 +606,8 @@ async function iniciarDueloLocal() {
      }
 }
 
-// Recordá tener esta variable definida al inicio de tu archivo:
-// let penalEnCurso = false;
-
 async function ejecutarPenalLocal(direccionElegida) {
-     // 🛡️ Si ya hay un tiro en ejecución o faltan datos esenciales, rebotamos de inmediato
-     if (penalEnCurso || !usuarioActual || !direccionGanadora) return;
-     
-     penalEnCurso = true; // Cerramos el candado de seguridad al arrancar el tiro
+     if (!usuarioActual || !direccionGanadora) return;
 
      const esMovil = window.innerWidth <= 768;
      const fX = esMovil ? 0.55 : 1.0; 
@@ -689,7 +655,6 @@ async function ejecutarPenalLocal(direccionElegida) {
           balon.style.transform = mapaAnimaciones[direccionElegida].balon;
      }
 
-     // Desactivamos clicks en los objetivos visuales durante el transcurso
      document.querySelectorAll('.zona-disparo-target').forEach(z => z.style.pointerEvents = "none");
      await new Promise(r => setTimeout(r, 600));
 
@@ -718,7 +683,7 @@ async function ejecutarPenalLocal(direccionElegida) {
                alert(data.mensaje);
                resTexto.style.color = "var(--rojo)";
                resTexto.innerText = "¡SIN ENERGÍA! ⏱️";
-               return; // Corta acá, pero el bloque finally se va a ejecutar igual
+               return;
           }
 
           usuarioActual.monedas = data.datos.monedas;
@@ -737,12 +702,7 @@ async function ejecutarPenalLocal(direccionElegida) {
           arrancarCronometroVisual(data.siguienteIn);
      } catch (err) {
           console.error(err);
-          // Si explota la red, volvemos a habilitar las zonas para que no se congele la UI
           document.querySelectorAll('.zona-disparo-target').forEach(z => z.style.pointerEvents = "auto");
-     } finally {
-          // 🛡️ REGLA DE ORO: Pase lo que pase (éxito, error de energía o caída de red), 
-          // abrimos el candado al final para que el jugador pueda seguir usando el módulo.
-          penalEnCurso = false;
      }
 }
 
@@ -789,15 +749,15 @@ async function actualizarTimbasRestantesUI() {
           const res = await fetch(URL_BASE + '/timbas-restantes/' + usuarioActual.id);
           const datos = await res.json();
           
-          // 🛡️ CORRECCIÓN: Limpiamos usando la variable global real del archivo
-          if (intervaloCronometroTimba) {
-               clearInterval(intervaloCronometroTimba);
+          // 🔥 1. FRENAR EL RELOJ VIEJO INMEDIATAMENTE
+          // Buscá cómo se llama la variable global de tu setInterval del reloj (suele ser 'timerTimba', 'intervaloCronometro', etc.)
+          // Reemplazá 'intervaloCronometroVisual' por el nombre real de tu variable global:
+          if (typeof intervaloCronometroVisual !== "undefined") {
+               clearInterval(intervaloCronometroVisual);
           }
           
-          // 🛡️ Seteamos el estado lógico real
-          tieneEnergiaTimba = datos.timbas > 0;
-          
-          if (!tieneEnergiaTimba) {
+          // 2. Pintamos el estado actual de tus apuestas
+          if (datos.timbas <= 0) {
                lblCronometro.style.borderColor = 'var(--rojo)';
                lblCronometro.style.color = 'var(--rojo)';
                lblCronometro.innerText = '❌ SIN ENERGÍA PARA TIMBEAR ⏱️';
@@ -807,10 +767,15 @@ async function actualizarTimbasRestantesUI() {
                lblCronometro.innerText = '🎰 Apuestas disponibles: ' + datos.timbas + '/10';
           }
 
+          // 🔥 3. AGUANTAR EL MUNDO POR 5 SEGUNDOS
           if (datos.siguienteIn > 0 && datos.timbas < 10) {
-               const TIEMPO_CONGELADO_MS = 5000;
+               const TIEMPO_CONGELADO_MS = 5000; // ⏱️ Se queda fijo 5 segundos enteros
+
                setTimeout(() => {
-                    const tiempoAjustado = datos.siguienteIn - TIEMPO_CONGELADO_MS;
+                    // Pasados los 5 segundos, recalculamos el tiempo restante y reactivamos tu loop dinámico
+                    const tiempoTranscurrido = TIEMPO_CONGELADO_MS;
+                    const tiempoAjustado = datos.siguienteIn - tiempoTranscurrido;
+                    
                     arrancarCronometroTimbaVisual(tiempoAjustado > 0 ? tiempoAjustado : datos.siguienteIn);
                }, TIEMPO_CONGELADO_MS);
           }
@@ -884,8 +849,7 @@ function actualizarHistorialUI(infoPartido) {
      historialPartidosSimulados.forEach(p => {
           const li = document.createElement("li");
           li.className = "item-historial-partido";
-          // 🛡️ CORREGIDO: p.visitor en vez de p.visitante para que coincida con el objeto enviado
-          li.innerHTML = `<span>⚔️ ${p.local} vs ${p.visitor}</span> <b style="color: var(--celeste);">${p.res}</b>`;
+          li.innerHTML = `<span>⚔️ ${p.local} vs ${p.visitante}</span> <b style="color: var(--celeste);">${p.res}</b>`;
           contenedorLista.appendChild(li);
      });
 }
@@ -2433,21 +2397,17 @@ function seleccionarQuiniela(partido, prediccion, boton) {
 }
 
 // Envía la boleta combinada compartiendo los límites de la timba individual
-// Variable de control interna para evitar múltiples clicks seguidos antes de la respuesta
-let quinielaEnCurso = false;
-
 async function enviarBoletaQuiniela() {
-    // 🛡️ REGLA DE ORO SÓLIDA: Validar la energía mirando el estado lógico real, no el DOM
-    if (!tieneEnergiaTimba) {
+    const monto = parseInt(document.getElementById("input-monto-quiniela").value);
+    const divRes = document.getElementById("resultado-quiniela");
+
+    // 🛡️ REGLA DE ORO: Validar la energía mirando únicamente el botón nativo
+    const btnTimbaComun = document.getElementById("btn-preparar-apuesta"); 
+
+    if (btnTimbaComun && btnTimbaComun.disabled) {
         alert("⚠️ ¡Sin energía! Debés esperar a que se recargue el cronómetro de la Timba para poder jugar otra boleta.");
         return;
     }
-
-    // Candado anti-spam por si hacen clicks masivos mientras procesa el servidor
-    if (quinielaEnCurso) return;
-
-    const monto = parseInt(document.getElementById("input-monto-quiniela").value);
-    const divRes = document.getElementById("resultado-quiniela");
 
     if (!eleccionesQuiniela.p1 || !eleccionesQuiniela.p2 || !eleccionesQuiniela.p3) {
         alert("⚠️ Seleccioná un pronóstico para los 3 partidos vigentes.");
@@ -2458,7 +2418,6 @@ async function enviarBoletaQuiniela() {
         return;
     }
 
-    quinielaEnCurso = true; // Cierra el candado de red
     divRes.style.color = "#fff";
     divRes.innerText = "⏳ Procesando boleta combinada...";
 
@@ -2480,10 +2439,10 @@ async function enviarBoletaQuiniela() {
             const elMonedas = document.getElementById("lbl-monedas");
             if (elMonedas && data.nuevoOro !== undefined) elMonedas.innerText = data.nuevoOro;
 
-            // 2. 🔥 IMPACTO VISUAL E INTERNO DE ENERGÍA NATIVA
-            // Sincroniza la variable lógica y refresca el contador
+            // 2. 🔥 IMPACTO VISUAL INMEDIATO DE ENERGÍA NATIVA
+            // Forzamos a tu sistema core a re-calcular y dibujar los intentos restantes en pantalla
             if (typeof actualizarTimbasRestantesUI === "function") {
-                await actualizarTimbasRestantesUI();
+                actualizarTimbasRestantesUI();
             }
 
             // 3. Render del Desglose de Resultados
@@ -2528,7 +2487,5 @@ async function enviarBoletaQuiniela() {
         console.error(err);
         divRes.style.color = "var(--rojo)";
         divRes.innerText = "❌ Error de conexión.";
-    } finally {
-        quinielaEnCurso = false; // Abre el candado de red al finalizar de cualquier modo
     }
 }
