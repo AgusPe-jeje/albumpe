@@ -2236,33 +2236,49 @@ app.get('/api/multijugador/resultado-invitado/:sala_id', async (req, res) => {
 });
 
 /* ========================================================================
-   🃏 MERCADO DE PASES AI: TRADEO DE REPETIDAS CON EL BOT
+   🃏 MERCADO DE PASES AI: TRADEO DE REPETIDAS ADAPTADO A 'OBTENIDO'
    ======================================================================== */
 app.post('/api/album/comerciar-bot', async (req, res) => {
-    const { usuario_id, jugadorIdsASacar } = req.body; // Enviamos un array con los 3 IDs a sacrificar
+    const { usuario_id, jugadorIdsASacar } = req.body; 
 
     if (!jugadorIdsASacar || jugadorIdsASacar.length !== 3) {
         return res.status(400).json({ ok: false, mensaje: "El Bot exige exactamente 3 cartas para el trato." });
     }
 
     try {
-        // 1. Verificar que el usuario tenga stock de esas 3 cartas y sean REPETIDAS (cantidad > 1)
-        // Usamos un bucle para verificar una por una de forma segura
-        for (let jId of jugadorIdsASacar) {
+        // 1. Mapeamos cuántas veces se seleccionó cada ID en esta petición
+        const conteoSolicitado = {};
+        jugadorIdsASacar.forEach(id => {
+            conteoSolicitado[id] = (conteoSolicitado[id] || 0) + 1;
+        });
+
+        // Verificamos el stock real en la base de datos usando la columna 'obtenido'
+        for (let jId of Object.keys(conteoSolicitado)) {
+            const cantidadPedida = conteoSolicitado[jId];
+
+            // 🔥 CAMBIO: SELECT obtenido en lugar de cantidad
             const checkRepetida = await pool.query(
-                "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, jId]
+                "SELECT obtenido FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
+                [usuario_id, parseInt(jId)]
             );
             
-            if (checkRepetida.rows.length === 0 || checkRepetida.rows[0].amount <= 1) {
+            if (checkRepetida.rows.length === 0) {
+                return res.json({ ok: false, mensaje: "❌ Uno de los cromos seleccionados no está en tu inventario." });
+            }
+
+            // 🔥 CAMBIO: Mapeo directo a la columna real .obtenido
+            const cantidadActual = checkRepetida.rows[0].obtenido;
+
+            // Validación matemática anti-trampas
+            if (cantidadActual - cantidadPedida < 1) {
                 return res.json({ ok: false, mensaje: "❌ No tenés repetidas suficientes de alguno de los jugadores elegidos." });
             }
         }
 
-        // 2. Si todo está OK, procedemos a restar 1 unidad de cada cromo sacrificado
+        // 2. Si todo está OK, procedemos a restar 1 unidad a 'obtenido'
         for (let jId of jugadorIdsASacar) {
             await pool.query(
-                "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
+                "UPDATE usuario_progreso SET obtenido = obtenido - 1 WHERE usuario_id = $1 AND jugador_id = $2",
                 [usuario_id, jId]
             );
         }
@@ -2273,10 +2289,10 @@ app.post('/api/album/comerciar-bot', async (req, res) => {
         );
         const cartaPremio = lootBot.rows[0];
 
-        // 4. Inyectamos la nueva carta en el inventario del usuario
+        // 4. Inyectamos la nueva carta sumando 1 a 'obtenido' en caso de conflicto
         await pool.query(
-            `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) 
-             ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + 1`,
+            `INSERT INTO usuario_progreso (usuario_id, jugador_id, obtenido) VALUES ($1, $2, 1) 
+             ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET obtenido = usuario_progreso.obtenido + 1`,
             [usuario_id, cartaPremio.id]
         );
 
