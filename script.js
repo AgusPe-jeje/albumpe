@@ -2269,12 +2269,11 @@ async function enviarBoletaQuiniela() {
     const monto = parseInt(document.getElementById("input-monto-quiniela").value);
     const divRes = document.getElementById("resultado-quiniela");
 
-    // 🛡️ REGLA DE ORO: Validar si la timba está bloqueada por falta de energía o cooldown
-    // Buscamos si tu botón nativo de timba está deshabilitado o si el texto del cronómetro indica recarga
-    const crono = document.getElementById("cronometro-timba");
-    const btnTimbaComun = document.getElementById("btn-preparar-apuesta"); // El botón nativo que ya tenés arriba
+    // 🛡️ REGLA DE ORO CORREGIDA: Validar la energía mirando únicamente el botón nativo
+    // Si el botón principal ya está bloqueado, rebotamos la jugada de una sin importar el texto del reloj
+    const btnTimbaComun = document.getElementById("btn-preparar-apuesta"); 
 
-    if ((btnTimbaComun && btnTimbaComun.disabled) || (crono && !crono.innerText.includes("🔋"))) {
+    if (btnTimbaComun && btnTimbaComun.disabled) {
         alert("⚠️ ¡Sin energía! Debés esperar a que se recargue el cronómetro de la Timba para poder jugar otra boleta.");
         return;
     }
@@ -2337,18 +2336,12 @@ async function enviarBoletaQuiniela() {
                 btn.style.borderColor = "#475569";
             });
 
-            // 🔥 COMPARTIR LIMITACIÓN DE INTENTOS:
-            // Al ejecutar una jugada de quiniela, forzamos a que se gaste el intento llamando 
-            // a la misma función nativa que usás para activar el cooldown de la timba común.
-            // (Ejemplo: si usás iniciarCooldownTimba() o dispararRelojBanka(), ponela acá abajo)
+            // 🔥 COMPARTIR LIMITACIÓN DE INTENTOS
             if (typeof forzarCooldownTimbaLocal === "function") {
                 forzarCooldownTimbaLocal();
             } else {
-                // Si no tenés una función directa, simulamos el click en tu botón para que tu script viejo
-                // se encargue de quemar el intento y arrancar el reloj como siempre:
                 if (btnTimbaComun) {
                     console.log("Sincronizando gasto de intento con la Banka...");
-                    // Esto va a disparar tu lógica nativa de límites sin romper nada
                 }
             }
 
