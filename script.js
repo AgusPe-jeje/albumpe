@@ -57,8 +57,8 @@ var historialPartidosSimulados = [];
    ======================================================================== */
 
 function cambiarModulo(idModulo, botonPresionado) {
-     // Oculta tanto los módulos comunes como el multijugador
-     document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi').forEach(mod => mod.style.display = 'none');
+     // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' para que se oculte correctamente al navegar
+     document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi, #modulo-mercado-pases').forEach(mod => mod.style.display = 'none');
      document.querySelectorAll('.tile-modulo-fifa, .btn-modulo-match').forEach(btn => btn.classList.remove('activo'));
      
      // Muestra el módulo clickeado
@@ -69,6 +69,12 @@ function cambiarModulo(idModulo, botonPresionado) {
      // Lógica de carga interna bajo demanda de cada sección
      if (idModulo === 'modulo-album' && usuarioActual) cargarAlbumLocal();
      if (idModulo === 'modulo-penales' && usuarioActual) iniciarDueloLocal();
+     
+     // 🔥 NUEVA LÓGICA: Al entrar al Mercado, cargamos tus repetidas y las ofertas globales
+     if (idModulo === 'modulo-mercado-pases' && usuarioActual) {
+          cargarMisRepetidasParaVenta();
+          obtenerOfertasMercado();
+     }
      
      if (idModulo === 'modulo-timba' && usuarioActual) {
           rotarPartidoTimba();
@@ -2047,4 +2053,109 @@ function abrirMercadoBot(listaTusRepetidas) {
               document.getElementById("btn-ejecutar-trato").disabled = false;
          }
     };
+}
+
+// Llena el select usando las copias del álbum global de forma adaptada
+function cargarMisRepetidasParaVenta() {
+    const select = document.getElementById("select-mercado-vender");
+    if (!select) return;
+    select.innerHTML = '<option value="">-- Elegí tu cromo --</option>';
+    
+    const cartas = window.albumCompleto || [];
+    cartas.forEach(jugador => {
+        const copias = jugador.obtenido !== undefined ? jugador.obtenido : (jugador.cantidad || 0);
+        if (copias > 1) {
+            select.innerHTML += `<option value="${jugador.id}">${jugador.nombre} (${(jugador.rareza || 'comun').toUpperCase()}) [x${copias - 1}]</option>`;
+        }
+    });
+}
+
+// Envía el cromo a la vitrina
+async function publicarCartaMercado() {
+    const jugadorId = document.getElementById("select-mercado-vender").value;
+    const precio = parseInt(document.getElementById("input-mercado-precio").value);
+
+    if (!jugadorId || !precio || precio < 50) {
+        alert("⚠️ Seleccioná un cromo válido y un precio mínimo de 🪙50 de Oro.");
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/mercado/publicar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id: usuarioActual.id, jugador_id: parseInt(jugadorId), precio })
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+            alert("✨ Cromo publicado en la vitrina internacional.");
+            document.getElementById("input-mercado-precio").value = "";
+            cargarAlbumLocal(); // Sincroniza stock nativo
+            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+        } else {
+            alert(data.mensaje);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// Renderiza todas las publicaciones activas ajenas
+async function obtenerOfertasMercado() {
+    const grid = document.getElementById("grid-mercado-pases");
+    if (!grid) return;
+    grid.innerHTML = "<p style='color:#64748b; grid-column:1/-1; text-align:center;'>⏳ Cargando vitrina de pases...</p>";
+
+    try {
+        const res = await fetch(`/api/mercado/ofertas?usuario_id=${usuarioActual.id}`);
+        const data = await res.json();
+
+        if (!data.ok || data.ofertas.length === 0) {
+            grid.innerHTML = "<p style='color:#64748b; grid-column:1/-1; text-align:center;'>🏪 La vitrina está vacía en este momento.</p>";
+            return;
+        }
+
+        grid.innerHTML = "";
+        data.ofertas.forEach(oferta => {
+            grid.innerHTML += `
+                <div style="background: #1e293b; border: 1px solid var(--dorado); border-radius: 8px; padding: 12px; text-align: center; display: flex; flex-direction: column; justify-content: space-between;">
+                    <div>
+                        <span style="font-size: 1.5rem; display:block; margin-bottom:5px;">${oferta.bandera || '🛡️'}</span>
+                        <strong style="color: #fff; font-size: 0.95rem; display:block;">${oferta.nombre}</strong>
+                        <span style="font-size:0.75rem; color:var(--celeste); font-weight:bold; display:block; margin-top:2px;">${oferta.rareza.toUpperCase()}</span>
+                        <span style="font-size:0.75rem; color:#94a3b8; display:block; margin-top:4px;">Vendedor: ${oferta.nombre_vendedor}</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <div style="color: var(--dorado); font-weight: bold; font-size: 1rem; margin-bottom: 8px;">🪙 ${oferta.precio_oro}</div>
+                        <button type="button" class="btn-estadio" style="background: var(--dorado); color:#000; width:100%; font-size:0.8rem; padding: 5px 0;" onclick="comprarCartaMercado(${oferta.id})">COMPRAR</button>
+                    </div>
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// Ejecuta la adquisición de una carta expuesta
+async function comprarCartaMercado(ofertaId) {
+    try {
+        const res = await fetch('/api/mercado/comprar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id: usuarioActual.id, oferta_id: ofertaId })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador}. El Oro fue transferido.`);
+            cargarAlbumLocal(); // Actualiza el álbum nativo
+            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+        } else {
+            alert(data.mensaje);
+        }
+    } catch (err) {
+        console.error(err);
+    }
 }
