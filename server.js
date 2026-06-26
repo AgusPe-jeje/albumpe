@@ -32,7 +32,7 @@ function generarCodigoSala() {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
-const MODO_MANTENIMIENTO = true; 
+const MODO_MANTENIMIENTO = false; 
 // 👥 Agregá o sacá acá los usuarios permitidos en minúscula para las pruebas
 const TESTERS_PERMITIDOS = ["aguspe", "evevea"]; 
 
@@ -2615,7 +2615,7 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
     texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo.",
     urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
-    urlVideo: "https://www.youtube.com/embed/dQw4w9WgXcQ" 
+    urlVideo: "https://www.youtube.com/embed/6DTWH9kYAiY" 
 };
 
 // Endpoint público para que el juego consulte el anuncio
