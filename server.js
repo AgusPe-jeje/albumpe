@@ -2478,6 +2478,82 @@ app.post('/api/mercado/comprar', async (req, res) => {
 });
 
 /* ========================================================================
+   🎰 ENGINE QUINIELA COMBINADA (X10 MULTIPLICADOR)
+   ======================================================================== */
+app.post('/api/timba/quiniela', async (req, res) => {
+    let { usuario_id, monto, elecciones } = req.body; // elecciones viene como { p1: 'L', p2: 'E', p3: 'V' }
+
+    try {
+        // Blindaje de seguridad por si las moscas con el ID "1:1"
+        if (usuario_id && String(usuario_id).includes(":")) {
+            usuario_id = String(usuario_id).split(":")[0];
+        }
+        usuario_id = parseInt(usuario_id);
+        monto = parseInt(monto);
+
+        if (!monto || monto < 50) {
+            return res.json({ ok: false, mensaje: "⚠️ El monto mínimo para la boleta es de 50 de Oro." });
+        }
+
+        // 1. Validar fondos del apostador en Neon
+        const checkUser = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+        if (checkUser.rows.length === 0 || checkUser.rows[0].monedas < monto) {
+            return res.json({ ok: false, mensaje: "❌ No tenés suficiente Oro en tu cuenta para esta jugada." });
+        }
+
+        // Descontamos el costo de la boleta inmediatamente
+        await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [monto, usuario_id]);
+
+        // 2. SIMULACIÓN INTERNA DE LOS 3 ENCUENTROS
+        const opciones = ['L', 'E', 'V'];
+        const reales = {
+            p1: opciones[Math.floor(Math.random() * 3)],
+            p2: opciones[Math.floor(Math.random() * 3)],
+            p3: opciones[Math.floor(Math.random() * 3)]
+        };
+
+        // Verificamos si clavó el triple acierto
+        const aciertoP1 = (elecciones.p1 === reales.p1);
+        const aciertoP2 = (elecciones.p2 === reales.p2);
+        const aciertoP3 = (elecciones.p3 === reales.p3);
+        const boletaGanadora = (aciertoP1 && aciertoP2 && aciertoP3);
+
+        let premio = 0;
+        let mensaje = "";
+
+        if (boletaGanadora) {
+            premio = monto * 10; // Multiplicador x10 de la casa
+            await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [premio, usuario_id]);
+            mensaje = `🔥 ¡QUINIELA DE ORO PERFECTA! Acertaste los 3 partidos y ganaste 🪙${premio}.`;
+        } else {
+            mensaje = "❌ Boleta perdedora. Fallaste en el pronóstico combinado.";
+        }
+
+        // Guardamos el registro de la jugada en la tabla independiente
+        await pool.query(
+            "INSERT INTO quiniela_apuestas (usuario_id, monto_apostado, predicciones, ganada, premio_entregado) VALUES ($1, $2, $3, $4, $5)",
+            [usuario_id, monto, JSON.stringify(elecciones), boletaGanadora, premio]
+        );
+
+        // Traemos el saldo fresco final de Neon
+        const checkOroFinal = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+        const nuevoOro = checkOroFinal.rows[0].monedas;
+
+        return res.json({
+            ok: true,
+            ganó: boletaGanadora,
+            mensaje: mensaje,
+            resultadosReales: reales,
+            nuevoOro: nuevoOro
+        });
+
+    } catch (err) {
+        console.error("❌ Error en la quiniela:", err);
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+/* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
    ======================================================================== */
 // Esta configuración vive en el servidor, nadie la puede tocar desde el navegador
