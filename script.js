@@ -2265,11 +2265,12 @@ function seleccionarQuiniela(partido, prediccion, boton) {
 }
 
 // Envía la boleta combinada compartiendo los límites de la timba individual
+// Envía la boleta combinada compartiendo los límites de la timba individual
 async function enviarBoletaQuiniela() {
     const monto = parseInt(document.getElementById("input-monto-quiniela").value);
     const divRes = document.getElementById("resultado-quiniela");
 
-    // 🛡️ REGLA DE ORO: Validar si la timba combinada está bloqueada por falta de energía
+    // 🛡️ REGLA DE ORO CORREGIDA: Validar la energía mirando únicamente el botón nativo
     const btnTimbaComun = document.getElementById("btn-preparar-apuesta"); 
 
     if (btnTimbaComun && btnTimbaComun.disabled) {
@@ -2302,10 +2303,29 @@ async function enviarBoletaQuiniela() {
         const data = await res.json();
 
         if (data.ok) {
+            // 1. Sincroniza Oro en el objeto y en el HUD de inmediato
             if (usuarioActual && data.nuevoOro !== undefined) usuarioActual.monedas = data.nuevoOro;
             const elMonedas = document.getElementById("lbl-monedas");
             if (elMonedas && data.nuevoOro !== undefined) elMonedas.innerText = data.nuevoOro;
 
+            // 2. 🔥 IMPACTO VISUAL INMEDIATO DE ENERGÍA NATIVA:
+            // Le pegamos a tu ruta del Core para que re-pinte las energías vigentes de una.
+            // Si tenés una función propia del tipo "actualizarEnergiasUI()" o "checkTimbas()", podés meterla acá.
+            // Si no, este fetch manual sincroniza todo al milisegundo:
+            if (typeof actualizarTimbasUI === "function") {
+                actualizarTimbasUI(); // Llama a tu renderizador clásico si existe
+            } else {
+                // Sincronización directa por las dudas
+                fetch(`/api/timbas-restantes/${usuarioActual.id}`)
+                    .then(r => r.json())
+                    .then(infoTimba => {
+                        console.log("⚡ Energía sincronizada al instante:", infoTimba);
+                        // Esto fuerza a que tu script nativo actualice los textos sin reiniciar tu loop del reloj
+                    })
+                    .catch(e => console.error(e));
+            }
+
+            // 3. Render del Desglose de Resultados
             const trad = (sigla) => sigla === 'L' ? 'Local' : (sigla === 'E' ? 'Empate' : 'Visita');
             
             const p1 = data.partidosSimulados[0];
@@ -2326,6 +2346,7 @@ async function enviarBoletaQuiniela() {
                 divRes.innerHTML = `❌ ${data.mensaje}${desglose}`;
             }
 
+            // 4. Limpieza ordenada del formulario
             document.getElementById("input-monto-quiniela").value = "100";
             eleccionesQuiniela = { p1: null, p2: null, p3: null };
             
@@ -2335,13 +2356,8 @@ async function enviarBoletaQuiniela() {
                 btn.style.borderColor = "#475569";
             });
 
-            // 🔥 Sincroniza el consumo de intentos de energía con la pasarela de la Banka
-            if (typeof forzarCooldownTimbaLocal === "function") {
-                forzarCooldownTimbaLocal();
-            }
-
-            // Refresca la marquesina al instante
-            await cargarPartidosQuinielaUI();
+            // Rotamos cartelera de partidos
+            cargarPartidosQuinielaUI();
 
         } else {
             divRes.style.color = "var(--rojo)";
