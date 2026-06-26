@@ -2201,3 +2201,95 @@ async function comprarCartaMercado(ofertaId) {
         alert("❌ Ocurrió un problema de red al procesar el fichaje.");
     }
 }
+
+// Memoria local temporal para guardar lo que va marcando el jugador
+let eleccionesQuiniela = { p1: null, p2: null, p3: null };
+
+// Maneja los clicks y pinta el botón seleccionado con color dorado
+function seleccionarQuiniela(partido, prediccion, boton) {
+    // Apaga el estilo de los otros botones de ese mismo partido
+    document.querySelectorAll(`.btn-quiniela-p${partido}`).forEach(btn => {
+        btn.style.background = "#1e293b";
+        btn.style.color = "#fff";
+        btn.style.borderColor = "#475569";
+    });
+
+    // Enciende el botón actual con tu mística clásica
+    boton.style.background = "var(--dorado)";
+    boton.style.color = "#000";
+    boton.style.borderColor = "var(--dorado)";
+
+    // Guarda la selección en la boleta temporal
+    eleccionesQuiniela[`p${partido}`] = prediccion;
+}
+
+// Envía la boleta combinada al Backend e impacta el HUD de una
+async function enviarBoletaQuiniela() {
+    const monto = parseInt(document.getElementById("input-monto-quiniela").value);
+    const divRes = document.getElementById("resultado-quiniela");
+
+    if (!eleccionesQuiniela.p1 || !eleccionesQuiniela.p2 || !eleccionesQuiniela.p3) {
+        alert("⚠️ Tenés que marcar un pronóstico para los 3 partidos antes de jugar la boleta.");
+        return;
+    }
+
+    if (!monto || monto < 50) {
+        alert("⚠️ Ingresá un monto válido de apuesta (Mínimo 🪙50).");
+        return;
+    }
+
+    divRes.style.color = "#fff";
+    divRes.innerText = "⏳ Procesando boleta en los servidores de la Arena...";
+
+    try {
+        const res = await fetch('/api/timba/quiniela', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                usuario_id: usuarioActual.id,
+                monto: monto,
+                elecciones: eleccionesQuiniela
+            })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            // Sincroniza las monedas globales y el scoreboard real
+            if (usuarioActual && data.nuevoOro !== undefined) {
+                usuarioActual.monedas = data.nuevoOro;
+            }
+            const elMonedas = document.getElementById("lbl-monedas");
+            if (elMonedas && data.nuevoOro !== undefined) {
+                elMonedas.innerText = data.nuevoOro;
+            }
+
+            // Traduce los resultados para que el usuario entienda qué salió
+            const trad = (sigla) => sigla === 'L' ? 'Local' : (sigla === 'E' ? 'Empate' : 'Visita');
+
+            if (data.ganó) {
+                divRes.style.color = "var(--verde-match)";
+                divRes.innerHTML = `🎉 ${data.mensaje}<br><span style="color:#94a3b8; font-size:0.85rem;">Resultados de la fecha: [P1: ${trad(data.resultadosReales.p1)}] - [P2: ${trad(data.resultadosReales.p2)}] - [P3: ${trad(data.resultadosReales.p3)}]</span>`;
+            } else {
+                divRes.style.color = "var(--rojo)";
+                divRes.innerHTML = `❌ ${data.mensaje}<br><span style="color:#94a3b8; font-size:0.85rem;">Resultados reales: [P1: ${trad(data.resultadosReales.p1)}] - [P2: ${trad(data.resultadosReales.p2)}] - [P3: ${trad(data.resultadosReales.p3)}]</span>`;
+            }
+
+            // Resetea el formulario limpio
+            document.getElementById("input-monto-quiniela").value = "";
+            eleccionesQuiniela = { p1: null, p2: null, p3: null };
+            document.querySelectorAll('[class^="btn-quiniela-p"]').forEach(btn => {
+                btn.style.background = "#1e293b";
+                btn.style.color = "#fff";
+                btn.style.borderColor = "#475569";
+            });
+
+        } else {
+            divRes.style.color = "var(--rojo)";
+            divRes.innerText = data.mensaje;
+        }
+    } catch (err) {
+        console.error(err);
+        divRes.style.color = "var(--rojo)";
+        divRes.innerText = "❌ Error de conexión al procesar la jugada combinada.";
+    }
+}
