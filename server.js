@@ -1803,10 +1803,12 @@ app.post('/api/multijugador/preparar-draft', async (req, res) => {
 });
 
 /* ========================================================================
-   🏆 MÓDULO MULTIJUGADOR REFORMADO (SALAS, CREACIÓN, ACCESO, APUESTAS)
+   🏆 MÓDULO MULTIJUGADOR REFORMADO (ENTRADA GRATUITA - COBRO AL INICIAR)
    ======================================================================== */
+
+// 1. Crear Sala: Se genera el código GRATIS, guardando la configuración de la apuesta
 app.post('/api/multijugador/crear', async (req, res) => {
-    const { usuario_id, seleccion, jugador_ids, tipo_apuesta, apuesta_oro, carta_apuesta_id } = req.body;
+    const { usuario_id, seleccion, jugador_ids, tipo_apuesta, apuesta_oro } = req.body;
 
     if (!jugador_ids || jugador_ids.length !== 3) {
         return res.json({ ok: false, mensaje: "❌ Debés seleccionar 3 jugadores para tu plantel." });
@@ -1817,50 +1819,20 @@ app.post('/api/multijugador/crear', async (req, res) => {
     const montoApuesta = parseInt(apuesta_oro) || 0;
 
     try {
-        // 1. Chequeamos saldo/cartas del creador antes de tocar la base de datos
-        const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+        // Solo chequeamos que el usuario host exista en Neon
+        const userCheck = await pool.query("SELECT username FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
 
-        const monedasActuales = userCheck.rows[0].monedas;
-        let nuevoOroCreador = monedasActuales;
-        let pozoInicial = 0;
-
-        // 🎰 Cobro dinámico al HOST según la modalidad
-        if (modalidad === 'oro') {
-            if (monedasActuales < montoApuesta) {
-                return res.json({ ok: false, mensaje: `🪙 No tenés oro suficiente para fijar esa apuesta de ${montoApuesta} monedas.` });
-            }
-            nuevoOroCreador = monedasActuales - montoApuesta;
-            pozoInicial = montoApuesta; // El pozo arranca con el aporte del creador
-        } else if (modalidad === 'carta') {
-            const miCromoRepetido = await pool.query(
-                "SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1",
-                [usuario_id]
-            );
-            if (miCromoRepetido.rows.length === 0) {
-                return res.json({ ok: false, mensaje: "🃏 No podés crear la sala porque no tenés cartas repetidas para arriesgar." });
-            }
-            await pool.query(
-                "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, miCromoRepetido.rows[0].jugador_id]
-            );
-        }
-
-        // 2. Si pasó los filtros, aplicamos el descuento de monedas (si corresponde)
-        if (modalidad === 'oro') {
-            await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOroCreador, usuario_id]);
-        }
-
-        // 3. Insertamos la sala guardando el TIPO_APUESTA y el POZO_TOTAL inicial
+        // Guardamos la sala con pozo_total en 0. El cobro se congela recién al dar la orden de juego
         const insertSalaQuery = `
             INSERT INTO mundial_salas (codigo_sala, creador_id, tipo_apuesta, apuesta_oro, pozo_total, estado)
-            VALUES ($1, $2, $3, $4, $5, 'esperando')
+            VALUES ($1, $2, $3, $4, 0, 'esperando')
             RETURNING id;
         `;
-        const salaResult = await pool.query(insertSalaQuery, [codigo_sala, usuario_id, modalidad, montoApuesta, pozoInicial]);
+        const salaResult = await pool.query(insertSalaQuery, [codigo_sala, usuario_id, modalidad, montoApuesta]);
         const sala_id = salaResult.rows[0].id;
 
-        // 4. Insertamos al creador en la tabla de participantes
+        // Metemos al creador en los participantes
         const insertParticipanteQuery = `
             INSERT INTO sala_participantes (sala_id, usuario_id, seleccion, jugador_ids)
             VALUES ($1, $2, $3, $4);
@@ -1872,20 +1844,16 @@ app.post('/api/multijugador/crear', async (req, res) => {
             ok: true,
             sala_id: sala_id,
             codigo_sala: codigo_sala,
-            monedasActualizadas: nuevoOroCreador, // Para que el frontend del host actualice su HUD al instante
-            mensaje: "Sala creada con éxito en la Arena."
+            mensaje: "Sala creada con éxito. Ya podés pasar el código a tu rival."
         });
 
     } catch (error) {
-        console.error("❌ ERROR CRÍTICO DE NEON AL CREAR:", error.message);
-        return res.status(500).json({ 
-            ok: false, 
-            mensaje: `Error de Base de Datos: ${error.message}` 
-        });
+        console.error("❌ ERROR AL CREAR SALA:", error.message);
+        return res.status(500).json({ ok: false, mensaje: "Error de Base de Datos al abrir la sala." });
     }
 });
 
-// Nuevo endpoint para consultar las reglas de la sala antes de unirse
+// 2. Consultar Sala: Sigue igual, sirviendo de espía de aranceles para el invitado
 app.get('/api/multijugador/consultar-sala/:codigo', async (req, res) => {
     const { codigo } = req.params;
     try {
@@ -1908,15 +1876,16 @@ app.get('/api/multijugador/consultar-sala/:codigo', async (req, res) => {
     }
 });
 
+// 3. Unirse a Sala: El invitado entra GRATIS al vestuario. No le tocamos el Oro ni las Cartas todavía
 app.post('/api/multijugador/unirse', async (req, res) => {
-    const { usuario_id, codigo_sala, seleccion, jugador_ids, carta_apuesta_id } = req.body;
+    const { usuario_id, codigo_sala, seleccion, jugador_ids } = req.body;
 
     if (!codigo_sala) return res.json({ ok: false, mensaje: "❌ Falta el código de la sala." });
     if (!jugador_ids || jugador_ids.length !== 3) return res.json({ ok: false, mensaje: "❌ Debés seleccionar 3 jugadores." });
 
     try {
         const salaCheck = await pool.query(
-            "SELECT id, tipo_apuesta, apuesta_oro, estado FROM mundial_salas WHERE codigo_sala = $1", 
+            "SELECT id, estado FROM mundial_salas WHERE codigo_sala = $1", 
             [codigo_sala.toUpperCase()]
         );
         if (salaCheck.rows.length === 0) return res.json({ ok: false, mensaje: "❌ La sala no existe." });
@@ -1924,38 +1893,11 @@ app.post('/api/multijugador/unirse', async (req, res) => {
 
         if (sala.estado !== 'esperando') return res.json({ ok: false, mensaje: "🚫 Sala cerrada." });
 
-        const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-        const monedasActuales = userCheck.rows[0].monedas;
-        let nuevoOroUsuario = monedasActuales;
-
-        const tipoSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
-
-        // 🃏 COBRO EXPLÍCITO AL INVITADO SEGÚN LO QUE ELIGIÓ EN LA UI
-        if (tipoSala === 'oro') {
-            if (monedasActuales < sala.apuesta_oro) return res.json({ ok: false, mensaje: "🪙 No tenés oro suficiente." });
-            nuevoOroUsuario = monedasActuales - sala.apuesta_oro;
-            await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOroUsuario, usuario_id]);
-            await pool.query("UPDATE mundial_salas SET pozo_total = pozo_total + $1 WHERE id = $2", [sala.apuesta_oro, sala.id]);
-        } 
-        else if (tipoSala === 'carta') {
-            if (!carta_apuesta_id) return res.json({ ok: false, mensaje: "🃏 Debés seleccionar una carta repetida para apostar." });
-            
-            // Verificamos que realmente tenga ese cromo repetido
-            const cromoCheck = await pool.query(
-                "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2 AND cantidad > 1",
-                [usuario_id, carta_apuesta_id]
-            );
-            if (cromoCheck.rows.length === 0) return res.json({ ok: false, mensaje: "❌ No tenés ese cromo repetido para arriesgar." });
-
-            // Se lo descontamos en el acto al entrar al vestuario
-            await pool.query(
-                "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, carta_apuesta_id]
-            );
-        }
-
-        // Validación de país libre
-        const seleccionCheck = await pool.query("SELECT id FROM sala_participantes WHERE sala_id = $1 AND UPPER(seleccion) = $2", [sala.id, seleccion.toUpperCase()]);
+        // Validación clásica de país disponible
+        const seleccionCheck = await pool.query(
+            "SELECT id FROM sala_participantes WHERE sala_id = $1 AND UPPER(seleccion) = $2", 
+            [sala.id, seleccion.toUpperCase()]
+        );
         if (seleccionCheck.rows.length > 0) return res.json({ ok: false, mensaje: `La selección de ${seleccion.toUpperCase()} ya está ocupada.` });
 
         const arrayFormateadoPostgres = `{${jugador_ids.join(',')}}`;
@@ -1966,9 +1908,8 @@ app.post('/api/multijugador/unirse', async (req, res) => {
 
         return res.json({
             ok: true,
-            mensaje: "⚽ ¡Te uniste con éxito!",
-            sala_id: sala.id,
-            monedasActualizadas: nuevoOroUsuario 
+            mensaje: "⚽ ¡Te uniste con éxito! Esperando que el host inicie el fixture...",
+            sala_id: sala.id
         });
     } catch (err) {
         console.error(err);
@@ -1976,6 +1917,7 @@ app.post('/api/multijugador/unirse', async (req, res) => {
     }
 });
 
+// 4. Ver estado de Sala en Polling
 app.get('/api/multijugador/sala/:codigo', async (req, res) => {
     const { codigo } = req.params;
     try {
@@ -2063,6 +2005,54 @@ app.post('/api/multijugador/jugar', async (req, res) => {
 
         if (competidores.length < 2) return res.json({ ok: false, mensaje: "❌ Se necesitan al menos 2 jugadores reales." });
 
+        // Identificamos las identidades de ambos rivales reales
+        const idHost = sala.creador_id;
+        const idInvitado = competidores.find(c => c.id !== idHost).id;
+        const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
+        const arancelOro = sala.apuesta_oro || 0;
+
+        // ========================================================================
+        // 🔥 VALIDACIÓN Y COBRO SIMULTÁNEO ATÓMICO (OPCIÓN A)
+        // ========================================================================
+        if (modalidadSala === 'oro') {
+            // Consultamos las billeteras reales de ambos en Neon
+            const chequearMonedas = await pool.query("SELECT id, monedas FROM usuarios WHERE id IN ($1, $2)", [idHost, idInvitado]);
+            const oroHost = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
+            const oroInvitado = chequearMonedas.rows.find(r => r.id === idInvitado)?.monedas || 0;
+
+            if (oroHost < arancelOro) {
+                return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: Vos (el Host) ya no tenés el Oro suficiente en tu cuenta para iniciar." });
+            }
+            if (oroInvitado < arancelOro) {
+                return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: El rival invitado se quedó sin Oro suficiente para cubrir la apuesta." });
+            }
+
+            // Si ambos cumplen, debitamos en el acto
+            await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [arancelOro, idHost]);
+            await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [arancelOro, idInvitado]);
+            
+            // Seteamos el pozo total real retenido de ambos (arancel * 2)
+            sala.pozo_total = arancelOro * 2;
+            await pool.query("UPDATE mundial_salas SET pozo_total = $1 WHERE id = $2", [sala.pozo_total, sala_id]);
+
+        } else if (modalidadSala === 'carta') {
+            // Buscamos si ambos tienen al menos 1 cromo repetido cualquiera disponible
+            const repetidasHost = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1", [idHost]);
+            const repetidasInvitado = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1", [idInvitado]);
+
+            if (repetidasHost.rows.length === 0) {
+                return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Ya no contás con cartas repetidas para arriesgar." });
+            }
+            if (repetidasInvitado.rows.length === 0) {
+                return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Tu rival invitado no posee cartas repetidas en su álbum para poner en juego." });
+            }
+
+            // 🔥 REPARADO: Descontamos la carta repetida encontrada usando su jugador_id exacto
+            await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [idHost, repetidasHost.rows[0].jugador_id]);
+            await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [idInvitado, repetidasInvitado.rows[0].jugador_id]);
+        }
+
+        // Rellenado clásico de bots para completar los 8 casilleros del fixture
         const PAISES_BOTS_BACKUP = ["ALEMANIA", "ITALIA", "ESPAÑA", "INGLATERRA", "PORTUGAL", "HOLANDA", "URUGUAY", "MÉXICO"];
         let botIdx = 0;
         while (competidores.length < 8) {
@@ -2074,32 +2064,16 @@ app.post('/api/multijugador/jugar', async (req, res) => {
             botIdx++;
         }
 
-        // 📋 1. REMOCIÓN PREVIA DE APUESTAS
-        const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
-        
-        if (modalidadSala === 'carta') {
-            for (let jugadorReal of competidores.filter(c => !c.esBot)) {
-                const cartaCheck = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 0 LIMIT 1", [jugadorReal.id]);
-                if (cartaCheck.rows.length > 0) {
-                    await pool.query(
-                        "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                        [jugadorReal.id, cartaCheck.rows[0].id]
-                    );
-                }
-            }
-        }
-
         // ========================================================================
-        // 🎲 2. NUEVO SISTEMA DE SORTEO PURO DE LLAVES (ANTI-CRUCE FIJO)
+        // 🎲 SISTEMA DE SORTEO PURO DE LLAVES
         // ========================================================================
         let listaMezclada = mezclarArray([...competidores]);
         let grillaTorneo = new Array(8);
         
-        // Repartimos a los usuarios y bots en casilleros aleatorios del 0 al 7
         for (let competidor of listaMezclada) {
             let posAleatoria = Math.floor(Math.random() * 8);
             while (grillaTorneo[posAleatoria] !== undefined) {
-                posAleatoria = (posAleatoria + 1) % 8; // Evita solapamiento de posiciones
+                posAleatoria = (posAleatoria + 1) % 8;
             }
             grillaTorneo[posAleatoria] = competidor;
         }
@@ -2107,13 +2081,12 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         let bitacoraPartidosPlana = [];
 
         // ========================================================================
-        // 🏆 3. SIMULACIÓN DE CUARTOS DE FINAL (Usa grillaTorneo)
+        // 🏆 SIMULACIÓN DE CUARTOS DE FINAL
         // ========================================================================
         let ganadoresCuartos = new Array(4);
         let numeroPartido = 1;
 
         for (let i = 0; i < 8; i += 2) {
-            // Se enfrentan de forma balanceada: 0 vs 1, 2 vs 3, 4 vs 5, 6 vs 7
             let cruce = simularPartidoEliminatorio(grillaTorneo[i], grillaTorneo[i+1]);
             
             bitacoraPartidosPlana.push({
@@ -2134,7 +2107,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         }
 
         // ========================================================================
-        // 🏆 4. SIMULACIÓN DE SEMIFINALES
+        // 🏆 SIMULACIÓN DE SEMIFINALES
         // ========================================================================
         let numeroSemi = 1;
         let ganadoresSemis = [];
@@ -2160,7 +2133,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         }
 
         // ========================================================================
-        // 🏆 5. SIMULACIÓN DE LA GRAN FINAL
+        // 🏆 SIMULACIÓN DE LA GRAN FINAL
         // ========================================================================
         let finalCruce = simularPartidoEliminatorio(ganadoresSemis[0], ganadoresSemis[1]);
         const campeonMundial = finalCruce.ganador;
@@ -2179,7 +2152,7 @@ app.post('/api/multijugador/jugar', async (req, res) => {
         });
 
         // ========================================================================
-        // 🎁 6. RECOMPENSAS FINALES Y POZOS
+        // 🎁 RECOMPENSAS FINALES Y REPARTO DEL POZO REAL
         // ========================================================================
         let datosPremio = { 
             ganoBot: true, 
