@@ -1427,14 +1427,51 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            const res = await fetch(`${URL_BASE}/multijugador/sala/${cod}`);
+            // 1. 🔥 CORREGIDO: Le pegamos al endpoint de consulta que tiene las reglas de Neon
+            const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`);
             const data = await res.json();
+
+            if (!data.ok) {
+                ocultarCarga();
+                return alert(data.mensaje);
+            }
+            if (data.estado !== 'esperando') {
+                ocultarCarga();
+                return alert("🚫 Esta sala ya cerró o el torneo ya arrancó.");
+            }
+
+            // Mapeamos la modalidad real para las fases siguientes
+            window.multiTipoApuestaActual = data.tipo_apuesta ? data.tipo_apuesta.toLowerCase() : 'amistoso';
+
+            // 2. 🔥 ARMADO DEL CARTEL CON DATOS REALES VIGENTES
+            let cartelAdvertencia = "";
+
+            if (window.multiTipoApuestaActual === 'amistoso') {
+                cartelAdvertencia = `🏟️ ¿Querés unirte a la Sala ${cod}?\n\n🔹 Modalidad: AMISTOSO\n🔸 No se arriesgan recursos. ¡Puro juego para foguear el plantel!`;
+            } else if (window.multiTipoApuestaActual === 'oro') {
+                cartelAdvertencia = `🪙 ¡ATENCIÓN JUGADOR!\n\nLa Sala ${cod} exige una entrada de: 🪙${data.apuesta_oro || 0} monedas de Oro.\n⚠️ El monto se debitará de tu cuenta al confirmar tu planilla final en el Draft. ¿Querés continuar?`;
+            } else if (window.multiTipoApuestaActual === 'carta') {
+                cartelAdvertencia = `🚨 ¡CUIDADO CRACK!\n\nLa Sala ${cod} es una contienda: POR CARTAS REPETIDAS.\n⚠️ Deberás seleccionar un cromo de tu inventario para poner en juego antes de entrar a la cancha. Si perdés, no vuelve. ¿Te la bancás?`;
+            }
+
             ocultarCarga();
 
-            if (!data.ok) return alert(data.mensaje);
-            window.multiTipoApuestaActual = data.tipo_apuesta ? data.tipo_apuesta.toLowerCase() : 'amistoso';
-            multiSalaId = data.sala_id;
-        } catch (e) { ocultarCarga(); return alert("Error de conexión con la sala."); }
+            // 3. Freno de mano: si toca "Cancelar", clavamos el flujo acá y no gasta nada
+            if (!confirm(cartelAdvertencia)) {
+                return;
+            }
+
+            // 4. Si dio "Aceptar", traemos de fondo el ID real de la sala para el Polling
+            const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`);
+            const dataSala = await resSala.json();
+            if (dataSala.ok) {
+                multiSalaId = dataSala.sala_id;
+            }
+
+        } catch (e) { 
+            ocultarCarga(); 
+            return alert("Error de conexión con la sala."); 
+        }
     } else {
         const inputApuesta = document.getElementById("multi-input-apuesta");
         multiApuestaFijada = inputApuesta ? (parseInt(inputApuesta.value) || 0) : 0;
@@ -1442,8 +1479,9 @@ async function abrirDraftMulti(esCreador) {
         window.multiTipoApuestaActual = selectTipo ? selectTipo.value.toLowerCase() : 'amistoso';
     }
 
+    // Si pasó los filtros o es host, entramos al vestuario
     document.getElementById("multi-menu-inicial").style.display = "none";
-    document.getElementById("multi-fase-inscripcion").style.display = "block";
+    document.getElementById("multi-fase-indigo" ? "multi-fase-inscripcion" : "multi-fase-inscripcion").style.display = "block";
     prepararInscripcionMundialMulti();
 }
 
