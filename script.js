@@ -1932,7 +1932,6 @@ function cerrarAnuncioGlobal() {
 
 // Función para abrir la interfaz del Bot en el Front
 function abrirMercadoBot(listaTusRepetidas) {
-    // Supongamos que tenés un contenedor para el mercado del Bot
     const contenedorBot = document.getElementById("modulo-comerciante-bot");
     contenedorBot.style.display = "block";
 
@@ -1945,11 +1944,11 @@ function abrirMercadoBot(listaTusRepetidas) {
             
             <div id="zona-seleccion-bot" style="margin: 15px 0; text-align: left;">
                  <label style="color: #fff; font-size: 0.85rem; font-weight: bold;">Elegí tus 3 cartas a sacrificar:</label>
-                 <div id="lista-checks-repetidas" style="max-height: 150px; overflow-y: auto; background: #020617; padding: 10px; border-radius: 6px; margin-top: 5px;">
-                      </div>
+                 <div id="lista-checks-repetidas" style="max-height: 150px; min-height: 60px; overflow-y: auto; background: #020617; padding: 10px; border-radius: 6px; margin-top: 5px;">
+                 </div>
             </div>
 
-            <button type="button" id="btn-ejecutar-trato" class="btn-estadio" style="background: var(--verde-match); color: #000; width: 100%; font-weight: bold;">
+            <button type="button" id="btn-ejecutar-trato" class="btn-estadio" style="background: var(--verde-match); color: #000; width: 100%; font-weight: bold; transition: all 0.3s ease;">
                  🤝 FIRMAR CONTRATO DE TRADEO
             </button>
             <div id="resultado-trato-bot" style="margin-top: 12px; font-weight: bold; font-size: 0.95rem;"></div>
@@ -1957,20 +1956,46 @@ function abrirMercadoBot(listaTusRepetidas) {
     `;
 
     const listaCheckboxes = document.getElementById("lista-checks-repetidas");
+    listaCheckboxes.innerHTML = ""; 
+
+    let contadorRepetidas = 0;
     
-    // Filtramos e insertamos solo los jugadores que tengan cantidad > 1
+    // 1. Renderizar repetidas si existen
     listaTusRepetidas.forEach(jugador => {
-         if (jugador.cantidad > 1) {
+         if (jugador.obtenido > 1) {
+              contadorRepetidas++;
               listaCheckboxes.innerHTML += `
-                   <label style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 5px; cursor: pointer;">
+                   <label style="display: block; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 5px; cursor: pointer; text-align: left; width: 100%;">
                         <input type="checkbox" class="check-cromo-bot" value="${jugador.id}" style="margin-right: 8px;">
-                        ${jugador.nombre} (${jugador.rareza.toUpperCase()}) - Repetidas: [${jugador.cantidad - 1}]
+                        ${jugador.nombre} (${jugador.rareza.toUpperCase()}) - Repetidas: [${jugador.obtenido - 1}]
                    </label>
               `;
          }
     });
 
-    // Evento al hacer click en el tradeo
+    // 2. 🔥 PARCHE SEGURO: Si no hay repetidas, aplicamos flex solo para centrar el mensaje de error
+    if (contadorRepetidas === 0) {
+         listaCheckboxes.style.display = "flex";
+         listaCheckboxes.style.flexDirection = "column";
+         listaCheckboxes.style.justifyContent = "center";
+         
+         listaCheckboxes.innerHTML = `
+              <div style="color: var(--rojo); font-weight: bold; font-size: 0.9rem; text-align: center; width: 100%;">
+                   ❌ No tenés cromos repetidos en tu álbum para negociar.
+              </div>
+         `;
+         const btnTrato = document.getElementById("btn-ejecutar-trato");
+         btnTrato.disabled = true;
+         btnTrato.style.background = "#334155";
+         btnTrato.style.color = "#94a3b8";
+         btnTrato.style.cursor = "not-allowed";
+         btnTrato.innerText = "⛔ SIN ELEMENTOS PARA INTERCAMBIAR";
+    } else {
+         // Si tiene repetidas, nos aseguramos de que use la visualización en bloque estándar
+         listaCheckboxes.style.display = "block";
+    }
+
+    // 3. Evento de envío
     document.getElementById("btn-ejecutar-trato").onclick = async () => {
          const seleccionados = Array.from(document.querySelectorAll('.check-cromo-bot:checked')).map(cb => parseInt(cb.value));
 
@@ -1980,13 +2005,14 @@ function abrirMercadoBot(listaTusRepetidas) {
          }
 
          document.getElementById("btn-ejecutar-trato").disabled = true;
+         document.getElementById("resultado-trato-bot").style.color = "#fff";
          document.getElementById("resultado-trato-bot").innerText = "⏳ El bot está tasando tus cartas...";
 
          try {
               const res = await fetch('/api/album/comerciar-bot', {
                    method: 'POST',
                    headers: { 'Content-Type': 'application/json' },
-                   body: JSON.stringify({ usuario_id: miUsuarioId, jugadorIdsASacar: seleccionados })
+                   body: JSON.stringify({ usuario_id: usuarioActual.id, jugadorIdsASacar: seleccionados })
               });
               const data = await res.json();
 
@@ -1996,8 +2022,10 @@ function abrirMercadoBot(listaTusRepetidas) {
                         🎉 ${data.mensaje}<br>
                         🌟 CROMO RECIBIDO: <span style="color: var(--dorado);">${data.cartaGanada.nombre} [${data.cartaGanada.rareza}]</span>
                    `;
-                   // Acá podés recargar el álbum de tu front de forma limpia
-                   setTimeout(() => { actualizarUI_Album(); }, 2000);
+                   setTimeout(() => { 
+                       cargarAlbumLocal(); 
+                       cambiarModulo('modulo-album', null);
+                   }, 2000);
               } else {
                    document.getElementById("resultado-trato-bot").style.color = "var(--rojo)";
                    document.getElementById("resultado-trato-bot").innerText = data.mensaje;
@@ -2005,6 +2033,8 @@ function abrirMercadoBot(listaTusRepetidas) {
               }
          } catch (err) {
               console.error(err);
+              document.getElementById("resultado-trato-bot").style.color = "var(--rojo)";
+              document.getElementById("resultado-trato-bot").innerText = "❌ Error de conexión con la Arena.";
               document.getElementById("btn-ejecutar-trato").disabled = false;
          }
     };
