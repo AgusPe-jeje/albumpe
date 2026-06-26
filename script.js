@@ -729,10 +729,17 @@ async function actualizarTimbasRestantesUI() {
      if (!lblCronometro) return;
 
      try {
-          // Usamos URL_BASE como lo tenés configurado nativamente
           const res = await fetch(URL_BASE + '/timbas-restantes/' + usuarioActual.id);
           const datos = await res.json();
           
+          // 🔥 1. FRENAR EL RELOJ VIEJO INMEDIATAMENTE
+          // Buscá cómo se llama la variable global de tu setInterval del reloj (suele ser 'timerTimba', 'intervaloCronometro', etc.)
+          // Reemplazá 'intervaloCronometroVisual' por el nombre real de tu variable global:
+          if (typeof intervaloCronometroVisual !== "undefined") {
+               clearInterval(intervaloCronometroVisual);
+          }
+          
+          // 2. Pintamos el estado actual de tus apuestas
           if (datos.timbas <= 0) {
                lblCronometro.style.borderColor = 'var(--rojo)';
                lblCronometro.style.color = 'var(--rojo)';
@@ -743,20 +750,15 @@ async function actualizarTimbasRestantesUI() {
                lblCronometro.innerText = '🎰 Apuestas disponibles: ' + datos.timbas + '/10';
           }
 
-          // 🔥 EL TRUCO ESTÁ ACÁ:
-          // Si hay tiempo de recarga pendiente, congelamos el cartel de arriba unos segundos 
-          // para que el jugador lo vea bien, y RECIÉN AHÍ devolvemos el contador regresivo fluido.
+          // 🔥 3. AGUANTAR EL MUNDO POR 5 SEGUNDOS
           if (datos.siguienteIn > 0 && datos.timbas < 10) {
-               // Limpiamos cualquier intervalo viejo que esté corriendo en tu loop para que no se pisen textos
-               if (typeof intervaloCronometroVisual !== "undefined") {
-                    clearInterval(intervaloCronometroVisual);
-               }
-
-               const TIEMPO_CONGELADO_MS = 4000; // ⏱️ Cambiá este número (4000 = 4 segundos en pantalla)
+               const TIEMPO_CONGELADO_MS = 5000; // ⏱️ Se queda fijo 5 segundos enteros
 
                setTimeout(() => {
-                    // Pasados los 4 segundos, le restamos el tiempo que ya pasó y arrancamos tu reloj nativo
-                    const tiempoAjustado = datos.siguienteIn - TIEMPO_CONGELADO_MS;
+                    // Pasados los 5 segundos, recalculamos el tiempo restante y reactivamos tu loop dinámico
+                    const tiempoTranscurrido = TIEMPO_CONGELADO_MS;
+                    const tiempoAjustado = datos.siguienteIn - tiempoTranscurrido;
+                    
                     arrancarCronometroTimbaVisual(tiempoAjustado > 0 ? tiempoAjustado : datos.siguienteIn);
                }, TIEMPO_CONGELADO_MS);
           }
