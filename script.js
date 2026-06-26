@@ -1492,17 +1492,23 @@ async function prepararInscripcionMundialMulti() {
      mostrarCarga("Conectando con la central de la Arena Online...");
 
      try {
-          const res = await fetch(`${URL_BASE}/multijugador/preparar-draft`, {
+          // 🔥 REPARADO: Se agregó '/api' a la ruta y la cabecera 'Authorization' con el token
+          const res = await fetch(`${URL_BASE}/api/multijugador/preparar-draft`, {
                method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ usuario_id: usuarioActual.id })
+               headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token_arena')}`
+               },
+               body: JSON.stringify({}) // El server saca el ID del token, no hace falta mandarlo acá
           });
-          const data = await res.json(); ocultarCarga();
+          
+          const data = await res.json(); 
+          ocultarCarga();
 
           if (!data.ok) {
                document.getElementById("multi-menu-inicial").style.display = "block";
                document.getElementById("multi-fase-inscripcion").style.display = "none";
-               return alert(data.mensaje);
+               return alert(data.mensaje || data.error);
           }
 
           const barraNavegacion = document.querySelector(".nav-modulos-estadio");
@@ -1510,18 +1516,24 @@ async function prepararInscripcionMundialMulti() {
           const btnSalir = document.querySelector(".btn-logout-kick");
           if (btnSalir) btnSalir.style.display = "none";
 
-          mundialTernaPaises = data.terna; jugadoresSeleccionadosDraft = [];
+          mundialTernaPaises = data.terna; 
+          jugadoresSeleccionadosDraft = [];
           const contenedorTerna = document.getElementById("multi-zona-eleccion-pais");
-          if (!contenedorTerna) return; contenedorTerna.innerHTML = "";
+          if (!contenedorTerna) return; 
+          contenedorTerna.innerHTML = "";
           
           data.terna.forEach(pais => {
                const btn = document.createElement("button");
-               btn.className = "btn-estadio btn-modulo-match"; btn.style.margin = "8px";
+               btn.className = "btn-estadio btn-modulo-match"; 
+               btn.style.margin = "8px";
                btn.innerText = `⚽ ${pais.toUpperCase()}`;
                btn.onclick = () => iniciarDraftJugadoresMundialMulti(pais);
                contenedorTerna.appendChild(btn);
           });
-     } catch (err) { console.error(err); ocultarCarga(); }
+     } catch (err) { 
+          console.error("Error en el draft:", err); 
+          ocultarCarga(); 
+     }
 }
 
 function iniciarDraftJugadoresMundialMulti(paisElegido) {
