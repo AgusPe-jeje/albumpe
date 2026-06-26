@@ -89,6 +89,13 @@ function cambiarModulo(idModulo, botonPresionado) {
           document.getElementById("fase-draft-mundial").style.display = "none";
           document.getElementById("fase-fixture-mundial").style.display = "none";
      }
+     if (idModulo === 'modulo-timba') {
+        // Ejecuta la carga automática de la cartelera rotativa
+        if (typeof cargarPartidosQuinielaUI === "function") {
+            cargarPartidosQuinielaUI();
+            }
+     }   
+
 }
 
 function mostrarCarga(mensaje = "Conectando con la Arena...") {
