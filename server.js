@@ -2390,24 +2390,20 @@ app.post('/api/mercado/publicar', async (req, res) => {
     }
 });
 
-// 2. Traer las ofertas de la vitrina (excluyendo las tuyas)
+// 2. 🔥 REPARADO: Traer TODAS las ofertas incluyendo el vendedor_id para el Front
 app.get('/api/mercado/ofertas', async (req, res) => {
-    const { usuario_id } = req.query;
-
     try {
         const ofertas = await pool.query(
-            `SELECT m.id, m.precio_oro, j.nombre, j.rareza, j.bandera, u.usuario AS nombre_vendedor
+            `SELECT m.id, m.precio_oro, m.vendedor_id, j.nombre, j.rareza, j.bandera, u.usuario AS nombre_vendedor
              FROM mercado_pases m
              JOIN jugadores j ON m.jugador_id = j.id
              JOIN usuarios u ON m.vendedor_id = u.id
-             WHERE m.vendedor_id != $1
-             ORDER BY m.fecha_publicacion DESC`,
-            [parseInt(usuario_id)]
+             ORDER BY m.fecha_publicacion DESC`
         );
 
         return res.json({ ok: true, ofertas: ofertas.rows });
     } catch (err) {
-        console.error(err);
+        console.error("❌ Error en GET ofertas mercado:", err);
         return res.status(500).json({ ok: false, error: err.message });
     }
 });
@@ -2428,6 +2424,11 @@ app.post('/api/mercado/comprar', async (req, res) => {
         }
 
         const { vendedor_id, jugador_id, precio_oro } = buscarOferta.rows[0];
+
+        // Evitar que un usuario se compre a sí mismo
+        if (parseInt(vendedor_id) === parseInt(usuario_id)) {
+            return res.json({ ok: false, mensaje: "❌ No podés comprar tu propia publicación." });
+        }
 
         // Traemos el balance en oro del comprador (columna 'monedas')
         const checkOro = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
