@@ -1710,18 +1710,39 @@ async function actualizarLobbyEnVivo() {
 async function lanzarSimulacionMulti() {
     mostrarCarga("Sorteando las llaves y cerrando las planillas online...");
     clearInterval(multiIntervaloLobby);
+    
+    // 🛡️ Aseguramos capturar el ID sin importar si es .id o ._id
+    const miUsuarioId = usuarioActual ? (usuarioActual.id || usuarioActual._id) : null;
+
     try {
-        // 🔥 REPARADO: Quitamos el 'api/' de más para evitar /api/api
         const res = await fetch(`${URL_BASE}/multijugador/jugar`, { 
           method: 'POST', 
           headers: obtenerHeadersSeguros(),
-          body: JSON.stringify({ sala_id: multiSalaId, usuario_id: usuarioActual.id })
+          // 🚀 Enviamos un combo completo para que el backend encuentre sí o sí el dato que busca
+          body: JSON.stringify({ 
+              sala_id: multiSalaId, 
+              codigo_sala: multiCodigoSala, // Por si el backend busca por código de 6 letras
+              usuario_id: miUsuarioId,
+              creador_id: miUsuarioId       // Por si en el body buscaba explícitamente "creador_id"
+          })
         });
-        const data = await res.json(); ocultarCarga();
-        if (!data.ok) { alert(data.mensaje); multiIntervaloLobby = setInterval(actualizarLobbyEnVivo, 3000); return; }
+        
+        const data = await res.json(); 
+        ocultarCarga();
+        
+        if (!data.ok) { 
+            alert(data.mensaje); 
+            // Si falla, volvemos a activar el re-escaneo del lobby para no quedarnos colgados
+            multiIntervaloLobby = setInterval(actualizarLobbyEnVivo, 3000); 
+            return; 
+        }
 
         window.renderizarFixturePasoAPaso(data.bitacora, data.premio);
-    } catch (err) { console.error(err); ocultarCarga(); }
+    } catch (err) { 
+        console.error(err); 
+        ocultarCarga(); 
+        multiIntervaloLobby = setInterval(actualizarLobbyEnVivo, 3000);
+    }
 }
 
 async function consultarResultadoInvitado(intento = 1) {
