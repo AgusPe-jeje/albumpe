@@ -1961,13 +1961,15 @@ function abrirMercadoBot(listaTusRepetidas) {
     let contadorRepetidas = 0;
     
     listaTusRepetidas.forEach(jugador => {
-         if (jugador.obtenido > 1) {
+         // 🔥 Blindaje absoluto: toma 'obtenido' o 'cantidad', el que venga definido en el objeto
+         const copias = jugador.obtenido !== undefined ? jugador.obtenido : (jugador.cantidad || 0);
+
+         if (copias > 1) {
               contadorRepetidas++;
-              // 🔥 FIX DE ESTILOS: Usamos flexbox horizontal para que la casilla y el texto queden perfectos
               listaCheckboxes.innerHTML += `
                    <label style="display: flex; align-items: center; gap: 10px; color: #cbd5e1; font-size: 0.85rem; margin-bottom: 8px; cursor: pointer; text-align: left; width: 100%;">
                         <input type="checkbox" class="check-cromo-bot" value="${jugador.id}" style="width: 16px; height: 16px; cursor: pointer; flex-shrink: 0;">
-                        <span style="flex-grow: 1;">${jugador.nombre} (${jugador.rareza.toUpperCase()}) - Repetidas: [${jugador.obtenido - 1}]</span>
+                        <span style="flex-grow: 1;">${jugador.nombre || 'Jugador'} (${(jugador.rareza || 'comun').toUpperCase()}) - Repetidas: [${copias - 1}]</span>
                    </label>
               `;
          }
@@ -2024,7 +2026,6 @@ function abrirMercadoBot(listaTusRepetidas) {
                        cambiarModulo('modulo-album', null);
                    }, 2000);
               } else {
-                   // 🔥 FIX UNDEFINED: Si no viene data.mensaje, lee data.error o tira un mensaje genérico
                    document.getElementById("resultado-trato-bot").style.color = "var(--rojo)";
                    document.getElementById("resultado-trato-bot").innerText = data.mensaje || data.error || "❌ La Arena rechazó el intercambio.";
                    document.getElementById("btn-ejecutar-trato").disabled = false;
