@@ -32,7 +32,7 @@ function generarCodigoSala() {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 // 👥 Agregá o sacá acá los usuarios permitidos en minúscula para las pruebas
 const TESTERS_PERMITIDOS = ["aguspe", "evevea"]; 
 
@@ -1885,6 +1885,29 @@ app.post('/api/multijugador/crear', async (req, res) => {
     }
 });
 
+// Nuevo endpoint para consultar las reglas de la sala antes de unirse
+app.get('/api/multijugador/consultar-sala/:codigo', async (req, res) => {
+    const { codigo } = req.params;
+    try {
+        const salaCheck = await pool.query(
+            "SELECT tipo_apuesta, apuesta_oro, estado FROM mundial_salas WHERE codigo_sala = $1", 
+            [codigo.toUpperCase()]
+        );
+        if (salaCheck.rows.length === 0) return res.json({ ok: false, mensaje: "❌ La sala no existe." });
+        
+        const sala = salaCheck.rows[0];
+        return res.json({
+            ok: true,
+            tipo_apuesta: sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso',
+            apuesta_oro: sala.apuesta_oro,
+            estado: sala.estado
+        });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
 app.post('/api/multijugador/unirse', async (req, res) => {
     const { usuario_id, codigo_sala, seleccion, jugador_ids, carta_apuesta_id } = req.body;
 
@@ -2386,31 +2409,53 @@ app.post('/api/mercado/publicar', async (req, res) => {
     }
 });
 
-// 2. 🔥 REPARADO, BLINDADO Y ADAPTADO A 'u.username'
+// 1. REEMPLAZÁ TU VIEJO GET CON ESTE (Ya viene con el filtro WHERE de 1 día)
 app.get('/api/mercado/ofertas', async (req, res) => {
     let { usuario_id } = req.query;
-
     try {
-        // 🛡️ Parche por si el Front todavía manda el bardo del ID "1:1"
         if (usuario_id && String(usuario_id).includes(":")) {
             usuario_id = String(usuario_id).split(":")[0];
         }
 
-        // 🔥 CORRECCIÓN CRUCIAL: Cambiado u.usuario por u.username de Neon
         const ofertas = await pool.query(
             `SELECT m.id, m.precio_oro, m.vendedor_id, j.nombre, j.rareza, j.bandera, u.username AS nombre_vendedor
              FROM mercado_pases m
              JOIN jugadores j ON m.jugador_id = j.id
              JOIN usuarios u ON m.vendedor_id = u.id
+             WHERE m.fecha_publicacion >= NOW() - INTERVAL '1 day'
              ORDER BY m.fecha_publicacion DESC`
         );
-
         return res.json({ ok: true, ofertas: ofertas.rows });
     } catch (err) {
         console.error("❌ Error en GET ofertas mercado:", err);
         return res.json({ ok: false, error: err.message, mensaje: "Error al sincronizar con Neon." });
     }
 });
+
+// 2. PEGÁ EL LIMPIADOR ACÁ (Suelto en el archivo, abajo del GET)
+setInterval(async () => {
+    console.log("🧹 Revisando vitrinas del mercado para limpiar pases vencidos...");
+    try {
+        const vencidas = await pool.query(
+            "SELECT id, vendedor_id, jugador_id FROM mercado_pases WHERE fecha_publicacion < NOW() - INTERVAL '1 day'"
+        );
+
+        if (vencidas.rows.length > 0) {
+            console.log(`📦 Encontradas ${vencidas.rows.length} ofertas vencidas. Devolviendo cromos...`);
+            for (let oferta of vencidas.rows) {
+                await pool.query(
+                    `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
+                     ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + 1`,
+                    [oferta.vendedor_id, oferta.jugador_id]
+                );
+                await pool.query("DELETE FROM mercado_pases WHERE id = $1", [oferta.id]);
+            }
+            console.log("✅ Devolución y limpieza completada.");
+        }
+    } catch (err) {
+        console.error("❌ Error crítico en el limpiador del mercado:", err.message);
+    }
+}, 15 * 60 * 1000); // Se ejecuta en background cada 15 min
 
 // 3. Procesar la compra de un cromo expuesto de forma atómica
 app.post('/api/mercado/comprar', async (req, res) => {
