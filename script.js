@@ -2101,7 +2101,7 @@ async function publicarCartaMercado() {
     }
 }
 
-// 🔥 REPARADO: Renderiza todas las ofertas y aplica estilos condicionales si el cromo es tuyo
+// Renderiza todas las ofertas y aplica estilos condicionales si el cromo es tuyo
 async function obtenerOfertasMercado() {
     const grid = document.getElementById("grid-mercado-pases");
     if (!grid) return;
@@ -2159,6 +2159,29 @@ async function obtenerOfertasMercado() {
     }
 }
 
+// 🔥 AGREGADA POR SEGURIDAD: Ejecuta la adquisición de una carta expuesta
+async function comprarCartaMercado(ofertaId) {
+    try {
+        const res = await fetch('/api/mercado/comprar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario_id: parseInt(usuarioActual.id), oferta_id: ofertaId })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador}. El Oro fue transferido.`);
+            cargarAlbumLocal(); // Actualiza el álbum nativo
+            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+        } else {
+            alert(data.mensaje);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("❌ Ocurrió un problema de red al procesar el fichaje.");
+    }
+}
+
 // Ejecuta la adquisición de una carta expuesta
 async function comprarCartaMercado(ofertaId) {
     try {
@@ -2172,7 +2195,8 @@ async function comprarCartaMercado(ofertaId) {
         if (data.ok) {
             alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador}. El Oro fue transferido.`);
             cargarAlbumLocal(); // Actualiza el álbum nativo
-            setTimeout(() => { cambiarModulo('modulo-market-pases' ? 'modulo-mercado-pases' : 'modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+            // 🔥 CORREGIDO: Redirección limpia al módulo del mercado sin ternario confuso
+            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
         } else {
             alert(data.mensaje);
         }
