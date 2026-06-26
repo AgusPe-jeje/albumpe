@@ -93,7 +93,6 @@ function cambiarModulo(idModulo, botonPresionado) {
         // Ejecuta la carga automática de la cartelera rotativa
         if (typeof cargarPartidosQuinielaUI === "function") {
             cargarPartidosQuinielaUI();
-            actualizarTimbasRestantesUI();
             }
      }   
 
@@ -2266,12 +2265,11 @@ function seleccionarQuiniela(partido, prediccion, boton) {
 }
 
 // Envía la boleta combinada compartiendo los límites de la timba individual
-// Envía la boleta combinada compartiendo los límites de la timba individual
 async function enviarBoletaQuiniela() {
     const monto = parseInt(document.getElementById("input-monto-quiniela").value);
     const divRes = document.getElementById("resultado-quiniela");
 
-    // 🛡️ REGLA DE ORO CORREGIDA: Validar la energía mirando únicamente el botón nativo
+    // 🛡️ REGLA DE ORO: Validar la energía mirando únicamente el botón nativo
     const btnTimbaComun = document.getElementById("btn-preparar-apuesta"); 
 
     if (btnTimbaComun && btnTimbaComun.disabled) {
@@ -2309,21 +2307,10 @@ async function enviarBoletaQuiniela() {
             const elMonedas = document.getElementById("lbl-monedas");
             if (elMonedas && data.nuevoOro !== undefined) elMonedas.innerText = data.nuevoOro;
 
-            // 2. 🔥 IMPACTO VISUAL INMEDIATO DE ENERGÍA NATIVA:
-            // Le pegamos a tu ruta del Core para que re-pinte las energías vigentes de una.
-            // Si tenés una función propia del tipo "actualizarEnergiasUI()" o "checkTimbas()", podés meterla acá.
-            // Si no, este fetch manual sincroniza todo al milisegundo:
-            if (typeof actualizarTimbasUI === "function") {
-                actualizarTimbasUI(); // Llama a tu renderizador clásico si existe
-            } else {
-                // Sincronización directa por las dudas
-                fetch(`/api/timbas-restantes/${usuarioActual.id}`)
-                    .then(r => r.json())
-                    .then(infoTimba => {
-                        console.log("⚡ Energía sincronizada al instante:", infoTimba);
-                        // Esto fuerza a que tu script nativo actualice los textos sin reiniciar tu loop del reloj
-                    })
-                    .catch(e => console.error(e));
+            // 2. 🔥 IMPACTO VISUAL INMEDIATO DE ENERGÍA NATIVA
+            // Forzamos a tu sistema core a re-calcular y dibujar los intentos restantes en pantalla
+            if (typeof actualizarTimbasRestantesUI === "function") {
+                actualizarTimbasRestantesUI();
             }
 
             // 3. Render del Desglose de Resultados
