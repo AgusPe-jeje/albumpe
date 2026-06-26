@@ -1706,10 +1706,14 @@ async function lanzarSimulacionMulti() {
     mostrarCarga("Sorteando las llaves y cerrando las planillas online...");
     clearInterval(multiIntervaloLobby);
     try {
-        const res = await fetch(`${URL_BASE}/multijugador/jugar`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sala_id: multiSalaId, usuario_id: usuarioActual.id })
-        });
+        const res = await fetch(`${URL_BASE}/api/multijugador/jugar`, { // 👈 Con '/api'
+          method: 'POST', 
+          headers: { 
+               'Content-Type': 'application/json',
+               'Authorization': `Bearer ${localStorage.getItem('token_arena')}` // 👈 Clave para que valide el Host
+          },
+          body: JSON.stringify({ sala_id: multiSalaId, usuario_id: usuarioActual.id })
+          });
         const data = await res.json(); ocultarCarga();
         if (!data.ok) { alert(data.mensaje); multiIntervaloLobby = setInterval(actualizarLobbyEnVivo, 3000); return; }
 
@@ -1720,7 +1724,8 @@ async function lanzarSimulacionMulti() {
 async function consultarResultadoInvitado(intento = 1) {
      if (intento === 1) mostrarCarga("¡El Torneo comenzó! Recibiendo transmisión oficial...");
      try {
-          const res = await fetch(`${URL_BASE}/multijugador/resultado-invitado/${multiSalaId}`);
+          // 🔥 REPARADO: Se agregó '/api' a la ruta espejo para el invitado
+          const res = await fetch(`${URL_BASE}/api/multijugador/resultado-invitado/${multiSalaId}`);
           const data = await res.json();
           
           if (data.ok && (!data.bitacora || data.bitacora.length <= 1)) {
