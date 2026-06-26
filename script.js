@@ -93,6 +93,7 @@ function cambiarModulo(idModulo, botonPresionado) {
         // Ejecuta la carga automática de la cartelera rotativa
         if (typeof cargarPartidosQuinielaUI === "function") {
             cargarPartidosQuinielaUI();
+            actualizarTimbasRestantesUI();
             }
      }   
 
