@@ -9,30 +9,35 @@
 </head>
 <body class="ambiente-mundial">
     
+    <!-- PANTALLA DE CARGA GLOBAL -->
     <div id="pantalla-carga">
         <div class="spinner-arena"></div>
         <div id="texto-carga-dinamico" class="texto-carga">Conectando con la Arena...</div>
     </div>     
 
+    <!-- HEADER PRINCIPAL -->
     <header class="header-principal-mundial">
         <h1 class="titulo-copa-pe">🏆 ÁLBUM MUNDIAL PE 🏆</h1>
     </header>
 
+    <!-- FORMULARIO DE ACCESO (LOGIN / REGISTRO) -->
     <div id="seccion-login" class="login-card-estadio">
         <h2>ACCESO A LA ARENA</h2>
         <div class="wrapper-inputs-estadio">
-            <input type="text" id="input-usuario" placeholder="Usuario" tabindex="1">
-            <input type="password" id="input-pass" placeholder="Contraseña" tabindex="2">
+            <input type="text" id="input-usuario" placeholder="Usuario">
+            <input type="password" id="input-pass" placeholder="Contraseña">
         </div>
 
         <div class="contenedor-botones-login">
-            <button type="button" class="btn-estadio btn-login-match" tabindex="3" onclick="autenticarUsuario('login')">Iniciar Sesión</button>
-            <button type="button" class="btn-estadio btn-registro-match" tabindex="4" onclick="autenticarUsuario('registro')">Crear Cuenta</button>
+            <button type="button" class="btn-estadio btn-login-match" onclick="autenticarUsuario('login')">Iniciar Sesión</button>
+            <button type="button" class="btn-estadio btn-registro-match" onclick="autenticarUsuario('registro')">Crear Cuenta</button>
         </div>
     </div>
 
+    <!-- INTERFAZ PRINCIPAL DEL JUEGO -->
     <main id="interfaz-juego" style="display: none;">
         
+        <!-- PANEL DE ESTADO SUPERIOR (HUD SCOREBOARD) -->
         <div class="header-status-scoreboard">
             <div class="stat-box-tv">
                 <span class="stat-label">👤 JUGADOR</span>
@@ -50,22 +55,25 @@
                 <span class="stat-label">👑 MUNDIALES</span>
                 <span id="lbl-copas-mundiales" class="stat-valor valor-dorado" style="color: #ff9900;">0</span>
             </div>
-            <button class="btn-ayuda-arena" tabindex="5" onclick="abrirModalAyuda()">❓ AYUDA</button>
-            <button class="btn-logout-kick btn-logout-premium" tabindex="6" onclick="cerrarSesionLocal()">🚪 SALIR</button>
+            <button class="btn-ayuda-arena" onclick="abrirModalAyuda()">❓ AYUDA</button>
+            <button class="btn-logout-kick btn-logout-premium" onclick="cerrarSesionLocal()">🚪 SALIR</button>
         </div>
 
+        <!-- PESTAÑAS DE NAVEGACIÓN -->
         <nav class="nav-modulos-estadio">
-            <button class="btn-modulo-match teclable-nav activo" tabindex="7" onclick="cambiarModulo('modulo-sobres', this)">🛍️ TIENDA</button>
-            <button class="btn-modulo-match teclable-nav" tabindex="8" onclick="cambiarModulo('modulo-album', this)">📖 MI ÁLBUM</button>
-            <button class="btn-modulo-match teclable-nav" tabindex="9" onclick="cambiarModulo('modulo-penales', this)">⚽ PENALES</button>
-            <button class="btn-modulo-match teclable-nav" tabindex="10" onclick="cambiarModulo('modulo-timba', this)">🎰 TIMBA</button>
-            <button type="button" class="btn-modulo-match teclable-nav" id="btn-nav-mercado" tabindex="11" onclick="cambiarModulo('modulo-mercado-pases', this)"> 💸 MERCADO</button>
-            <button class="btn-modulo-match teclable-nav" tabindex="12" onclick="cambiarModulo('modulo-minimundial', this)">🏆 MUNDIAL</button>
-            <button class="btn-modulo-match teclable-nav" style="border-color: var(--dorado); color: var(--dorado);" tabindex="13" onclick="cambiarModulo('modulo-mundial-multi', this)">👥 MULTIJUGADOR</button>
+            <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)">🛍️ TIENDA</button>
+            <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)">📖 MI ÁLBUM</button>
+            <button class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)">⚽ PENALES</button>
+            <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)">🎰 TIMBA</button>
+            <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)"> 💸 MERCADO</button>
+            <button class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)">🏆 MUNDIAL</button>
+            <button class="btn-modulo-match" style="border-color: var(--dorado); color: var(--dorado);" onclick="cambiarModulo('modulo-mundial-multi', this)">👥 MULTIJUGADOR</button>
         </nav>
 
+        <!-- SECCIÓN DE MÓDULOS DINÁMICOS -->
         <section style="width: 100%; max-width: 900px; box-sizing: border-box;">
 
+            <!-- MÓDULO 1: TIENDA DE SOBRES (COFRES) -->
             <div id="modulo-sobres" class="modulo-contenido activo">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-tienda">
@@ -78,19 +86,19 @@
                         <div class="tarjeta-cofre-match plata">
                             <h3>🥈 Cofre de Plata</h3>
                             <div class="cofre-icono-pack">🪙100</div>
-                            <button class="btn-comprar-pack teclable-tienda" tabindex="14" onclick="comprarSobreEspecifico('plata')">ABRIR (🪙100)</button>
+                            <button class="btn-comprar-pack" onclick="comprarSobreEspecifico('plata')">ABRIR (🪙100)</button>
                         </div>
 
                         <div class="tarjeta-cofre-match oro">
                             <h3>🥇 Cofre de Oro</h3>
                             <div class="cofre-icono-pack">🪙250</div>
-                            <button class="btn-comprar-pack teclable-tienda" tabindex="15" onclick="comprarSobreEspecifico('oro')">ABRIR (🪙250)</button>
+                            <button class="btn-comprar-pack" onclick="comprarSobreEspecifico('oro')">ABRIR (🪙250)</button>
                         </div>
 
                         <div class="tarjeta-cofre-match legendario">
                             <h3>👑 Cofre Legendario</h3>
                             <div class="cofre-icono-pack">🪙500</div>
-                            <button class="btn-comprar-pack teclable-tienda" tabindex="16" onclick="comprarSobreEspecifico('legendario')">ABRIR (🪙500)</button>
+                            <button class="btn-comprar-pack" onclick="comprarSobreEspecifico('legendario')">ABRIR (🪙500)</button>
                         </div>
                     </div>
 
@@ -103,7 +111,7 @@
                                 <div class="pista-bloque" id="pista-rareza">?</div>
                             </div>
                             <div id="pantalla-carta-presentada" class="carta-presentada-wrapper"></div>
-                            <button type="button" id="btn-siguiente-carta-pack" class="btn-estadio btn-next-pack-card" tabindex="17" onclick="mostrarSiguienteCartaSecuencia()">
+                            <button type="button" id="btn-siguiente-carta-pack" class="btn-estadio btn-next-pack-card" onclick="mostrarSiguienteCartaSecuencia()">
                                 SIGUIENTE CARTA ▶
                             </button>
                         </div>
@@ -112,6 +120,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 2: ÁLBUM COLECTOR INTERACTIVO -->
             <div id="modulo-album" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="progreso-album-scoreboard">
@@ -124,26 +133,27 @@
                         </div>
                     </div>
 
+                    <!-- 🔥 NUEVO BOTÓN: Acceso directo al Mercado AI -->
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <button type="button" class="btn-estadio" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--dorado); color: var(--dorado); max-width: 350px; width: 100%; font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;" tabindex="18" onclick="cambiarModulo('modulo-comerciante-bot', this); abrirMercadoBot(window.albumCompleto || []);">
-                            🤖 HABLAR WITH EL BOT COMERCIANTE
+                        <button type="button" class="btn-estadio" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--dorado); color: var(--dorado); max-width: 350px; width: 100%; font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;" onclick="cambiarModulo('modulo-comerciante-bot', this); abrirMercadoBot(window.albumCompleto || []);">
+                            🤖 HABLAR CON EL BOT COMERCIANTE
                         </button>
                     </div>
 
                     <div class="contenedor-filtros-album">
                         <div class="grupo-filtro">
                             <span class="filtro-label">🔍 ESTADO:</span>
-                            <button class="btn-filtro-tv activo" tabindex="19" onclick="filtrarAlbumPorEstado('todas', this)">TODAS</button>
-                            <button class="btn-filtro-tv" tabindex="20" onclick="filtrarAlbumPorEstado('desbloqueadas', this)">🔓 PEGADAS</button>
-                            <button class="btn-filtro-tv" tabindex="21" onclick="filtrarAlbumPorEstado('pendientes', this)">⏳ FALTANTES</button>
+                            <button class="btn-filtro-tv activo" onclick="filtrarAlbumPorEstado('todas', this)">TODAS</button>
+                            <button class="btn-filtro-tv" onclick="filtrarAlbumPorEstado('desbloqueadas', this)">🔓 PEGADAS</button>
+                            <button class="btn-filtro-tv" onclick="filtrarAlbumPorEstado('pendientes', this)">⏳ FALTANTES</button>
                         </div>
                         <div class="grupo-filtro">
                             <span class="filtro-label">💎 RAREZA:</span>
-                            <button class="btn-filtro-tv activo" tabindex="22" onclick="filtrarAlbumPorRareza('todas', this)">TODAS</button>
-                            <button class="btn-filtro-tv f-comun" tabindex="23" onclick="filtrarAlbumPorRareza('comun', this)">COMÚN</button>
-                            <button class="btn-filtro-tv f-rara" tabindex="24" onclick="filtrarAlbumPorRareza('rara', this)">RARA</button>
-                            <button class="btn-filtro-tv f-epica" tabindex="25" onclick="filtrarAlbumPorRareza('epica', this)">ÉPICA</button>
-                            <button class="btn-filtro-tv f-legendaria" tabindex="26" onclick="filtrarAlbumPorRareza('legendaria', this)">LEGENDARIA</button>
+                            <button class="btn-filtro-tv activo" onclick="filtrarAlbumPorRareza('todas', this)">TODAS</button>
+                            <button class="btn-filtro-tv f-comun" onclick="filtrarAlbumPorRareza('comun', this)">COMÚN</button>
+                            <button class="btn-filtro-tv f-rara" onclick="filtrarAlbumPorRareza('rara', this)">RARA</button>
+                            <button class="btn-filtro-tv f-epica" onclick="filtrarAlbumPorRareza('epica', this)">ÉPICA</button>
+                            <button class="btn-filtro-tv f-legendaria" onclick="filtrarAlbumPorRareza('legendaria', this)">LEGENDARIA</button>
                         </div>
                     </div>
 
@@ -152,6 +162,7 @@
                 </div>
             </div>
 
+            <!-- MÓDULO 3: MINIJUEGO DE PENALES LOCAL -->
             <div id="modulo-penales" class="modulo-contenido">
                 <div class="contenedor-penales-layout-estadio">
                     <div class="caja-modulo-estadio juego-penales-principal">
@@ -177,7 +188,7 @@
 
                         <h3 id="resultado-penal" class="marcador-alerta-tv">¡PREPARÁ EL DISPARO!</h3>
                         <p id="cronometro-tiros" class="badge-reloj-energia"></p>
-                        <button class="btn-estadio btn-next-shot" tabindex="27" onclick="iniciarDueloLocal()">⚽ PRÓXIMO TIRO</button>
+                        <button class="btn-estadio btn-next-shot" onclick="iniciarDueloLocal()">⚽ PRÓXIMO TIRO</button>
                     </div>
 
                     <div class="panel-lateral-ranking-tv">
@@ -217,20 +228,20 @@
                             <div id="cronometro-timba" class="banca-reloj-status">🔋 Cargando energía...</div>
                             <div class="monto-apuesta-row">
                                 <label class="label-tv">🎰 ¿QUÉ VAS A JUGAR?</label>
-                                <select id="select-tipo-apuesta" tabindex="28" onchange="conmutarControlesTimbaUI()" class="select-estadio-custom">
+                                <select id="select-tipo-apuesta" onchange="conmutarControlesTimbaUI()" class="select-estadio-custom">
                                     <option value="monedas">🪙 MONEDAS DE ORO</option>
                                     <option value="cromo">🃏 FIGURITA REPETIDA</option>
                                 </select>
                             </div>
                             <div id="wrapper-apuesta-monedas" class="monto-apuesta-row">
                                 <label class="label-tv">🪙 MONEDAS:</label>
-                                <input type="number" id="input-monto-apuesta" tabindex="29" min="10" value="50" class="input-estadio-numeric">
+                                <input type="number" id="input-monto-apuesta" min="10" value="50" class="input-estadio-numeric">
                             </div>
                             <div id="wrapper-apuesta-cromo" class="monto-apuesta-row" style="display: none;">
                                 <label class="label-tv">🃏 SELECCIONÁ TU CROMO:</label>
-                                <select id="select-cromo-repetido" tabindex="30" class="select-estadio-custom select-cromo-wide"></select>
+                                <select id="select-cromo-repetido" class="select-estadio-custom select-cromo-wide"></select>
                             </div>
-                            <button type="button" id="btn-preparar-apuesta" tabindex="31" onclick="prepararOpcionesApuesta()" class="btn-estadio btn-bet-action">🎲 OPCIONES DE PRONÓSTICO</button>
+                            <button type="button" id="btn-preparar-apuesta" onclick="prepararOpcionesApuesta()" class="btn-estadio btn-bet-action">🎲 OPCIONES DE PRONÓSTICO</button>
                             <div id="contenedor-opciones-goles" class="grid-opciones-goles-match" style="display: none;"></div>
                         </div>
                     </div>
@@ -246,33 +257,44 @@
                         </div>
 
                         <div style="display: flex; justify-content: center; align-items: center; gap: 10px; max-width: 420px; margin: 0 auto;">
-                            <input type="number" id="input-monto-quiniela" tabindex="32" placeholder="Monto Oro" min="50" value="100" class="input-estadio-numeric" style="max-width: 140px; margin: 0;">
-                            <button type="button" class="btn-estadio" tabindex="33" style="background: var(--dorado, #fbbf24); color: #000; font-weight: bold;" onclick="enviarBoletaQuiniela()">🎲 JUGAR BOLETA</button>
+                            <input type="number" id="input-monto-quiniela" placeholder="Monto Oro" min="50" value="100" class="input-estadio-numeric" style="max-width: 140px; margin: 0;">
+                            <button type="button" class="btn-estadio" style="background: var(--dorado, #fbbf24); color: #000; font-weight: bold;" onclick="enviarBoletaQuiniela()">🎲 JUGAR BOLETA</button>
                         </div>
                         
                         <div id="resultado-quiniela" style="margin-top: 15px; font-weight: bold; font-size: 0.9rem; min-height: 20px;"></div>
                     </div>
+
                 </div>
             </div>
 
+            <!-- ========================================================================
+                🏪 MÓDULO INDEPENDIENTE: MERCADO DE PASES ENTRE JUGADORES (P2P)
+                ======================================================================== -->
             <div id="modulo-mercado-pases" class="modulo-contenido" style="display: none; padding: 15px;">
                 <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--dorado); padding: 20px; border-radius: 12px; max-width: 900px; margin: 20px auto;">
+                    
                     <h2 style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px; font-size: 1.8rem;">💸 MERCADO DE PASES P2P</h2>
                     
+                    <!-- Caja de publicación -->
                     <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; border: 1px solid #1a2436; margin-bottom: 25px; text-align: center;">
                         <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin-top:0; letter-spacing: 0.5px;">💼 PONER REPETIDA EN VENTA</h3>
                         <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin-top: 10px;">
-                            <select id="select-mercado-vender" class="select-estadio-custom" tabindex="34" style="max-width: 250px; width: 100%; padding: 8px; background: #020617; color: #fff; border-radius: 6px; border: 1px solid #334155;"></select>
-                            <input type="number" id="input-mercado-precio" tabindex="35" placeholder="Precio en Oro" min="50" class="input-estadio-numeric" style="max-width: 130px; padding: 8px; background: #020617; color: #fff; border-radius: 6px; border: 1px solid #334155;">
-                            <button type="button" class="btn-estadio" tabindex="36" style="background: var(--verde-match); color:#000; font-weight: bold; padding: 8px 15px; border-radius: 6px; cursor: pointer;" onclick="publicarCartaMercado()">PUBLICAR</button>
+                            <select id="select-mercado-vender" class="select-estadio-custom" style="max-width: 250px; width: 100%; padding: 8px; background: #020617; color: #fff; border-radius: 6px; border: 1px solid #334155;"></select>
+                            <input type="number" id="input-mercado-precio" placeholder="Precio en Oro" min="50" class="input-estadio-numeric" style="max-width: 130px; padding: 8px; background: #020617; color: #fff; border-radius: 6px; border: 1px solid #334155;">
+                            <button type="button" class="btn-estadio" style="background: var(--verde-match); color:#000; font-weight: bold; padding: 8px 15px; border-radius: 6px; cursor: pointer;" onclick="publicarCartaMercado()">PUBLICAR</button>
                         </div>
                     </div>
 
                     <h3 style="color: var(--celeste); font-family: 'Oswald'; text-align: center; font-size: 1.4rem; margin-bottom: 15px;">🏪 VITRINA DE TRANSFERENCIAS INTERNACIONALES</h3>
-                    <div id="grid-mercado-pases" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; max-height: 450px; overflow-y: auto; padding: 5px;"></div>
+                    
+                    <div id="grid-mercado-pases" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; max-height: 450px; overflow-y: auto; padding: 5px;">
+                        <!-- Render dinámico de ofertas -->
+                    </div>
+                    
                 </div>
             </div>
 
+            <!-- MÓDULO 5: COLISEO DEL MUNDIAL (UN JUGADOR) -->
             <div id="modulo-minimundial" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-mundial">
@@ -296,9 +318,9 @@
                     </div>
 
                     <div id="fase-inscripcion-mundial" class="inputs-apuesta-timba-stadium" style="text-align: center; padding: 20px;">
-                        <div id="cronometro-mundial" class="banca-reloj-status" style="margin-bottom: 15px;">⏱ Verificando estado del vestuario...</div>
+                        <div id="cronometro-mundial" class="banca-reloj-status" style="margin-bottom: 15px;">⏱ McKay Verificando estado del vestuario...</div>
                         <div id="zona-eleccion-pais-mundial" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
-                        <button type="button" id="btn-preparar-mundial" tabindex="37" onclick="prepararInscripcionMundial()" class="btn-estadio btn-bet-action" style="max-width: 320px; margin: 0 auto;">
+                        <button type="button" id="btn-preparar-mundial" onclick="prepararInscripcionMundial()" class="btn-estadio btn-bet-action" style="max-width: 320px; margin: 0 auto;">
                             🏆 INSCRIBIRSE AL TORNEO (🪙1.500 Oro)
                         </button>
                     </div>
@@ -322,7 +344,7 @@
 
                         <div class="grid-cartas-draft-mundial" id="grid-cartas-draft-mundial" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
 
-                        <button type="button" tabindex="38" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">
+                        <button type="button" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">
                             ⚔️ JUGAR PARTIDO DE SELECCIONES
                         </button>
                     </div>
@@ -330,22 +352,27 @@
                     <div id="fase-fixture-mundial" style="display: none; padding: 15px;">
                         <h2 class="subtitulo-modulo-tv" style="text-align: center; color: var(--dorado);">📊 BITÁCORA DE CRUCES Y RESULTADOS</h2>
                         <div id="lista-cruces-mundial-simulacion" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px;"></div>
-                        <button type="button" tabindex="39" onclick="cambiarModulo('modulo-minimundial')" class="btn-estadio btn-next-shot" style="width: 100%;">
+                        <button type="button" onclick="cambiarModulo('modulo-minimundial')" class="btn-estadio btn-next-shot" style="width: 100%;">
                             🔄 VOLVER AL VESTUARIO
                         </button>
                     </div>
                 </div>
             </div>
 
+            <!-- ========================================================================
+               👥 MÓDULO 6: ENGINE MULTIJUGADOR REFORMADO CON BOTONES DE ESCAPE (FIX COMPLETO)
+               ======================================================================== -->
             <div id="modulo-mundial-multi" class="modulo-contenido" style="display: none;">
                 <div class="caja-modulo-estadio">
                     <h2 class="titulo-modulo" style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">🏆 MINI-MUNDIAL MULTIJUGADOR</h2>
                     
+                    <!-- 1. MENÚ INICIAL: CREAR SALA O INGRESAR CÓDIGO -->
                     <div id="multi-menu-inicial" style="text-align: center; margin-top: 20px;">
                         <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto 20px; border: 1px solid #1a2436;">
                             <h3>🆕 CREAR NUEVA SALA</h3>
+                            
                             <label>Modalidad del torneo:</label>
-                            <select id="multi-select-tipo-apuesta" tabindex="40" onchange="conmutarInputsMultiUI()" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b; text-align: center;">
+                            <select id="multi-select-tipo-apuesta" onchange="conmutarInputsMultiUI()" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b; text-align: center;">
                                 <option value="amistoso">🤝 AMISTOSO (Gratis)</option>
                                 <option value="oro">🪙 TIMBA POR ORO</option>
                                 <option value="carta">🃏 APOSTAR FIGURITA REPETIDA</option>
@@ -353,28 +380,30 @@
 
                             <div id="multi-wrapper-oro" style="display: none;">
                                 <label>Apuesta de Oro:</label>
-                                <input type="number" id="multi-input-apuesta" tabindex="41" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
+                                <input type="number" id="multi-input-apuesta" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
                             </div>
 
                             <div id="multi-wrapper-carta" style="display: none;">
                                 <label>Elegí el Cromo a arriesgar:</label>
-                                <select id="multi-select-carta-apuesta" tabindex="42" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b;"></select>
+                                <select id="multi-select-carta-apuesta" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b;"></select>
                             </div>
 
-                            <button class="btn-estadio" tabindex="43" style="margin-top: 10px;" onclick="abrirDraftMulti(true)">Crear Sala</button>
+                            <button class="btn-estadio" style="margin-top: 10px;" onclick="abrirDraftMulti(true)">Crear Sala</button>
                         </div>
 
                         <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; border: 1px solid #1a2436;">
                             <h3>🚪 UNIRSE A UNA SALA</h3>
-                            <input type="text" id="multi-input-codigo" tabindex="44" placeholder="CÓDIGO DE SALA" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; text-transform: uppercase; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            <button class="btn-estadio" tabindex="45" onclick="abrirDraftMulti(false)">Ingresar Código</button>
+                            <input type="text" id="multi-input-codigo" placeholder="CÓDIGO DE SALA" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; text-transform: uppercase; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
+                            <button class="btn-estadio" onclick="abrirDraftMulti(false)">Ingresar Código</button>
                         </div>
                     </div>
 
-                    <div id="multi-fase-indigo" style="display: none; text-align: center; padding: 20px;">
+                    <!-- 2. FASE INSCRIPCIÓN: LISTADO DE PAÍSES ASIGNADOS -->
+                    <div id="multi-fase-inscripcion" style="display: none; text-align: center; padding: 20px;">
                         <h3 style="color: var(--celeste);">ELEGÍ TU PAÍS PARA EL TORNEO ONLINE</h3>
                         <div id="multi-zona-eleccion-pais" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
-                        <button type="button" tabindex="46" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); max-width: 250px; margin: 15px auto 0;">
+                        
+                        <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); max-width: 250px; margin: 15px auto 0;">
                             ❌ ABANDONAR INSCRIPCIÓN
                         </button>
                     </div>
@@ -391,32 +420,46 @@
                                 <span class="nombre-seleccion">RIVALES</span>
                             </div>
                         </div>
+                        <div class="banca-reloj-status" id="multi-lbl-estrellas-equipo" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">
+                            ⭐ (0/5 Estrellas)
+                        </div>
 
                         <div class="grid-cartas-draft-mundial" id="multi-grid-cartas-draft" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
                         
+                        <div id="multi-wrapper-apuesta-invitado" style="display: none; background:#131c2e; padding:15px; border-radius:8px; border:1px solid var(--dorado); margin-bottom:15px; text-align:center;">
+                            <label style="color:var(--dorado); font-weight:bold; display:block; margin-bottom:8px;">🃏 SELECCIONÁ TU CARTA PARA PONER EN JUEGO:</label>
+                            <select id="multi-select-carta-apuesta-invitado" style="width:90%; padding:8px; border-radius:6px; background:#0b111e; color:#fff; border:1px solid #1e293b;"></select>
+                        </div>
+
                         <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button type="button" tabindex="47" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">
-                                ⚔️ CONFIRMAR ALINEACIÓN
+                            <button type="button" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">
+                                ⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO
                             </button>
-                            <button type="button" tabindex="48" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">
-                                ↩️ SALIR
+                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">
+                                ↩️ CAMBIAR SELECCIÓN / SALIR
                             </button>
                         </div>
                     </div>
 
+                    <!-- 4. LOBBY DE ESPERA ACTIVO (POLLING RUNNING) -->
                     <div id="multi-lobby-espera" style="display: none; text-align: center;">
                         <div style="background: #0b111e; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 20px; border: 2px solid var(--dorado);">
                             <span style="font-size: 1.1rem; color: #64748b;">CÓDIGO DE SALA:</span>
                             <h2 id="lobby-txt-codigo" style="color: var(--dorado); margin: 5px 0; font-size: 2.2rem; font-family: 'Oswald'; letter-spacing: 2px;">------</h2>
                             <span id="lobby-txt-pozo" style="color: var(--verde-match); font-weight: bold;">💰 Pozo Actual: 0 Oro</span>
                         </div>
+
+                        <h4 style="color: var(--celeste); margin-bottom: 15px;">👥 JUGADORES CONECTADOS (<span id="lobby-cnt-jugadores">0</span>/8)</h4>
                         <div id="lobby-lista-participantes" style="max-width: 500px; margin: 0 auto 20px; display: flex; flex-direction: column; gap: 8px;"></div>
+
                         <div style="display: flex; flex-direction: column; gap: 10px; max-width: 350px; margin: 0 auto;">
-                            <button id="multi-btn-iniciar-fixture" class="btn-estadio" tabindex="49" style="display: none; width: 100%;" onclick="lanzarSimulacionMulti()">🔥 ¡LARGAR MUNDIAL! 🔥</button>
-                            <button type="button" tabindex="50" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">ABANDONAR SALA</button>
+                            <button id="multi-btn-iniciar-fixture" class="btn-estadio btn-modulo-match" style="display: none; margin: 0 auto; width: 100%;" onclick="lanzarSimulacionMulti()">🔥 ¡LARGAR MUNDIAL! 🔥</button>
+                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">🚪 ABANDONAR SALA ACTIVA</button>
                         </div>
+                        <p id="multi-txt-espera-host" style="color: #64748b; font-style: italic; margin-top: 10px;">Esperando que el creador inicie el torneo...</p>
                     </div>
 
+                    <!-- 5. TRANSMISIÓN EN VIVO DEL FIXTURE MULTIJUGADOR -->
                     <div id="multi-pantalla-fixture" style="display: none;">
                         <h3 style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">📊 TRANSMISIÓN EN VIVO MULTIJUGADOR</h3>
                         <div id="multi-cronologia-goles" style="max-width: 600px; margin: 0 auto; min-height: 300px; padding: 10px;"></div>
@@ -424,21 +467,40 @@
                 </div>
             </div>
 
-            <div id="modulo-comerciante-bot" class="modulo-contenido" style="display: none;"></div>
+            <!-- 5. TRANSMISIÓN EN VIVO DEL FIXTURE MULTIJUGADOR -->
+                    <div id="multi-pantalla-fixture" style="display: none;">
+                        <h3 style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">📊 TRANSMISIÓN EN VIVO MULTIJUGADOR</h3>
+                        <div id="multi-cronologia-goles" style="max-width: 600px; margin: 0 auto; min-height: 300px; padding: 10px;"></div>
+                    </div>
+                </div>
+            </div> <!-- 👈 Acá cierra tu módulo multijugador -->
+
+            <!-- ========================================================================
+                 🤖 NUEVO MÓDULO 7: MERCADO DE PASES AI (BOT COMERCIANTE)
+                 ======================================================================== -->
+            <div id="modulo-comerciante-bot" class="modulo-contenido" style="display: none;">
+                <!-- El JavaScript va a inyectar toda la interfaz interactiva acá de forma limpia -->
+            </div>
 
         </section>
     </main>
 
+    <!-- MODAL DE AYUDA Y REGLAS -->
     <div id="modal-ayuda-juego" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
         <div style="background: #0b111e; border: 2px solid var(--dorado); width: 100%; max-width: 600px; padding: 25px; border-radius: 12px; max-height: 85vh; overflow-y: auto; position: relative;">
             <h2 style="color: var(--dorado); font-family: 'Oswald'; text-align: center; margin-top: 0; font-size: 1.8rem; border-bottom: 1px solid #1a2436; padding-bottom: 10px;">🏟️ REGLAS DE LA ARENA</h2>
+            
             <div style="color: #fff; font-size: 0.95rem; line-height: 1.6; display: flex; flex-direction: column; gap: 15px; margin-top: 15px; font-family: system-ui, sans-serif;">
-                <p><strong>🛍️ SOBRES:</strong> Conseguí cartas en la tienda para completar tu colección.</p>
-                <p><strong>⚽ PENALES:</strong> Patea al arco para ganar Oro y subir en el Ranking.</p>
-                <p><strong>🏆 MINI-MUNDIAL MULTI:</strong> Armá tu terna de 3 jugadores y desafiá a otro usuario online.</p>
-                <p><strong>💸 MERCADO DE PASES P2P:</strong> Publicá tus cromos repetidos al precio de Oro que quieras.</p>
+                <p><strong>🛍️ SOBRES:</strong> Conseguí cartas Comunes, Raras, Épicas y Legendarias en la tienda para completar tu colección.</p>
+                <p><strong>⚽ PENALES:</strong> Patea al arco para ganar Oro y subir en el Ranking. Consume energía de tu cuenta.</p>
+                
+                <p><strong>🏆 MINI-MUNDIAL MULTI:</strong> Armá tu terna de 3 jugadores y desafiá a otro usuario online. Podés jugar en modo <i>Amistoso</i>, por <i>Oro</i> o por <i>Cartas</i>. <b>¡Ojo!</b> La inscripción en el Draft es gratuita: los aranceles o cromos repetidos se debitan de forma atómica recién cuando el Host inicia el fixture.</p>
+                
+                <p><strong>💸 MERCADO DE PASES P2P:</strong> Publicá tus cromos repetidos al precio de Oro que quieras en la vitrina internacional. Las ofertas tienen una <b>duración estricta de 24 horas</b>. Si nadie compra tu cromo en ese plazo, el sistema en background lo retira de exposición y te devuelve la carta automáticamente a tu stock.</p>
+                
+                <p><strong>🎰 TIMBA:</strong> Arriesgá tus recursos pronosticando marcadores reales de simulaciones veloces.</p>
             </div>
-            <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio" style="width: 100%; margin-top: 25px; background: var(--rojo); border-color: var(--rojo); cursor: pointer; font-weight: bold;">❌ CERRAR GUÍA</button>
+            <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio btn-next-shot" style="width: 100%; margin-top: 25px; background: var(--rojo); border-color: var(--rojo); cursor: pointer; font-weight: bold;">❌ CERRAR GUÍA</button>
         </div>
     </div>
 
@@ -452,18 +514,29 @@
 
     <div id="modal-informe-parche" class="modal-anuncio-overlay">
         <div class="modal-anuncio-content" style="border-color: var(--celeste); max-width: 550px; max-height: 80vh; overflow-y: auto; display: flex; flex-direction: column; justify-content: space-between;">
+            
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1a2436; padding-bottom: 10px;">
                     <h2 style="color: var(--celeste); font-family: 'Oswald'; margin: 0; font-size: 1.6rem; text-transform: uppercase;">📋 Informe de Cambios</h2>
                     <span id="informe-txt-version" style="background: var(--celeste); color: #000; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; font-family: monospace;">v0.0</span>
                 </div>
-                <p style="color: #64748b; font-size: 0.8rem; margin-top: 8px; font-style: italic; text-align: left;">Publicado: <span id="informe-txt-fecha">--</span></p>
-                <div id="informe-lista-cambios" style="color: #fff; font-size: 0.9rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; margin-top: 15px; text-align: left;"></div>
+                
+                <p style="color: #64748b; font-size: 0.8rem; margin-top: 8px; font-family: system-ui, sans-serif; font-style: italic; text-align: left;">
+                    Publicado: <span id="informe-txt-fecha">--</span>
+                </p>
+                
+                <div id="informe-lista-cambios" style="color: #fff; font-size: 0.9rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; margin-top: 15px; font-family: system-ui, sans-serif; text-align: left;">
+                    </div>
             </div>
-            <button type="button" onclick="cerrarInformeParche()" class="btn-estadio" style="width: 100%; margin-top: 25px; background: var(--celeste); color: #000; font-weight: bold;">¡Entendido, Crack!</button>
+            
+            <button type="button" onclick="cerrarInformeParche()" class="btn-estadio" style="width: 100%; margin-top: 25px; background: var(--celeste); color: #000; font-weight: bold; border-color: var(--celeste); cursor: pointer; padding: 10px 0; border-radius: 6px; font-family: 'Oswald'; text-transform: uppercase;">
+                ¡Entendido, Crack!
+            </button>
+            
         </div>
     </div>
 
+    <!-- PARSEO SEGURO DE EMOJIS (TWEMOJI) -->
     <script src="https://unpkg.com/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
     <script>
     window.addEventListener('DOMContentLoaded', () => {
