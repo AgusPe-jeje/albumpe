@@ -2386,26 +2386,30 @@ async function comprarCartaMercado(ofertaId) {
     }
 }
 
-let eleccionesQuiniela = { p1: null, p2: null, p3: null };
+// 📑 MANTENER COMO OBJETO CONSTANTE PARA EVITAR PÉRDIDA DE REFERENCIA GLOBAL
+const eleccionesQuiniela = { p1: null, p2: null, p3: null };
 
 async function cargarPartidosQuinielaUI() {
     const contenedor = document.getElementById("contenedor-lista-quiniela");
     if (!contenedor) return;
 
     try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
-        const res = await fetch(`${URL_BASE}/timba/quiniela/partidos`);
+        // 🔥 INYECTADO: Se agregan headers seguros por si la ruta requiere verificarToken
+        const res = await fetch(`${URL_BASE}/timba/quiniela/partidos`, {
+            method: 'GET',
+            headers: typeof obtenerHeadersSeguros === "function" ? obtenerHeadersSeguros() : { 'Content-Type': 'application/json' }
+        });
         const data = await res.json();
 
-        if (data.ok && data.partidos.length === 3) {
+        if (data.ok && data.partidos && data.partidos.length === 3) {
             contenedor.innerHTML = ""; 
 
             data.partidos.forEach((partido, index) => {
                 const numP = index + 1;
                 contenedor.innerHTML += `
-                    <div style="background: rgba(2, 6, 23, 0.6); padding: 10px; border-radius: 6px; border: 1px solid #334155;">
+                    <div style="background: rgba(2, 6, 23, 0.6); padding: 10px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 8px;">
                         <div style="color: #cbd5e1; font-size: 0.8rem; font-weight: bold; text-align: center; margin-bottom: 6px; letter-spacing: 0.5px;">
-                            ${partido.emoji} PARTIDO ${numP}: ${partido.local} vs ${partido.visitante}
+                            ${partido.emoji || '⚽'} PARTIDO ${numP}: ${partido.local} vs ${partido.visitante}
                         </div>
                         <div style="display: flex; justify-content: space-around; gap: 6px;">
                             <button type="button" class="btn-quiniela-p${numP}" style="background: #1e293b; color: #fff; padding: 6px 10px; cursor: pointer; font-size: 0.75rem; border-radius: 4px; border: 1px solid #475569; width: 32%; font-weight: bold;" onclick="seleccionarQuiniela(${numP}, 'L', this)">LOCAL</button>
@@ -2415,6 +2419,8 @@ async function cargarPartidosQuinielaUI() {
                     </div>
                 `;
             });
+        } else {
+            contenedor.innerHTML = "<p style='color:var(--dorado); text-align:center;'>⏳ No hay partidos disponibles en la cartelera actual.</p>";
         }
     } catch (err) {
         console.error("Error cargando quiniela rotativa:", err);
@@ -2459,12 +2465,14 @@ async function enviarBoletaQuiniela() {
     divRes.innerText = "⏳ Procesando boleta combinada...";
 
     try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
+        // 🔥 CORREGIDO: Se inyecta obtenerHeadersSeguros() para pasar el token JWT requerido por verificarToken
+        const miUsuarioId = usuarioActual ? (usuarioActual.id || usuarioActual._id) : null;
+        
         const res = await fetch(`${URL_BASE}/timba/quiniela`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: typeof obtenerHeadersSeguros === "function" ? obtenerHeadersSeguros() : { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                usuario_id: usuarioActual.id,
+                usuario_id: miUsuarioId,
                 monto: monto,
                 elecciones: eleccionesQuiniela
             })
@@ -2482,14 +2490,19 @@ async function enviarBoletaQuiniela() {
 
             const trad = (sigla) => sigla === 'L' ? 'Local' : (sigla === 'E' ? 'Empate' : 'Visita');
             
-            const p1 = data.partidosSimulados[0];
-            const p2 = data.partidosSimulados[1];
-            const p3 = data.partidosSimulados[2];
+            // 🛡️ CONTROL DE RESGUARDO: Si falló la sincronización de partidosSimulados, evita romper la UI
+            const p1 = data.partidosSimulados ? data.partidosSimulados[0] : { local: 'P1', visitante: 'Rival' };
+            const p2 = data.partidosSimulados ? data.partidosSimulados[1] : { local: 'P2', visitante: 'Rival' };
+            const p3 = data.partidosSimulados ? data.partidosSimulados[2] : { local: 'P3', visitante: 'Rival' };
+
+            const resP1 = data.resultadosReales ? data.resultadosReales.p1 : 'L';
+            const resP2 = data.resultadosReales ? data.resultadosReales.p2 : 'L';
+            const resP3 = data.resultadosReales ? data.resultadosReales.p3 : 'L';
 
             const desglose = `<br><span style="color:#94a3b8; font-size:0.8rem;">
-                [${p1.local} vs ${p1.visitante}: ${trad(data.resultadosReales.p1)}]<br>
-                [${p2.local} vs ${p2.visitante}: ${trad(data.resultadosReales.p2)}]<br>
-                [${p3.local} vs ${p3.visitante}: ${trad(data.resultadosReales.p3)}]
+                [${p1.local} vs ${p1.visitante}: ${trad(resP1)}]<br>
+                [${p2.local} vs ${p2.visitante}: ${trad(resP2)}]<br>
+                [${p3.local} vs ${p3.visitante}: ${trad(resP3)}]
             </span>`;
 
             if (data.ganó) {
@@ -2501,7 +2514,11 @@ async function enviarBoletaQuiniela() {
             }
 
             document.getElementById("input-monto-quiniela").value = "100";
-            eleccionesQuiniela = { p1: null, p2: null, p3: null };
+            
+            // 🔥 CORREGIDO: Se limpian los campos del objeto manteniendo la misma referencia
+            eleccionesQuiniela.p1 = null;
+            eleccionesQuiniela.p2 = null;
+            eleccionesQuiniela.p3 = null;
             
             document.querySelectorAll('[class^="btn-quiniela-p"]').forEach(btn => {
                 btn.style.background = "#1e293b";
@@ -2513,7 +2530,7 @@ async function enviarBoletaQuiniela() {
 
         } else {
             divRes.style.color = "var(--rojo)";
-            divRes.innerText = data.mensaje;
+            divRes.innerText = data.mensaje || "Error procesando la jugada.";
         }
     } catch (err) {
         console.error(err);
