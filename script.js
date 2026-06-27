@@ -2538,9 +2538,3 @@ async function enviarBoletaQuiniela() {
         divRes.innerText = "❌ Error de conexión.";
     }
 }
-
-// Asegurar que al cargar la página el foco se posicione en el primer input
-document.addEventListener("DOMContentLoaded", () => {
-    const primerInput = document.getElementById("input-usuario");
-    if (primerInput) primerInput.focus();
-});
