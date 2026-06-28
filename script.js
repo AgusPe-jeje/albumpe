@@ -467,6 +467,11 @@ async function comprarSobreEspecifico(tipoCofre) {
           usuarioActual.monedas = data.monedas; // Tomamos el value real del backend
           actualizarInterfazUI();
 
+          // 🎵 GATILLO DE AUDIO INYECTADO: Sonido metálico instantáneo al procesar la compra
+          if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+               AudioArena.play('monedas');
+          }
+
           // 🟢 SECTOR MISIONES API: Impactamos el progreso de forma atómica en el Servidor
           if (typeof trackearProgresoMision === 'function') {
                await trackearProgresoMision("sobres", 1);
@@ -1168,15 +1173,14 @@ async function prepararInscripcionMundial() {
      try {
           const res = await fetch(`${URL_BASE}/mundial/preparar`, {
                  method: 'POST',
-                 headers: obtenerHeadersSeguros(), // 🔥 Token inyectado
-                 body: JSON.stringify({}) // ❌ usuario_id ELIMINADO
+                 headers: obtenerHeadersSeguros(), 
+                 body: JSON.stringify({}) 
           });
           const data = await res.json();
           ocultarCarga();
 
           if (!data.ok) return alert(data.mensaje);
 
-          // 🛡️ REGLA DE ORO: Sincronizamos estrictamente las monedas que recalculó Neon
           usuarioActual.monedas = data.monedasActualizadas;
           actualizarInterfazUI();
 
@@ -1277,7 +1281,7 @@ async function ejecutarTorneoMundial() {
      try {
           const res = await fetch(`${URL_BASE}/mundial/jugar`, {
                method: 'POST',
-               headers: obtenerHeadersSeguros(), // 🔥 Token inyectado
+               headers: obtenerHeadersSeguros(), 
                body: JSON.stringify({
                     seleccionElegida: window.mundialSeleccionUsuario,
                     rivalClasificacion: mundialRivalClasif, 
@@ -1288,7 +1292,6 @@ async function ejecutarTorneoMundial() {
 
           if (!data.ok) return alert(data.mensaje);
 
-          // 🟢 SECTOR MISIONES API: Impactamos el progreso del Mundial en el servidor antes de simular
           if (typeof trackearProgresoMision === 'function') {
                await trackearProgresoMision("mundial", 1);
           }
@@ -1326,6 +1329,9 @@ async function ejecutarTorneoMundial() {
           data.progreso.integrantesGrupo.forEach(p => { estadoTablaMundial[p] = { pais: p, pts: 0, gf: 0, gc: 0 }; });
           renderizarTablaGrupoLive(estadoTablaMundial);
 
+          // 🎵 GATILLO DE AUDIO INYECTADO: Sonido de Silbatazo al arrancar la Fase de Grupos
+          if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
           for (let f = 0; f < data.progreso.bitacoraGrupo.length; f++) {
                const fechaData = data.progreso.bitacoraGrupo[f];
                const divFecha = document.createElement("div");
@@ -1337,10 +1343,17 @@ async function ejecutarTorneoMundial() {
                     let segV = 0; let g1_L = 0; let g1_V = 0; let g2_L = 0; let g2_V = 0;
                     const tGroup = setInterval(() => {
                          segV += 9; if (segV > 90) segV = 90;
-                         if (g1_L < fechaData.gL && Math.random() < 0.2) g1_L++;
-                         if (g1_V < fechaData.gV && Math.random() < 0.2) g1_V++;
+                         
+                         // 🎵 GATILLO DE AUDIO INYECTADO: Si hay variación de goles en tu pantalla, ruge la tribuna
+                         let huboGol = false;
+                         if (g1_L < fechaData.gL && Math.random() < 0.2) { g1_L++; huboGol = true; }
+                         if (g1_V < fechaData.gV && Math.random() < 0.2) { g1_V++; huboGol = true; }
                          if (g2_L < fechaData.gBL && Math.random() < 0.2) g2_L++;
                          if (g2_V < fechaData.gBV && Math.random() < 0.2) g2_V++;
+
+                         if (huboGol && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                              AudioArena.play('gol');
+                         }
 
                          if (segV === 90) { g1_L = fechaData.gL; g1_V = fechaData.gV; g2_L = fechaData.gBL; g2_V = fechaData.gBV; }
                          document.getElementById(`goles-m1-f${f}`).innerText = `${g1_L} - ${g1_V}`;
@@ -1350,11 +1363,11 @@ async function ejecutarTorneoMundial() {
                          if (segV >= 90) {
                               clearInterval(tGroup);
                               const acumLive = (loc, vis, gl, gv) => {
-                                  estadoTablaMundial[loc].gf += gl; estadoTablaMundial[loc].gc += gv;
-                                  estadoTablaMundial[vis].gf += gv; estadoTablaMundial[vis].gc += gl;
-                                  if (gl > gv) estadoTablaMundial[loc].pts += 3;
-                                  else if (gl < gv) estadoTablaMundial[vis].pts += 3;
-                                  else { estadoTablaMundial[loc].pts += 1; estadoTablaMundial[vis].pts += 1; }
+                                   estadoTablaMundial[loc].gf += gl; estadoTablaMundial[loc].gc += gv;
+                                   estadoTablaMundial[vis].gf += gv; estadoTablaMundial[vis].gc += gl;
+                                   if (gl > gv) estadoTablaMundial[loc].pts += 3;
+                                   else if (gl < gv) estadoTablaMundial[vis].pts += 3;
+                                   else { estadoTablaMundial[loc].pts += 1; estadoTablaMundial[vis].pts += 1; }
                               };
                               acumLive(fechaData.local, fechaData.visitante, fechaData.gL, fechaData.gV);
                               acumLive(fechaData.botL, fechaData.botV, fechaData.gBL, fechaData.gBV);
@@ -1429,6 +1442,9 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
           contenedor.appendChild(filaPartido); 
           filaPartido.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+          // 🎵 GATILLO DE AUDIO INYECTADO: Silbato del referí al arrancar la ronda de Playoffs
+          if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
           // Generación lógica de goles esperados finales
           let golesTu = Math.floor(Math.random() * 3); 
           let golesRival = Math.floor(Math.random() * 3);
@@ -1453,7 +1469,6 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
           document.getElementById(`btn-charla-${idUnico}`).onclick = () => {
                tieneBoost = true;
                
-               // 🟢 CORREGIDO: Removemos la clase .oculto para encender el badge en tiempo real
                const badge = document.getElementById(`boost-badge-${idUnico}`);
                if (badge) badge.classList.remove("oculto");
                
@@ -1477,10 +1492,15 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                     document.getElementById(`zona-entretiempo-${idUnico}`).style.display = "block";
                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = "📣 Charla técnica en curso en los vestuarios...";
                     
+                    // 🎵 GATILLO DE AUDIO INYECTADO: Silbatazo corto indicando fin del PT
+                    if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
                     setTimeout(() => {
                          document.getElementById(`zona-entretiempo-${idUnico}`).style.display = "none";
                          partidoPausado = false;
                          segundoVirtual += 3;
+                         // 🎵 GATILLO DE AUDIO INYECTADO: Silbatazo de inicio del ST
+                         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
                     }, 5000);
                     return;
                }
@@ -1489,13 +1509,22 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                if (segundoVirtual > 90) segundoVirtual = 90;
 
                if ((segundoVirtual >= 10 && segundoVirtual < 45) || segundoVirtual >= 50) {
+                    let cantoGol = false;
                     if (golesTuActuales < golesTu && Math.random() < (tieneBoost ? 0.20 : 0.11)) {
                          golesTuActuales++;
+                         cantoGol = true;
+                         // Sonido de monedas agregado solo de premio de ambiente extra si querés
                          inyectarAlertaIncidencia(idUnico, `⚽ ¡GOOOL DE ${tuPais.toUpperCase()}! 🔥`);
                     }
                     if (golesRivalActuales < golesRival && Math.random() < 0.10) {
                          golesRivalActuales++;
+                         cantoGol = true;
                          inyectarAlertaIncidencia(idUnico, `💥 Gol de ${rival.toUpperCase()}. Se grita fuerte en el banco rival.`);
+                    }
+
+                    // 🎵 GATILLO DE AUDIO INYECTADO: ¡Goooool! Estalla la tribuna virtual
+                    if (cantoGol && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                        AudioArena.play('gol');
                     }
                }
 
@@ -1515,6 +1544,9 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                     clearInterval(timer); 
                     filaPartido.style.borderColor = ganoUsuario ? "var(--verde-match)" : "var(--rojo)";
                     
+                    // 🎵 GATILLO DE AUDIO INYECTADO: Pitazo final del referí
+                    if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
                     const finLabel = document.createElement("div");
                     finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:8px; font-family:'Oswald'; color:${ganoUsuario ? 'var(--verde-match)' : 'var(--rojo)'};`;
                     finLabel.innerText = ganoUsuario ? "🏁 FINALIZADO - AVANZAS ✅" : "🏁 FINALIZADO - ELIMINADO ❌";
@@ -1560,7 +1592,6 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            // 🔥 REPARADO: Se usa URL_BASE limpia (ya incluye /api) y se inyecta Authorization para evitar el 403
             const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
@@ -1594,7 +1625,6 @@ async function abrirDraftMulti(esCreador) {
                 return;
             }
 
-            // 🔥 REPARADO: URL corregida para evitar /api/api y protegida con headers seguros
             const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
@@ -1625,11 +1655,10 @@ async function prepararInscripcionMundialMulti() {
      mostrarCarga("Conectando con la central de la Arena Online...");
 
      try {
-          // 🔥 REPARADO: Quitamos el 'api/' redundante porque URL_BASE ya lo trae de fábrica
           const res = await fetch(`${URL_BASE}/multijugador/preparar-draft`, {
-               method: 'POST',
-               headers: obtenerHeadersSeguros(),
-               body: JSON.stringify({})
+                method: 'POST',
+                headers: obtenerHeadersSeguros(),
+                body: JSON.stringify({})
           });
           
           const data = await res.json(); 
@@ -1731,7 +1760,6 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
 
     mostrarCarga("Enviando planilla de vestuarios a la Arena Online...");
     
-    // 🔥 REPARADO: Quitamos el 'api/' redundante de las variables base
     let url = `${URL_BASE}/multijugador/crear`;
     let cuerpo = {
         seleccion: paisElegido, 
@@ -1777,7 +1805,6 @@ async function actualizarLobbyEnVivo() {
     if (!multiCodigoSala) return;
 
     try {
-        // 🔥 REPARADO: Removido el '/api/' de más para limpiar el 404 y blindado con Token
         const res = await fetch(`${URL_BASE}/multijugador/sala/${multiCodigoSala}`, {
             method: 'GET',
             headers: obtenerHeadersSeguros()
@@ -1836,19 +1863,17 @@ async function lanzarSimulacionMulti() {
     mostrarCarga("Sorteando las llaves y cerrando las planillas online...");
     clearInterval(multiIntervaloLobby);
     
-    // 🛡️ Aseguramos capturar el ID sin importar si es .id o ._id
     const miUsuarioId = usuarioActual ? (usuarioActual.id || usuarioActual._id) : null;
 
     try {
         const res = await fetch(`${URL_BASE}/multijugador/jugar`, { 
           method: 'POST', 
           headers: obtenerHeadersSeguros(),
-          // 🚀 Enviamos un combo completo para que el backend encuentre sí o sí el dato que busca
           body: JSON.stringify({ 
               sala_id: multiSalaId, 
-              codigo_sala: multiCodigoSala, // Por si el backend busca por código de 6 letras
+              codigo_sala: multiCodigoSala, 
               usuario_id: miUsuarioId,
-              creador_id: miUsuarioId       // Por si en el body buscaba explícitamente "creador_id"
+              creador_id: miUsuarioId       
           })
         });
         
@@ -1857,7 +1882,6 @@ async function lanzarSimulacionMulti() {
         
         if (!data.ok) { 
             alert(data.mensaje); 
-            // Si falla, volvemos a activar el re-escaneo del lobby para no quedarnos colgados
             multiIntervaloLobby = setInterval(actualizarLobbyEnVivo, 3000); 
             return; 
         }
@@ -1873,7 +1897,6 @@ async function lanzarSimulacionMulti() {
 async function consultarResultadoInvitado(intento = 1) {
      if (intento === 1) mostrarCarga("¡El Torneo comenzó! Recibiendo transmisión oficial...");
      try {
-          // 🔥 REPARADO: Quitamos el 'api/' redundante para limpiar la consulta espejo
           const res = await fetch(`${URL_BASE}/multijugador/resultado-invitado/${multiSalaId}`, {
               method: 'GET',
               headers: obtenerHeadersSeguros()
@@ -1919,7 +1942,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         secuenciaPromesas = secuenciaPromesas.then(() => {
             return new Promise((resolveCruce) => {
                  const bloquePartido = document.createElement("div"); 
-                 bloquePartido.className = "partido-simulado-card"; // 🟢 HEREDA EL ESTILO PREMIUM
+                 bloquePartido.className = "partido-simulado-card"; 
                  bloquePartido.style.marginBottom = "20px";
                  bloquePartido.style.borderLeft = "4px solid var(--dorado)";
                  
@@ -1941,6 +1964,9 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  tablero.appendChild(bloquePartido); 
                  bloquePartido.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+                 // 🎵 GATILLO DE AUDIO INYECTADO: Silbatazo inicial del árbitro al arrancar el partido online
+                 if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
                  let minVirtual = 0; 
                  let gL_act = 0; 
                  let gV_act = 0;
@@ -1950,14 +1976,32 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                       if (minVirtual > 90) minVirtual = 90;
 
                       if (minVirtual >= 15) {
+                           let gritoGolOnline = false;
                            if (gL_act < golesLocalDefinitivos && Math.random() < 0.2) {
                                 gL_act++;
+                                gritoGolOnline = true;
                                 inyectarGritoGolMulti(index, `⚽ ¡GOOOL DE ${loc.toUpperCase()}! Se cae el estadio... 🔥`);
                            }
                            if (gV_act < golesVisitanteDefinitivos && Math.random() < 0.2) {
                                 gV_act++;
+                                gritoGolOnline = true;
                                 inyectarGritoGolMulti(index, `💥 ¡GOL DE ${vis.toUpperCase()}! Silencio sepulcral en la Arena...`);
                            }
+
+                           // 🎵 GATILLO DE AUDIO INYECTADO: Tribuna estalla si hay gol en el marcador
+                           if (gritoGolOnline && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                               AudioArena.play('gol');
+                           }
+                      }
+
+                      if (minVirtual === 45 && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                           // Silbato corto indicando entretiempo tactico
+                           AudioArena.play('pitazo');
+                      }
+
+                      if (minVirtual === 50 && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                           // Silbato de reanudacion del segundo tiempo
+                           AudioArena.play('pitazo');
                       }
 
                       if (minVirtual === 90) { 
@@ -1978,6 +2022,9 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                       if (minVirtual >= 90) {
                            clearInterval(timerMulti);
                            
+                           // 🎵 GATILLO DE AUDIO INYECTADO: Pitazo final del encuentro
+                           if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
                            if (partido.definicionPenales) {
                                 const pBox = document.getElementById(`multi-penales-box-${index}`);
                                 if (pBox) {
@@ -2917,10 +2964,32 @@ async function reclamarPremioMisionServer(idMision) {
                 const elMonedas = document.getElementById("lbl-monedas");
                 if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
             }
+            
+            // 🎵 GATILLO DE AUDIO INYECTADO: Sonido de moneditas al cobrar tu recompensa
+            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+                AudioArena.play('monedas');
+            }
+
             renderizarMisionesDiarias();
-            alert(`🪙 ¡Servidor procesó tu reclamo! Se acreditaron tus monedas correspondientes.`);
+
+            // 👑 CAMBIO DE INMERSIÓN: Reemplazamos el alert() viejo por una notificación sutil en la UI
+            // Si tenés un sistema de toasts o carteles flotantes lo metés acá. Si no, al actualizarse el número
+            // con el sonido metálico de fondo, el game-feel ya se entiende a la perfección.
+            console.log(`🪙 Recompensa cobrada con éxito. Balance actualizado a: ${data.monedas}`);
+
         } else {
-            alert(`❌ Error: ${data.error}`);
+            // Error controlado (ej: misión no completada o ya reclamada)
+            const modal = document.getElementById('modalAnuncioGlobal');
+            const tituloHtml = document.getElementById('anuncioTitulo');
+            const cuerpoHtml = document.getElementById('anuncioCuerpo');
+            
+            if (modal && tituloHtml && cuerpoHtml) {
+                tituloHtml.textContent = "⚠️ RECLAMO DENEGADO";
+                cuerpoHtml.innerHTML = `<p style="text-align:center; color:#cbd5e1; padding:15px;">${data.error}</p>`;
+                modal.style.display = "flex";
+            } else {
+                alert(`❌ Error: ${data.error}`); // Resguardo por si las misiones se abren fuera de interfaz
+            }
         }
     } catch (err) {
         console.error("Error al reclamar recompensa:", err);
@@ -3025,3 +3094,99 @@ async function verificarRecompensaDiaria() {
         iniciarControladorAnunciosSeguro();
     }
 }
+
+/* ========================================================================
+   🎵 MOTOR DE AUDIO: SÍNTESIS DE EFECTOS DE TRANSMISIÓN (WEB AUDIO API)
+   ======================================================================== */
+const AudioArena = {
+    ctx: null,
+
+    init() {
+        if (!this.ctx) {
+            // Inicializa el contexto de audio compartida de forma perezosa
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    },
+
+    play(tipo) {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            
+            // Si el contexto está suspendido (regla del navegador), lo despertamos
+            if (this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+
+            const ahora = this.ctx.currentTime;
+
+            if (tipo === 'monedas') {
+                // 🪙 EFECTO MONEDAS: Dos pulsos rápidos agudos metálicos
+                [0, 0.08].forEach((delay) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(delay === 0 ? 880 : 1200, ahora + delay); // Nota alta
+                    
+                    gain.gain.setValueAtTime(0.15, ahora + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ahora + delay + 0.2);
+                    
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(ahora + delay);
+                    osc.stop(ahora + delay + 0.2);
+                });
+            } 
+            else if (tipo === 'pitazo') {
+                // 💨 EFECTO PITAZO: Un tono agudo penetrante con vibrato corto
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, ahora);
+                osc.frequency.linearRampToValueAtTime(850, ahora + 0.15);
+                
+                gain.gain.setValueAtTime(0.2, ahora);
+                gain.gain.linearRampToValueAtTime(0.2, ahora + 0.3);
+                gain.gain.exponentialRampToValueAtTime(0.001, ahora + 0.4);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(ahora);
+                osc.stop(ahora + 0.4);
+            } 
+            else if (tipo === 'gol') {
+                // ⚽ EFECTO RUGBIDO DE TRIBUNA: Ruido blanco filtrado emulando ambiente
+                const bufferSize = this.ctx.sampleRate * 1.5; // 1.5 segundos de festejo
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                // Generamos ruido aleatorio puro
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+
+                const ruido = this.ctx.createBufferSource();
+                ruido.buffer = buffer;
+
+                // Filtro pasa-bajos para que suene gordo y de estadio lleno, no como estática de TV
+                const filtro = this.ctx.createBiquadFilter();
+                filtro.type = 'lowpass';
+                filtro.frequency.setValueAtTime(400, ahora);
+                filtro.frequency.exponentialRampToValueAtTime(200, ahora + 1.2);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.3, ahora);
+                gain.gain.exponentialRampToValueAtTime(0.001, ahora + 1.5);
+
+                ruido.connect(filtro);
+                filtro.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                ruido.start(ahora);
+                ruido.stop(ahora + 1.5);
+            }
+        } catch (e) {
+            console.warn("Audio bloqueado o no soportado por el navegador:", e);
+        }
+    }
+};
