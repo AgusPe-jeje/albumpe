@@ -71,7 +71,18 @@ function cambiarModulo(idModulo, botonPresionado) {
      
      // 🔥 NUEVA LÓGICA: Al entrar al Mercado, cargamos tus repetidas y las ofertas globales
      if (idModulo === 'modulo-mercado-pases' && usuarioActual) {
-          cargarMisRepetidasParaVenta();
+          // Si tu función cargarAlbumLocal() hace un fetch a la base de datos, 
+          // nos aseguramos de que window.albumCompleto tenga información real antes de renderizar el select
+          if (typeof cargarAlbumLocal === "function") {
+               cargarAlbumLocal().then(() => {
+                    cargarMisRepetidasParaVenta();
+               }).catch(() => {
+                    // Resguardo por si tu cargarAlbumLocal no es una Promesa async
+                    cargarMisRepetidasParaVenta(); 
+               });
+          } else {
+               cargarMisRepetidasParaVenta();
+          }
           obtenerOfertasMercado();
      }
      
@@ -2328,6 +2339,52 @@ function abrirMercadoBot(listaTusRepetidas) {
     };
 }
 
+function cargarMisRepetidasParaVenta() {
+    const select = document.getElementById("select-mercado-vender");
+    if (!select) return;
+    select.innerHTML = '<option value="">-- Elegí tu cromo --</option>';
+    
+    const cartas = window.albumCompleto || [];
+    cartas.forEach(jugador => {
+        const copias = jugador.obtenido !== undefined ? jugador.obtenido : (jugador.cantidad || 0);
+        if (copias > 1) {
+            select.innerHTML += `<option value="${jugador.id}">${jugador.nombre} (${(jugador.rareza || 'comun').toUpperCase()}) [x${copias - 1}]</option>`;
+        }
+    });
+}
+
+async function publicarCartaMercado() {
+    // 🔥 CORREGIDO: ID alineado con el HTML nativo ("select-mercado-vender")
+    const jugadorId = document.getElementById("select-mercado-vender").value; 
+    const precio = parseInt(document.getElementById("input-mercado-precio").value);
+
+    if (!jugadorId || !precio || precio < 50) {
+        alert("⚠️ Seleccioná un cromo válido y un precio mínimo de 🪙50 de Oro.");
+        return;
+    }
+
+    try {
+        // 🔥 CORREGIDO: URL absoluta con URL_BASE
+        const res = await fetch(`${URL_BASE}/mercado/publicar`, {
+            method: 'POST',
+            headers: obtenerHeadersSeguros(), 
+            body: JSON.stringify({ jugador_id: parseInt(jugadorId), precio }) 
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+            alert("✨ Cromo publicado en la vitrina internacional.");
+            document.getElementById("input-mercado-precio").value = "";
+            cargarAlbumLocal();
+            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
+        } else {
+            alert(data.mensaje);
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 async function obtenerOfertasMercado() {
     const grid = document.getElementById("grid-mercado-pases");
     if (!grid) return;
@@ -2595,3 +2652,9 @@ async function enviarBoletaQuiniela() {
         divRes.innerText = "❌ Error de conexión.";
     }
 }
+
+// Asegurar que al cargar la página el foco se posicione en el primer input
+document.addEventListener("DOMContentLoaded", () => {
+    const primerInput = document.getElementById("input-usuario");
+    if (primerInput) primerInput.focus();
+});
