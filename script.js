@@ -84,6 +84,11 @@ function cambiarModulo(idModulo, botonPresionado) {
                cargarMisRepetidasParaVenta();
           }
           obtenerOfertasMercado();
+
+          // 🟢 INYECCIÓN FEED RECIENTE: Refrescamos el historial dinámico al entrar a la sección
+          if (typeof actualizarHistorialTransferenciasUI === "function") {
+               actualizarHistorialTransferenciasUI();
+          }
      }
      
      if (idModulo === 'modulo-timba' && usuarioActual) {
@@ -1018,6 +1023,78 @@ function actualizarHistorialUI(infoPartido) {
           li.innerHTML = `<span>⚔️ ${p.local} vs ${p.visitante}</span> <b style="color: var(--celeste);">${p.res}</b>`;
           contenedorLista.appendChild(li);
      });
+}
+
+// ========================================================================
+// 📈 MARQUESINA EN VIVO: HISTORIAL DE FICHAJES RECIENTES GLOBAL
+// ========================================================================
+async function actualizarHistorialTransferenciasUI() {
+    // Buscá el contenedor de tu vitrina P2P en el DOM
+    const contenedorMercado = document.getElementById("modulo-mercado-p2p"); 
+    if (!contenedorMercado) return;
+
+    // Buscamos o creamos el bloque del feed abajo de todo en el módulo
+    let feedBox = document.getElementById("arena-feed-transferencias");
+    if (!feedBox) {
+        feedBox = document.createElement("div");
+        feedBox.id = "arena-feed-transferencias";
+        feedBox.style.cssText = "margin-top: 25px; padding: 15px; background: rgba(11, 17, 30, 0.8); border: 1px solid #1e293b; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);";
+        contenedorMercado.appendChild(feedBox);
+    }
+
+    try {
+        const res = await fetch(`${URL_BASE}/mercado/historial`);
+        const data = await res.json();
+
+        if (!data.ok || !data.historial || data.historial.length === 0) {
+            feedBox.innerHTML = `<h4 style="color: var(--celeste); font-family: 'Oswald'; margin: 0 0 5px 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 ACTIVIDAD RECIENTE</h4><p style="color: #64748b; font-size: 0.85rem; margin: 0; font-style: italic;">Sin movimientos comerciales en las últimas horas...</p>`;
+            return;
+        }
+
+        let htmlFeed = `
+            <h4 style="color: var(--dorado); font-family: 'Oswald'; margin: 0 0 10px 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 6px;">
+                ⚡ TRANSFERENCIAS RECIENTES EN VIVO
+            </h4>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+        `;
+
+        data.historial.forEach(log => {
+            let tiempoTexto = "Hace un instante";
+            if (log.segundos_atras >= 60) {
+                const minutos = Math.floor(log.segundos_atras / 60);
+                tiempoTexto = `Hace ${minutos} min`;
+            } else if (log.segundos_atras > 5) {
+                tiempoTexto = `Hace ${log.segundos_atras} seg`;
+            }
+
+            // Seteamos el color estratégico según la rareza de la venta
+            let colorRareza = "#cbd5e1";
+            const rarezaLimpia = log.rareza.toLowerCase();
+            if (rarezaLimpia === 'rara' || rarezaLimpia === 'especial') colorRareza = "#38bdf8";
+            else if (rarezaLimpia === 'epica') colorRareza = "#c084fc";
+            else if (rarezaLimpia === 'legendaria') colorRareza = "#fbbf24";
+
+            htmlFeed += `
+                <div style="background: rgba(2, 6, 23, 0.4); border-left: 3px solid ${colorRareza}; padding: 8px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem;">
+                    <span style="color: #94a3b8;">
+                        👤 <strong style="color: #fff;">${log.comprador_username}</strong> fichó a 
+                        <span style="color: ${colorRareza}; font-weight: bold;">${log.jugador_nombre.toUpperCase()}</span> 
+                        de <span style="color: #cbd5e1;">${log.vendedor_username}</span>
+                    </span>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-family: 'Oswald'; color: var(--verde-match); font-weight: bold;">🪙 ${log.precio_oro}</span>
+                        <span style="color: #64748b; font-size: 0.75rem; min-width: 70px; text-align: right;">⏱️ ${tiempoTexto}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        htmlFeed += `</div>`;
+        feedBox.innerHTML = htmlFeed;
+
+    } catch (err) {
+        console.error("Error al pintar feed de transferencias:", err);
+    }
 }
 
 async function prepararOpcionesApuesta() {
