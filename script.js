@@ -2730,8 +2730,8 @@ window.misionesDiariasUsuario = [];
 // Esta función se ejecuta al iniciar sesión (adentro de autenticarUsuario)
 async function cargarMisionesDelServidor() {
     try {
-        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
-        const res = await fetch(`${URL_BASE}/api/misiones/obtener`, {
+        // 🟢 FIX DEFINITIVO: Eliminado el '/api' duplicado. URL_BASE ya lo incluye.
+        const res = await fetch(`${URL_BASE}/misiones/obtener`, {
             method: 'GET',
             headers: obtenerHeadersSeguros()
         });
@@ -2790,8 +2790,8 @@ function renderizarMisionesDiarias() {
 // Envía la acción al servidor en segundo plano cada vez que haces un sobre/trade/mundial
 async function trackearProgresoMision(tipo, cantidad = 1) {
     try {
-        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
-        const res = await fetch(`${URL_BASE}/api/misiones/trackear`, {
+        // 🟢 FIX DEFINITIVO: Eliminado el '/api' duplicado. URL_BASE ya lo incluye.
+        const res = await fetch(`${URL_BASE}/misiones/trackear`, {
             method: 'POST',
             headers: obtenerHeadersSeguros(),
             body: JSON.stringify({ tipo, cantidad })
@@ -2809,8 +2809,8 @@ async function trackearProgresoMision(tipo, cantidad = 1) {
 // Reclama cobrando directo desde el saldo calculado por el backend
 async function reclamarPremioMisionServer(idMision) {
     try {
-        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
-        const res = await fetch(`${URL_BASE}/api/misiones/reclamar`, {
+        // 🟢 FIX DEFINITIVO: Eliminado el '/api' duplicado. URL_BASE ya lo incluye.
+        const res = await fetch(`${URL_BASE}/misiones/reclamar`, {
             method: 'POST',
             headers: obtenerHeadersSeguros(),
             body: JSON.stringify({ misionId: idMision })
