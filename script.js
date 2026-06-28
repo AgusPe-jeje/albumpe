@@ -442,7 +442,7 @@ async function comprarSobreEspecifico(tipoCofre) {
           const res = await fetch(`${URL_BASE}/comprar-sobre`, {
                 method: 'POST',
                 headers: obtenerHeadersSeguros(), // 🔥 Inyecta el token en el encabezado
-                body: JSON.stringify({ tipoCofre: tipoCofre }) // ❌ usuario_id ELIMINADO
+                body: JSON.stringify({ tipoCofre: tipoCofre }) 
           });
           
           const data = await res.json();
@@ -455,6 +455,11 @@ async function comprarSobreEspecifico(tipoCofre) {
           usuarioActual.monedas = data.monedas; // Tomamos el value real del backend
           actualizarInterfazUI();
 
+          // 🏅 SECTOR 1: Avanzamos el progreso de la misión diaria de abrir sobres
+          if (typeof trackearProgresoMision === 'function') {
+               trackearProgresoMision("sobres", 1);
+          }
+
           colaCartasPack = data.sobre;
           sobreAbiertoCompletoCache = data.sobre;
           indiceCartaActualPack = 0;
@@ -465,7 +470,43 @@ async function comprarSobreEspecifico(tipoCofre) {
           contenedorOpening.style.display = "flex";
           contenedorOpening.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-          ejecutarSecuenciaReveladoCarta();
+          // 🏎️ SECTOR 2: Verificamos si en este sobre viene un "Caminante Legendario"
+          const tieneLegendario = data.sobre.some(figu => (figu.rareza || '').toLowerCase() === 'legendaria');
+
+          if (tieneLegendario) {
+               // Buscamos el contenedor del escenario cinemático
+               const escenario = document.querySelector(".pack-opening-escenario");
+               if (escenario) {
+                    // Creamos un overlay flash de suspenso total
+                    const flashOverlay = document.createElement("div");
+                    flashOverlay.id = "caminante-flash-cinematic";
+                    flashOverlay.style.cssText = "position:absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.92); z-index:100; display:flex; flex-direction:column; justify-content:center; align-items:center; animation: pulsoFocoGamer 1.5s infinite ease-in-out;";
+                    flashOverlay.innerHTML = `
+                        <div class="spinner-arena" style="border-top-color: var(--dorado); width: 70px; height: 70px;"></div>
+                        <h2 style="color: var(--dorado); font-family: 'Oswald'; font-size: 2rem; margin-top: 20px; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 15px rgba(255,177,0,0.6);">
+                             ✨ ¡ATENCIÓN, CAMINANTE DETECTADO! ✨
+                        </h2>
+                        <p style="color: #94a3b8; font-family: sans-serif; font-size: 0.95rem; margin: 5px 0 0 0;">Las luces del estadio se encienden para una superestrella...</p>
+                    `;
+                    escenario.appendChild(flashOverlay);
+
+                    // Ponemos efectos de sonido virtuales o retraso de revelado dramático de 2.5 segundos
+                    setTimeout(() => {
+                         flashOverlay.style.opacity = "0";
+                         flashOverlay.style.transition = "opacity 0.5s ease";
+                         setTimeout(() => {
+                              flashOverlay.remove();
+                              ejecutarSecuenciaReveladoCarta();
+                         }, 500);
+                    }, 2500);
+               } else {
+                    ejecutarSecuenciaReveladoCarta();
+               }
+          } else {
+               // Si no trae legendarios, pasa directo a la secuencia normal sin demoras
+               ejecutarSecuenciaReveladoCarta();
+          }
+
      } catch (err) {
           console.error("Error en la apertura del pack:", err);
           ocultarCarga();
@@ -1172,11 +1213,17 @@ async function ejecutarTorneoMundial() {
                     seleccionElegida: window.mundialSeleccionUsuario,
                     rivalClasificacion: mundialRivalClasif, 
                     jugadorIds: jugadoresSeleccionadosDraft
-               }) // ❌ usuario_id eliminado
+               }) 
           });
           const data = await res.json(); ocultarCarga();
 
           if (!data.ok) return alert(data.mensaje);
+
+          // 🏅 SECTOR 1: Avanzamos la misión diaria de disputar un cruce en el MiniMundial
+          if (typeof trackearProgresoMision === 'function') {
+               trackearProgresoMision("mundial", 1);
+          }
+
           document.getElementById("fase-draft-mundial").style.display = "none";
           document.getElementById("fase-fixture-mundial").style.display = "block";
 
@@ -1214,7 +1261,7 @@ async function ejecutarTorneoMundial() {
                const fechaData = data.progreso.bitacoraGrupo[f];
                const divFecha = document.createElement("div");
                divFecha.style.cssText = "background:#0b111e; padding:12px; border-radius:8px; border-left:4px solid var(--celeste); margin-bottom:15px;";
-               divFecha.innerHTML = `<div style="color:var(--celeste); font-size:0.9rem; font-weight:bold;">📅 FECHA ${fechaData.fecha}</div><div style="display:flex; justify-content:space-between;"><span>🇦🇷 ${fechaData.local} vs ${fechaData.visitante}</span><span id="goles-m1-f${f}" style="color:var(--verde-match);">0 - 0</span></div><div style="display:flex; justify-content:space-between;"><span>🤖 ${fechaData.botL} vs ${fechaData.botV}</span><span id="goles-m2-f${f}" style="color:#aaa;">0 - 0</span></div><div id="reloj-f${f}" style="text-align:center; font-size:0.8rem; color:#64748b;">⏱️ 00:00</div>`;
+               divFecha.innerHTML = `<div style="color:var(--celeste); font-size:0.9rem; font-weight:bold;">📅 FECHA ${fechaData.fecha}</div><div style="display:flex; justify-content:space-between;"><span>🇺🇾 ${fechaData.local} vs ${fechaData.visitante}</span><span id="goles-m1-f${f}" style="color:var(--verde-match);">0 - 0</span></div><div style="display:flex; justify-content:space-between;"><span>🤖 ${fechaData.botL} vs ${fechaData.botV}</span><span id="goles-m2-f${f}" style="color:#aaa;">0 - 0</span></div><div id="reloj-f${f}" style="text-align:center; font-size:0.8rem; color:#64748b;">⏱️ 00:00</div>`;
                contenedorLista.appendChild(divFecha); divFecha.scrollIntoView({ behavior: 'smooth' });
 
                await new Promise((resolveFecha) => {
@@ -2274,6 +2321,11 @@ function abrirMercadoBot(listaTusRepetidas) {
             const data = await res.json();
 
             if (data.ok) {
+                // 🟢 SECTOR 1: Computamos la misión diaria del contrato cerrado con éxito
+                if (typeof trackearProgresoMision === 'function') {
+                    trackearProgresoMision("trade", 1);
+                }
+
                 // Actualizar el álbum local en memoria inmediatamente tras el tradeo exitoso
                 if (typeof cargarAlbumLocal === 'function') {
                     await cargarAlbumLocal(); 
@@ -2293,14 +2345,13 @@ function abrirMercadoBot(listaTusRepetidas) {
                     plantillaMensaje += `<span style="color: #38bdf8; font-weight: bold; font-size: 0.85rem; display: block; padding: 8px; background: #0c4a6e; border-radius: 6px; border: 1px dashed #0284c7; margin-bottom: 15px; font-family: system-ui; text-align: left;">🎁 ${data.eventoEspecial}</span>`;
                 }
 
-                // 🔥 AQUÍ ESTÁ TU REQUERIMIENTO: Inyección de la botonera de decisión
                 plantillaMensaje += `
                         <div style="display: flex; gap: 10px; margin-top: 10px;">
                             <button type="button" id="btn-bot-reintentar" class="btn-estadio" style="background: var(--celeste); color: #000; flex: 1; font-weight: bold; padding: 10px; border-radius: 6px; font-family: 'Oswald'; font-size: 0.9rem; text-transform: uppercase;">
-                                🔄 Seguir Tradeando
+                                 🔄 Seguir Tradeando
                             </button>
                             <button type="button" id="btn-bot-salir" class="btn-estadio" style="background: #334155; color: #fff; flex: 1; font-weight: bold; padding: 10px; border-radius: 6px; font-family: 'Oswald'; font-size: 0.9rem; text-transform: uppercase;">
-                                🏟️ Ir al Álbum
+                                 🏟️ Ir al Álbum
                             </button>
                         </div>
                     </div>
@@ -2308,22 +2359,19 @@ function abrirMercadoBot(listaTusRepetidas) {
 
                 document.getElementById("resultado-trato-bot").innerHTML = plantillaMensaje;
                 
-                // Acción para quedarse y seguir operando con el bot
-               // 🔄 Acción para quedarse y seguir operando con el bot (Línea ~123)
-               document.getElementById("btn-bot-reintentar").onclick = () => {
-               // 🟢 SOLUCIÓN: Usamos estrictamente la data fresca que acaba de re-calcular cargarAlbumLocal()
+                // Acción para quedarse y seguir operando con el bot con el array limpio
+                document.getElementById("btn-bot-reintentar").onclick = () => {
                     const albumActualizado = window.albumCompleto || albumCompleto;
 
                     if (albumActualizado && albumActualizado.length > 0) {
-                         // Le inyectamos la lista con las cantidades ya descontadas por el backend
+                         // Forzar el render con los datos decrementados que trajo cargarAlbumLocal()
                          abrirMercadoBot(albumActualizado);
                     } else if (window.todosLosJugadoresGlobal) {
                          abrirMercadoBot(window.todosLosJugadoresGlobal);
                     } else {
-                         // Fallback extremo por si las moscas, recarga limpio
                          location.reload(); 
                     }
-               };
+                };
 
                 // Acción para salir definitivamente a la sección principal
                 document.getElementById("btn-bot-salir").onclick = () => {
@@ -2663,3 +2711,78 @@ document.addEventListener("DOMContentLoaded", () => {
     const primerInput = document.getElementById("input-usuario");
     if (primerInput) primerInput.focus();
 });
+
+/* ========================================================================
+   🏅 SISTEMA DE RETENCIÓN: MISIONES DIARIAS Y RECOMPENSAS
+   ======================================================================== */
+
+// Simulamos el estado de las misiones del usuario actual en memoria
+window.misionesDiariasUsuario = [
+    { id: 1, desc: "Abrir 3 sobres de cualquier rareza en la Tienda", progreso: 0, meta: 3, recompensa: 250, reclamada: false, tipo: "sobres" },
+    { id: 2, desc: "Firmar un contrato de intercambio con el Bot Comerciante", progreso: 0, meta: 1, recompensa: 400, reclamada: false, tipo: "trade" },
+    { id: 3, desc: "Alinear tus cromos y disputar un cruce en el MiniMundial", progreso: 0, meta: 1, recompensa: 300, reclamada: false, tipo: "mundial" }
+];
+
+function renderizarMisionesDiarias() {
+    const contenedor = document.getElementById("contenedor-lista-misiones");
+    if (!contenedor) return;
+    contenedor.innerHTML = "";
+
+    window.misionesDiariasUsuario.forEach(mision => {
+        const porcentaje = Math.min(Math.round((mision.progreso / mision.meta) * 100), 100);
+        const estaCompleta = mision.progreso >= mision.meta;
+        
+        const divMision = document.createElement("div");
+        divMision.style.cssText = "background: rgba(2, 6, 23, 0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 12px 15px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s;";
+        if (estaCompleta && !mision.reclamada) divMision.style.borderColor = "var(--verde-match)";
+
+        divMision.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
+                <p style="margin: 0; font-size: 0.9rem; color: #cbd5e1; font-weight: 500; text-align: left;">${mision.desc}</p>
+                <span style="font-family: 'Oswald'; color: var(--dorado); font-size: 1rem; flex-shrink: 0;">🪙 +${mision.recompensa}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; margin-top: 4px;">
+                <div style="background: #161c30; height: 10px; border-radius: 6px; flex-grow: 1; padding: 1px;">
+                    <div style="background: linear-gradient(90deg, var(--celeste) 0%, var(--verde-match) 100%); height: 100%; width: ${porcentaje}%; border-radius: 6px; transition: width 0.3s ease;"></div>
+                </div>
+                <span style="font-size: 0.75rem; font-family: monospace; color: #64748b; font-weight: bold; min-width: 45px; text-align: right;">${mision.progreso}/${mision.meta}</span>
+                ${
+                    mision.reclamada 
+                    ? `<button class="btn-estadio" disabled style="padding: 4px 10px; font-size: 0.75rem; background: #1e293b !important; color: #64748b !important; box-shadow: none !important;">CLAIMED</button>`
+                    : estaCompleta 
+                        ? `<button class="btn-estadio" onclick="reclamarPremioMision(${mision.id})" style="padding: 4px 10px; font-size: 0.75rem; background: var(--verde-match); color: #000; box-shadow: 0 2px 0 #00b35f;">RECLAMAR</button>`
+                        : `<button class="btn-estadio" disabled style="padding: 4px 10px; font-size: 0.75rem; background: #1e293b !important; color: #475569 !important; box-shadow: none !important;">EN CURSO</button>`
+                }
+            </div>
+        `;
+        contenedor.appendChild(divMision);
+    });
+}
+
+// Función disparadora para actualizar el progreso desde otros módulos
+function trackearProgresoMision(tipo, cantidad = 1) {
+    window.misionesDiariasUsuario.forEach(mision => {
+        if (mision.tipo === tipo && !mision.reclamada) {
+            mision.progreso = Math.min(mision.progreso + cantidad, mision.meta);
+        }
+    });
+    renderizarMisionesDiarias();
+}
+
+async function reclamarPremioMision(idMision) {
+    const mision = window.misionesDiariasUsuario.find(m => m.id === idMision);
+    if (!mision || mision.progreso < mision.meta || mision.reclamada) return;
+
+    mision.reclamada = true;
+    
+    // Sumamos la recompensa a las monedas del usuario actual
+    if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+        usuarioActual.monedas += mision.recompensa;
+        const elMonedas = document.getElementById("lbl-monedas");
+        if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
+    }
+
+    // Efecto de sonido visual temporario en la consola de la misión
+    renderizarMisionesDiarias();
+    alert(`🪙 ¡Objetivo cumplido! Se acreditaron 🪙${mision.recompensa} monedas de oro a tu cuenta.`);
+}
