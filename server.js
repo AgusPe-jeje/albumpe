@@ -56,7 +56,7 @@ const verificarToken = (req, res, next) => {
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
-const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
+const TESTERS_PERMITIDOS = ["aguspe", "evevea"]; 
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
@@ -184,6 +184,26 @@ async function inicializarTablas() {
             premio_entregado INTEGER DEFAULT 0,
             fecha_jugada TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )`);
+
+        // 🔥 8. MÓDULO NUEVO: Tabla de Control de Objetivos Diarios
+        await pool.query(`CREATE TABLE IF NOT EXISTS usuario_misiones (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+            mision_id INTEGER NOT NULL,
+            descripcion VARCHAR(255) NOT NULL,
+            tipo VARCHAR(50) NOT NULL,
+            progreso INTEGER DEFAULT 0,
+            meta INTEGER NOT NULL,
+            recompensa INTEGER NOT NULL,
+            reclamada BOOLEAN DEFAULT FALSE,
+            actualizado_en TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            CONSTRAINT uq_usuario_mision UNIQUE (usuario_id, mision_id)
+        )`);
+
+        // ⚡ Indexación de alta velocidad para acelerar el login de los jugadores
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_usuario_misiones_uid ON usuario_misiones(usuario_id)`);
+
+        console.log('🏟️ Todas las tablas del coliseo fueron inicializadas con éxito en Neon.');
 
         const checkJugadores = await pool.query("SELECT COUNT(*) as count FROM jugadores");
         if (parseInt(checkJugadores.rows[0].count) === 0) {
@@ -872,7 +892,7 @@ app.post('/api/login', async (req, res) => {
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username.trim()]);
           
         if (userCheck.rows.length === 0) {
-              return res.status(400).json({ error: "❌ El usuario no existe. ¡Registrate primero!" });
+             return res.status(400).json({ error: "❌ El usuario no existe. ¡Registrate primero!" });
         }
 
         const user = userCheck.rows[0];
@@ -880,23 +900,36 @@ app.post('/api/login', async (req, res) => {
         // ¡OJO ACÁ! Si estás usando bcrypt para comparar contraseñas, asegurate de usar await bcrypt.compare(password, user.password)
         // Por ahora mantenemos tu lógica, pero recordá que comparar passwords en texto plano es inseguro.
         if (user.password === password) {
-              console.log(`🔑 [LOGIN] El usuario "${username}" ingresó a la Arena.`);
-              
-              const token = jwt.sign(
-                  { id: user.id, username: user.username }, 
-                  JWT_SECRET, 
-                  { expiresIn: '24h' }
-              );
+             console.log(`🔑 [LOGIN] El usuario "${username}" ingresó a la Arena.`);
+             
+             // 🔥 RESERVA DE SEGURIDAD: Inicializa misiones para usuarios viejos (No pisa el progreso si ya existen)
+             const queryVerificarMisionesLogin = `
+                 INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, meta, recompensa)
+                 VALUES 
+                     ($1, 1, 'Abrir 3 sobres de cualquier rareza en la Tienda', 'sobres', 3, 250),
+                     ($1, 2, 'Firmar un contrato de intercambio con el Bot Comerciante', 'trade', 1, 400),
+                     ($1, 3, 'Alinear tus cromos y disputar un cruce en el MiniMundial', 'mundial', 1, 300)
+                 ON CONFLICT (usuario_id, mision_id) DO NOTHING;
+             `;
+             await pool.query(queryVerificarMisionesLogin, [user.id]);
+             console.log(`🎯 [MISIONES] Sincronización diaria garantizada para el usuario ID: ${user.id}`);
 
-              return res.json({ 
-                  mensaje: "Login exitoso", 
-                  usuario: user,
-                  token: token 
-              });
+             const token = jwt.sign(
+                 { id: user.id, username: user.username }, 
+                 JWT_SECRET, 
+                 { expiresIn: '24h' }
+             );
+
+             return res.json({ 
+                 mensaje: "Login exitoso", 
+                 usuario: user,
+                 token: token 
+             });
         } else {
-              return res.status(400).json({ error: "❌ Contraseña incorrecta." });
+             return res.status(400).json({ error: "❌ Contraseña incorrecta." });
         }
     } catch (err) {
+         console.error("❌ Error interno en /api/login:", err.message);
          return res.status(500).json({ error: "Error interno en el login." });
     }
 });
@@ -921,11 +954,31 @@ app.post('/api/registro', async (req, res) => {
             }
         }
 
+        // 1. Insertamos el usuario como siempre
         const nuevoUsuario = await pool.query(
             "INSERT INTO usuarios (username, password, ip_registro) VALUES ($1, $2, $3) RETURNING *", 
             [username.trim().toLowerCase(), password, ipCliente]
         );
-        console.log(`✨ [REGISTRO] Nuevo usuario creado: "${username.toUpperCase()}" desde la IP: ${ipCliente}`);
+        
+        const nuevoUsuarioId = nuevoUsuario.rows[0].id; // 🔑 Guardamos el ID que generó la base de datos
+        console.log(`✨ [REGISTRO] Nuevo usuario creado: "${username.toUpperCase()}" (ID: ${nuevoUsuarioId}) desde la IP: ${ipCliente}`);
+
+        // 2. 🎯 ASIGNACIÓN DE OBJETIVOS DIARIOS: Insertamos las 3 misiones iniciales ligadas a su id
+        const queryMisionesIniciales = `
+            INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, meta, recompensa)
+            VALUES 
+                ($1, 1, 'Abrir 3 sobres de cualquier rareza en la Tienda', 'sobres', 3, 250),
+                ($1, 2, 'Firmar un contrato de intercambio con el Bot Comerciante', 'trade', 1, 400),
+                ($1, 3, 'Alinear tus cromos y disputar un cruce en el MiniMundial', 'mundial', 1, 300)
+            ON CONFLICT (usuario_id, mision_id) DO UPDATE 
+            SET progreso = 0, reclamada = FALSE, actualizado_en = CURRENT_TIMESTAMP;
+        `;
+        
+        // Ejecutamos la consulta pasándole el nuevoUsuarioId al marcador $1 de Postgres
+        await pool.query(queryMisionesIniciales, [nuevoUsuarioId]);
+        console.log(`🎯 [MISIONES] Inicializadas con éxito para el usuario ID: ${nuevoUsuarioId}`);
+
+        // 3. Respondemos al frontend con éxito total
         return res.json({ mensaje: "Registrado con éxito", usuario: nuevoUsuario.rows[0] });
 
     } catch (err) {
@@ -2563,6 +2616,116 @@ app.post('/api/timba/quiniela', verificarToken, async (req, res) => {
     }
 });
 
+// ========================================================================
+// 🏅 ENDPOINTS SEGUROS PARA EL SISTEMA DE MISIONES DIARIAS (CONEXIÓN NEON)
+// ========================================================================
+
+// 1. OBTENER LAS MISIONES DIARIAS ACTUALES DEL JUGADOR
+app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
+    try {
+        const usuarioId = req.usuarioLogueado.id; // 🔥 Sincronizado con tu middleware real
+
+        const resultado = await pool.query(
+            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
+            [usuarioId]
+        );
+
+        res.json({ ok: true, misiones: resultado.rows });
+    } catch (err) {
+        console.error("❌ Error en /misiones/obtener:", err.message);
+        res.status(500).json({ error: "Error en el servidor al cargar objetivos." });
+    }
+});
+
+// 2. SINCRONIZAR PROGRESO DE MISIONES (REEMPLAZO DE TRACKEAR)
+app.post('/api/misiones/trackear', verificarToken, async (req, res) => {
+    try {
+        const { tipo, cantidad } = req.body;
+        const usuarioId = req.usuarioLogueado.id; // 🔥 Sincronizado con tu middleware real
+
+        // 🛡️ Consulta Atómica en Postgres: Incrementa el progreso sin pasarse de la meta
+        const queryUpdate = `
+            UPDATE usuario_misiones 
+            SET progreso = LEAST(progreso + $1, meta), actualizado_en = NOW()
+            WHERE usuario_id = $2 AND tipo = $3 AND reclamada = FALSE;
+        `;
+        await pool.query(queryUpdate, [cantidad || 1, usuarioId, tipo]);
+
+        // Traemos la lista actualizada completa para que el front redibuje los porcentajes
+        const misionesActualizadas = await pool.query(
+            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
+            [usuarioId]
+        );
+
+        // Retornamos el formato exacto que espera recibir el front en el .json()
+        res.json({ ok: true, misiones: misionesActualizadas.rows });
+
+    } catch (err) {
+        console.error("❌ Error en /misiones/trackear:", err.message);
+        res.status(500).json({ error: "Error al actualizar misiones en el servidor." });
+    }
+});
+
+// 3. RECLAMAR EL PREMIO DE FORMA BLINDADA (REEMPLAZO DE RECLAMAR)
+app.post('/api/misiones/reclamar', verificarToken, async (req, res) => {
+    try {
+        const { misionId } = req.body; // Viene el ID de la fila desde el botón del cliente
+        const usuarioId = req.usuarioLogueado.id; // 🔥 Sincronizado con tu middleware real
+
+        // 1. Buscamos la misión específica para verificar su estado en el Servidor
+        const buscarMision = await pool.query(
+            "SELECT * FROM usuario_misiones WHERE usuario_id = $1 AND id = $2",
+            [usuarioId, misionId]
+        );
+
+        if (buscarMision.rows.length === 0) {
+            return res.status(404).json({ error: "Misión no encontrada." });
+        }
+        
+        const mision = buscarMision.rows[0];
+
+        if (mision.progreso < mision.meta) {
+            return res.status(400).json({ error: "Objetivo no cumplido todavía." });
+        }
+        if (mision.reclamada) {
+            return res.status(400).json({ error: "Esta recompensa ya fue cobrada." });
+        }
+
+        // 2. Transacción Blindada: Marcamos como reclamada
+        await pool.query(
+            "UPDATE usuario_misiones SET reclamada = TRUE WHERE id = $1",
+            [misionId]
+        );
+
+        // 3. 🔥 REGLA DE ORO AUTOMÁTICA: Sumamos las monedas directo a la tabla usuarios
+        const queryOro = `
+            UPDATE usuarios 
+            SET monedas = monedas + $1 
+            WHERE id = $2 
+            RETURNING monedas;
+        `;
+        const resultadoUsuario = await pool.query(queryOro, [mision.recompensa, usuarioId]);
+        const nuevoOro = resultadoUsuario.rows[0].monedas;
+
+        // 4. Buscamos el estado final de todas las misiones para el cliente
+        const misionesFinales = await pool.query(
+            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
+            [usuarioId]
+        );
+
+        // Enviamos la respuesta limpia con el nuevo saldo de Oro calculado por Neon
+        res.json({ 
+            ok: true, 
+            monedas: nuevoOro, 
+            misiones: misionesFinales.rows 
+        });
+
+    } catch (err) {
+        console.error("❌ Error en /misiones/reclamar:", err.message);
+        res.status(500).json({ error: "Error al procesar el cobro en el servidor." });
+    }
+});
+
 /* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
    ======================================================================== */
@@ -2572,7 +2735,7 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
     texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo y lanzamos el Mercado P2P.",
     urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
-    urlVideo: "https://www.youtube.com/embed/Zodu-fEpATw",
+    urlVideo: "https://www.youtube.com/embed/6DTWH9kYAiY",
     
     informe: {
         version: "v2.4.1-Arena",
