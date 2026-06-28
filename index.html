@@ -55,6 +55,18 @@
                 <span class="stat-label">👑 MUNDIALES</span>
                 <span id="lbl-copas-mundiales" class="stat-valor valor-dorado" style="color: #ff9900;">0</span>
             </div>
+
+            <div class="caja-modulo-estadio" id="modulo-misiones-diarias" style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 10px; margin-bottom: 15px;">
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; margin: 0; text-transform: uppercase; letter-spacing: 1px; font-size: 1.4rem;">🎯 OBJETIVOS DIARIOS DE LA ARENA</h3>
+                    <span style="color: var(--celeste); font-family: monospace; font-size: 0.85rem; font-weight: bold;" id="timer-misiones">🔄 REINICIO EN: 12h 45m</span>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 12px;" id="contenedor-lista-misiones">
+                    <!-- Las misiones se inyectan dinámicamente con JS -->
+                </div>
+            </div>
+            
             <button class="btn-ayuda-arena" onclick="abrirModalAyuda()">❓ AYUDA</button>
             <button class="btn-logout-kick btn-logout-premium" onclick="cerrarSesionLocal()">🚪 SALIR</button>
         </div>
