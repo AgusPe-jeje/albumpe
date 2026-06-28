@@ -2139,7 +2139,6 @@ function abrirMercadoBot(listaTusRepetidas) {
 
     const listaCheckboxes = document.getElementById("lista-checks-repetidas");
     
-    // 🔥 CORREGIDO: Propiedades cambiadas a 'listado' para coincidir exactamente con el push
     const mapeoRarezas = {
         'legendaria': { titulo: "👑 REPETIDAS LEGENDARIAS", color: "#ffb100", listado: [] },
         'epica': { titulo: "🔮 REPETIDAS ÉPICAS", color: "#a335ee", listado: [] },
@@ -2153,11 +2152,10 @@ function abrirMercadoBot(listaTusRepetidas) {
         const copias = jugador.obtenido !== undefined ? jugador.obtenido : (jugador.cantidad || 0);
         
         if (copias > 1) {
-            // Limpiamos acentos y pasamos a minúsculas para un emparejamiento perfecto
             let rarezaLimpia = (jugador.rareza || 'comun')
                 .toLowerCase()
                 .normalize("NFD")
-                .replace(/[\u0300-\u036f]/g, ""); // Borra acentos (común -> comun)
+                .replace(/[\u0300-\u036f]/g, "");
 
             if (rarezaLimpia === 'especial') rarezaLimpia = 'rara';
             
@@ -2183,7 +2181,6 @@ function abrirMercadoBot(listaTusRepetidas) {
         return;
     }
 
-    // Renderizamos los bloques ordenados de mayor a menor rareza
     let htmlBolsas = "";
     Object.keys(mapeoRarezas).forEach(key => {
         const bloque = mapeoRarezas[key];
@@ -2211,7 +2208,6 @@ function abrirMercadoBot(listaTusRepetidas) {
 
     listaCheckboxes.innerHTML = htmlBolsas;
 
-    // CONTROLADOR EN TIEMPO REAL: Manejo dinámico de la UI de selección
     const checkboxes = document.querySelectorAll('.check-cromo-bot');
     const lblContador = document.getElementById('contador-seleccion-bot');
 
@@ -2220,7 +2216,6 @@ function abrirMercadoBot(listaTusRepetidas) {
             const seleccionados = document.querySelectorAll('.check-cromo-bot:checked');
             lblContador.innerText = `${seleccionados.length} / 3 ELEGIDOS`;
 
-            // Efecto visual de fila seleccionada
             if (chk.checked) {
                 chk.parentElement.style.background = "rgba(0, 255, 136, 0.05)";
                 chk.parentElement.style.borderColor = "var(--verde-match)";
@@ -2229,7 +2224,6 @@ function abrirMercadoBot(listaTusRepetidas) {
                 chk.parentElement.style.borderColor = "#1a2436";
             }
 
-            // Validación avanzada: Bloquear checkboxes si ya hay 3 seleccionados
             if (seleccionados.length >= 3) {
                 checkboxes.forEach(c => { if (!c.checked) c.disabled = true; });
             } else {
@@ -2238,7 +2232,6 @@ function abrirMercadoBot(listaTusRepetidas) {
         };
     });
 
-    // PROCESAMIENTO DEL TRATO
     document.getElementById("btn-ejecutar-trato").onclick = async () => {
         const checksActivos = Array.from(document.querySelectorAll('.check-cromo-bot:checked'));
         const seleccionados = checksActivos.map(cb => parseInt(cb.value));
@@ -2248,7 +2241,6 @@ function abrirMercadoBot(listaTusRepetidas) {
             return;
         }
 
-        // Validación de consistencia: Deben pertenecer a la misma rareza
         const rarezaPrimero = checksActivos[0].getAttribute('data-rareza');
         const mismaRareza = checksActivos.every(cb => cb.getAttribute('data-rareza') === rarezaPrimero);
 
@@ -2270,24 +2262,58 @@ function abrirMercadoBot(listaTusRepetidas) {
             const data = await res.json();
 
             if (data.ok) {
+                // Actualizar el álbum local en memoria inmediatamente tras el tradeo exitoso
+                if (typeof cargarAlbumLocal === 'function') {
+                    await cargarAlbumLocal(); 
+                }
+
                 document.getElementById("resultado-trato-bot").style.color = "var(--verde-match)";
                 
                 let plantillaMensaje = `
-                    🎉 ¡CONTRATO CERRADO EXITOSAMENTE!<br>
-                    🌟 RECIBISTE A: <span style="color: var(--dorado); font-size: 1.1rem;">${data.cartaGanada.nombre.toUpperCase()} [${data.cartaGanada.rareza.toUpperCase()}]</span>
+                    <div style="background: #020617; border: 1px solid #1e293b; padding: 15px; border-radius: 10px; margin-top: 15px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);">
+                        <p style="margin: 0 0 10px 0; color: var(--verde-match);">🎉 ¡CONTRATO CERRADO EXITOSAMENTE!</p>
+                        <span style="color: var(--dorado); font-size: 1.2rem; display: block; margin-bottom: 12px; font-family: 'Oswald';">
+                            🌟 RECIBISTE A: ${data.cartaGanada.nombre.toUpperCase()} [${data.cartaGanada.rareza.toUpperCase()}]
+                        </span>
                 `;
 
                 if (data.eventoEspecial) {
-                    plantillaMensaje += `<br><br><span style="color: #38bdf8; font-weight: bold; font-size: 0.95rem; display: block; padding: 10px; background: #0c4a6e; border-radius: 8px; border: 1px dashed #0284c7; font-family: system-ui;">🎁 ${data.eventoEspecial}</span>`;
-                    alert(`🎁 ¡EVENTO ULTRA RARO ACTIVADO!\n\n${data.eventoEspecial}`);
+                    plantillaMensaje += `<span style="color: #38bdf8; font-weight: bold; font-size: 0.85rem; display: block; padding: 8px; background: #0c4a6e; border-radius: 6px; border: 1px dashed #0284c7; margin-bottom: 15px; font-family: system-ui; text-align: left;">🎁 ${data.eventoEspecial}</span>`;
                 }
+
+                // 🔥 AQUÍ ESTÁ TU REQUERIMIENTO: Inyección de la botonera de decisión
+                plantillaMensaje += `
+                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                            <button type="button" id="btn-bot-reintentar" class="btn-estadio" style="background: var(--celeste); color: #000; flex: 1; font-weight: bold; padding: 10px; border-radius: 6px; font-family: 'Oswald'; font-size: 0.9rem; text-transform: uppercase;">
+                                🔄 Seguir Tradeando
+                            </button>
+                            <button type="button" id="btn-bot-salir" class="btn-estadio" style="background: #334155; color: #fff; flex: 1; font-weight: bold; padding: 10px; border-radius: 6px; font-family: 'Oswald'; font-size: 0.9rem; text-transform: uppercase;">
+                                🏟️ Ir al Álbum
+                            </button>
+                        </div>
+                    </div>
+                `;
 
                 document.getElementById("resultado-trato-bot").innerHTML = plantillaMensaje;
                 
-                setTimeout(() => { 
-                    cargarAlbumLocal(); 
+                // Acción para quedarse y seguir operando con el bot
+                document.getElementById("btn-bot-reintentar").onclick = () => {
+                    // Volvemos a invocar abriendo el mercado con la lista global actualizada en tu app
+                    if (window.todosLosJugadoresGlobal) {
+                        abrirMercadoBot(window.todosLosJugadoresGlobal);
+                    } else if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+                        // Resguardo en caso de usar otra variable estructural
+                        abrirMercadoBot(listaTusRepetidas);
+                    } else {
+                        location.reload(); // Fallback seguro
+                    }
+                };
+
+                // Acción para salir definitivamente a la sección principal
+                document.getElementById("btn-bot-salir").onclick = () => {
                     cambiarModulo('modulo-album', null);
-                }, 4000);
+                };
+
             } else {
                 document.getElementById("resultado-trato-bot").style.color = "var(--rojo)";
                 document.getElementById("resultado-trato-bot").innerText = data.mensaje || data.error || "❌ La Arena rechazó el intercambio.";
@@ -2300,38 +2326,6 @@ function abrirMercadoBot(listaTusRepetidas) {
             document.getElementById("btn-ejecutar-trato").disabled = false;
         }
     };
-}
-
-async function publicarCartaMercado() {
-    // 🔥 CORREGIDO: ID alineado con el HTML nativo ("select-mercado-vender")
-    const jugadorId = document.getElementById("select-mercado-vender").value; 
-    const precio = parseInt(document.getElementById("input-mercado-precio").value);
-
-    if (!jugadorId || !precio || precio < 50) {
-        alert("⚠️ Seleccioná un cromo válido y un precio mínimo de 🪙50 de Oro.");
-        return;
-    }
-
-    try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
-        const res = await fetch(`${URL_BASE}/mercado/publicar`, {
-            method: 'POST',
-            headers: obtenerHeadersSeguros(), 
-            body: JSON.stringify({ jugador_id: parseInt(jugadorId), precio }) 
-        });
-        const data = await res.json();
-        
-        if (data.ok) {
-            alert("✨ Cromo publicado en la vitrina internacional.");
-            document.getElementById("input-mercado-precio").value = "";
-            cargarAlbumLocal();
-            setTimeout(() => { cambiarModulo('modulo-mercado-pases', document.getElementById('btn-nav-mercado')); }, 500);
-        } else {
-            alert(data.mensaje);
-        }
-    } catch (err) {
-        console.error(err);
-    }
 }
 
 async function obtenerOfertasMercado() {
