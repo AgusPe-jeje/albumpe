@@ -2857,7 +2857,23 @@ const CONFIG_ANUNCIO_SERVIDOR = {
 };
 
 app.get('/api/anuncio-actual', (req, res) => {
-    return res.json(CONFIG_ANUNCIO_SERVIDOR);
+    // Sincronizamos la respuesta con el formato exacto que renderiza tu Front
+    res.json({
+        activo: true,
+        titulo: "📢 Actualización de Infraestructura ⚔️",
+        texto: "La Arena se actualizó a la versión v2.4.1 con mejoras críticas en el mercado y estabilidad de datos. ¡Revisá los cambios acá abajo, crack!",
+        tipo: "texto", // Al no ser imagen ni video, pasa directo al informe estructural
+        informe: {
+            version: "v2.4.1-Arena",
+            fecha: "Junio 2026",
+            cambios: [
+                "🏆 **Mini-Mundial Atómico**: Inscripciones gratuitas en el Draft. El Oro o cartas repetidas se debitan en Neon recién al presionar 'Iniciar'.",
+                "💸 **Mercado de Pases P2P**: Vitrina internacional activa. Las ofertas duran 24 horas y devuelven el cromo automáticamente si nadie compra.",
+                "⏱️ **Reloj de Expiración**: Añadido temporizador visual en las tarjetas de fichajes con alerta roja en la última hora de oferta.",
+                "🛡️ **Blindaje de ID**: Limpieza y parseo de strings corruptos (:1) en las solicitudes de red de la Arena."
+            ]
+        }
+    });
 });
 
 /* ========================================================================
