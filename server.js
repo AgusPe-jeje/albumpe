@@ -53,7 +53,7 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (FIXED)
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -63,8 +63,8 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // A. Permitimos descargar los archivos estáticos para que cargue la interfaz visual
-    if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg'))) {
+    // A. Permitimos descargar los archivos estáticos para que cargue la interfaz visual a cualquiera
+    if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
@@ -88,8 +88,18 @@ app.use((req, res, next) => {
         });
     }
 
-    // C. Si la petición viene de adentro (APIs internas), dejamos pasar
-    next();
+    // C. 🛡️ FILTRO DE CONTROL: Si la petición va a cualquier ruta de la API privada (/api/...)
+    // Dejamos pasar la petición SÓLO si trae un token de autorización en los headers.
+    // Como los únicos que pueden conseguir un token válido en mantenimiento son los testers permitidos, la API queda blindada.
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.split(' ')[1]) {
+        return next(); // Es un tester con sesión iniciada, puede consumir las misiones, sobres, etc.
+    }
+
+    // D. Si no es un archivo estático, ni un login de tester, ni tiene sesión iniciada, rebota acá:
+    return res.status(503).json({ 
+        error: "🚧 La Arena está en mantenimiento por reformas de infraestructura." 
+    });
 });
 
 // Carpeta estática asignada después del filtro de mantenimiento
