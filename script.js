@@ -2617,6 +2617,10 @@ function abrirMercadoBot(listaTusRepetidas) {
     };
 }
 
+/* ========================================================================
+   💸 GESTIÓN DEL MERCADO DE PASES P2P CON LOGS EN VIVO Y SEGURIDAD JWT
+   ======================================================================== */
+
 function cargarMisRepetidasParaVenta() {
     const select = document.getElementById("select-mercado-vender");
     if (!select) return;
@@ -2632,7 +2636,6 @@ function cargarMisRepetidasParaVenta() {
 }
 
 async function publicarCartaMercado() {
-    // 🔥 CORREGIDO: ID alineado con el HTML nativo ("select-mercado-vender")
     const jugadorId = document.getElementById("select-mercado-vender").value; 
     const precio = parseInt(document.getElementById("input-mercado-precio").value);
 
@@ -2642,7 +2645,6 @@ async function publicarCartaMercado() {
     }
 
     try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
         const res = await fetch(`${URL_BASE}/mercado/publicar`, {
             method: 'POST',
             headers: obtenerHeadersSeguros(), 
@@ -2676,7 +2678,6 @@ async function obtenerOfertasMercado() {
     }
 
     try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
         const res = await fetch(`${URL_BASE}/mercado/ofertas?usuario_id=${idLimpio}`);
         const data = await res.json();
 
@@ -2743,16 +2744,19 @@ async function obtenerOfertasMercado() {
 
 async function comprarCartaMercado(ofertaId) {
     try {
-        // 🔥 CORREGIDO: URL absoluta con URL_BASE
+        mostrarCarga("Cerrando transferencia en Neon...");
+        
+        // 🔥 FIX: Inyectamos obtenerHeadersSeguros() para adjuntar el Bearer Token JWT y evitar el 401
         const res = await fetch(`${URL_BASE}/mercado/comprar`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario_id: parseInt(usuarioActual.id), oferta_id: ofertaId })
+            headers: obtenerHeadersSeguros(),
+            body: JSON.stringify({ oferta_id: ofertaId })
         });
         const data = await res.json();
+        ocultarCarga();
 
         if (data.ok) {
-            alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador}. El Oro fue transferido.`);
+            alert(`🎉 ¡Fichaje cerrado! Recibiste a ${data.jugador.toUpperCase()}. El Oro fue transferido.`);
             
             if (usuarioActual && data.nuevoOro !== undefined) {
                 usuarioActual.monedas = data.nuevoOro;
@@ -2763,17 +2767,28 @@ async function comprarCartaMercado(ofertaId) {
                 elMonedas.innerText = data.nuevoOro;
             }
 
+            // 🎵 Gatillo de audio premium
+            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+                AudioArena.play('monedas');
+            }
+
             if (typeof cargarDatosUsuario === "function") cargarDatosUsuario();
             if (typeof actualizarPerfilUI === "function") actualizarPerfilUI();
 
             cargarAlbumLocal(); 
-            obtenerOffersMercado();
+            obtenerOfertasMercado(); // 🔥 FIX: Corregido de obtenerOffersMercado() a obtenerOfertasMercado()
+
+            // Refrescamos el historial dinámico si ya metiste el feed global abajo
+            if (typeof actualizarHistorialTransferenciasUI === "function") {
+                actualizarHistorialTransferenciasUI();
+            }
 
         } else {
             alert(data.mensaje);
         }
     } catch (err) {
         console.error(err);
+        ocultarCarga();
         alert("❌ Ocurrió un problema de red al procesar el fichaje.");
     }
 }
