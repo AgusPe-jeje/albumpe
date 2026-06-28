@@ -236,18 +236,135 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
 .nombre-seleccion { font-family: 'Oswald', sans-serif; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
 .vs-circulo-match { background: var(--rojo); color: #fff; font-family: 'Oswald', sans-serif; font-size: 1.3rem; font-weight: 700; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fff; box-shadow: 0 0 15px rgba(255, 51, 68, 0.4); }
 
-.inputs-apuesta-timba-stadium { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 20px; width: 100%; }
-.monto-apuesta-row { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; max-width: 300px; }
-.get-label-tv { font-size: 1rem; font-weight: 700; color: var(--dorado); letter-spacing: 0.5px; }
+/* ========================================================================
+   🎰 DISTRIBUCIÓN PREMIUM EN DOS COLUMNAS - TIMBA Y QUINIELA
+   ======================================================================== */
 
-.grid-opciones-goles-match { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 550px; margin-top: 15px; }
-.btn-opcion-resultado { background: rgba(15, 19, 34, 0.6); color: #fff; border: 1px solid var(--celeste) !important; font-family: 'Oswald', sans-serif; font-size: 1.4rem !important; padding: 8px !important; border-radius: 8px; box-shadow: 0 4px 0 #0088cc !important; }
-.btn-opcion-resultado:hover { background: rgba(22, 30, 48, 0.8); box-shadow: 0 0 12px rgba(0,204,255,0.4) !important; }
+/* Contenedor padre de la sección de apuestas */
+#modulo-timba .caja-modulo-estadio {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1000px !important;
+    margin: 0 auto;
+}
 
-.historial-timba-banca-tv { margin-top: 25px; background: rgba(5, 8, 14, 0.6); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 15px; width: 100%; box-sizing: border-box; }
-.historial-timba-banca-tv h4 { margin: 0 0 10px 0; color: var(--dorado); font-family: 'Oswald', sans-serif; font-size: 1rem; letter-spacing: 0.5px; }
-.item-historial-partido { list-style: none; font-size: 1.05rem; font-weight: 700; padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center; }
+/* Forzar que las dos tarjetas de timba se pongan a la par en pantallas grandes */
+@media (min-width: 768px) {
+    #modulo-timba .caja-modulo-estadio {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+        gap: 25px;
+    }
+    
+    /* El banner ocupa todo el ancho superior de la rejilla */
+    #modulo-timba .banner-modulo-imagen {
+        grid-column: span 2;
+    }
+}
 
+/* Estilización de las tarjetas contenedoras estilo TV */
+.contenedor-partido-timba-tv {
+    background: #0f172a !important;
+    border: 2px solid #1e293b !important;
+    border-radius: 14px !important;
+    padding: 20px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+    height: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+.contenedor-partido-timba-tv:hover {
+    border-color: var(--dorado, #fbbf24) !important;
+}
+
+/* 🟢 MODIFICADO: Cambiamos a 'stretch' para que los inputs se expandan con elegancia */
+.inputs-apuesta-timba-stadium { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: stretch; 
+    gap: 15px; 
+    margin-top: 20px; 
+    width: 100%; 
+}
+
+/* 🟢 MODIFICADO: Sacamos el max-width rígido para que herede el ancho de la tarjeta */
+.monto-apuesta-row { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: stretch; 
+    gap: 6px; 
+    width: 100%; 
+}
+
+.get-label-tv { 
+    font-size: 1rem; 
+    font-weight: 700; 
+    color: var(--dorado); 
+    letter-spacing: 0.5px; 
+    text-align: left; /* Alineación al inicio para los textos */
+}
+
+/* 🎰 GRILLA DE PRONÓSTICOS (BOTONES DE GOLES) */
+.grid-opciones-goles-match { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 10px; 
+    width: 100%; 
+    margin-top: 15px; 
+}
+
+.btn-opcion-resultado { 
+    background: rgba(15, 19, 34, 0.6); 
+    color: #fff; 
+    border: 1px solid var(--celeste) !important; 
+    font-family: 'Oswald', sans-serif; 
+    font-size: 1.2rem !important; /* Ajustado sutilmente para que no se pise el texto en la grilla */
+    padding: 10px !important; 
+    border-radius: 8px; 
+    box-shadow: 0 4px 0 #0088cc !important; 
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-opcion-resultado:hover { 
+    background: rgba(22, 30, 48, 0.8); 
+    box-shadow: 0 0 12px rgba(0,204,255,0.4) !important; 
+    transform: translateY(-2px);
+}
+
+/* 📋 HISTORIAL DE LA BANCA */
+.historial-timba-banca-tv { 
+    margin-top: 25px; 
+    background: rgba(5, 8, 14, 0.6); 
+    border: 1px solid rgba(255, 255, 255, 0.05); 
+    border-radius: 12px; 
+    padding: 15px; 
+    width: 100%; 
+    box-sizing: border-box; 
+}
+
+.historial-timba-banca-tv h4 { 
+    margin: 0 0 10px 0; 
+    color: var(--dorado); 
+    font-family: 'Oswald', sans-serif; 
+    font-size: 1rem; 
+    letter-spacing: 0.5px; 
+    text-transform: uppercase;
+}
+
+.item-historial-partido { 
+    list-style: none; 
+    font-size: 1.05rem; 
+    font-weight: 700; 
+    padding: 8px 12px; 
+    border-bottom: 1px solid rgba(255,255,255,0.05); 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
 #pantalla-carga { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(4, 6, 10, 0.95); backdrop-filter: blur(4px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 99999; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
 #pantalla-carga.activo { opacity: 1; pointer-events: auto; }
 .spinner-arena { width: 55px; height: 55px; border: 5px solid rgba(255, 255, 255, 0.05); border-top: 5px solid var(--celeste); border-radius: 50%; animation: girarSpinner 0.7s linear infinite; }
@@ -574,6 +691,42 @@ img.emoji {
     border-color: rgba(0, 204, 255, 0.25) !important;
 }
 
+/* ========================================================================
+   🎮 SISTEMA DE FOCO AVANZADO (KEYBOARD ACCESSIBILITY)
+   ======================================================================== */
+
+/* 1. Quitamos el outline feo por defecto del navegador */
+button:focus, 
+input:focus, 
+select:focus {
+    outline: none !important;
+}
+
+/* 2. Efecto Gamer de Foco Dorado Brillante */
+button:focus-visible, 
+input:focus-visible, 
+select:focus-visible,
+.carta-clash:focus-visible {
+    border-color: var(--dorado, #fbbf24) !important;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 
+                inset 0 0 8px rgba(251, 191, 36, 0.4) !important;
+    transform: scale(1.03) !important;
+    animation: pulsoFocoGamer 1.5s infinite ease-in-out;
+    transition: all 0.2s ease;
+}
+
+/* 3. Animación de respiración para el botón seleccionado */
+@keyframes pulsoFocoGamer {
+    0% {
+        box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 22px rgba(251, 191, 36, 0.9), 0 0 30px rgba(251, 191, 36, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+    }
+}
 
 /* ========================================================================
    📱 REINGENIERÍA EXCLUSIVA RESPONSIVA PARA CELULARES (MÁXIMO 768px) - FIXED
