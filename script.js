@@ -131,6 +131,10 @@ function cerrarModalAyuda() {
    👤 3. AUTENTICACIÓN, REGISTRO Y GESTIÓN DEL HUD DEL USUARIO
    ======================================================================== */
 
+/* ========================================================================
+   👤 3. AUTENTICACIÓN, REGISTRO Y GESTIÓN DEL HUD DEL USUARIO
+   ======================================================================== */
+
 async function autenticarUsuario(accion) {
      const username = document.getElementById("input-usuario").value.trim();
      const password = document.getElementById("input-pass").value;
@@ -167,9 +171,9 @@ async function autenticarUsuario(accion) {
                interfazJuego.style.removeProperty("display");
                interfazJuego.classList.add("mostrar");
                
-               // 🔥 SECTOR MISIONES: El DOM ya es visible, forzamos el renderizado seguro de objetivos
-               if (typeof renderizarMisionesDiarias === 'function') {
-                    renderizarMisionesDiarias();
+               // 🟢 SECTOR MISIONES API: Pedimos las misiones reales guardadas en la Base de Datos
+               if (typeof cargarMisionesDelServidor === 'function') {
+                    cargarMisionesDelServidor();
                }
                
                // Reseteamos filtros a nivel lógico al iniciar sesión
@@ -460,9 +464,9 @@ async function comprarSobreEspecifico(tipoCofre) {
           usuarioActual.monedas = data.monedas; // Tomamos el value real del backend
           actualizarInterfazUI();
 
-          // 🏅 SECTOR 1: Avanzamos el progreso de la misión diaria de abrir sobres
+          // 🟢 SECTOR MISIONES API: Impactamos el progreso de forma atómica en el Servidor
           if (typeof trackearProgresoMision === 'function') {
-               trackearProgresoMision("sobres", 1);
+               await trackearProgresoMision("sobres", 1);
           }
 
           colaCartasPack = data.sobre;
@@ -495,7 +499,7 @@ async function comprarSobreEspecifico(tipoCofre) {
                     `;
                     escenario.appendChild(flashOverlay);
 
-                    // Ponemos efectos de sonido virtuales o retraso de revelado dramático de 2.5 segundos
+                    // Retraso de revelado dramático de 2.5 segundos
                     setTimeout(() => {
                          flashOverlay.style.opacity = "0";
                          flashOverlay.style.transition = "opacity 0.5s ease";
@@ -1224,9 +1228,9 @@ async function ejecutarTorneoMundial() {
 
           if (!data.ok) return alert(data.mensaje);
 
-          // 🏅 SECTOR 1: Avanzamos la misión diaria de disputar un cruce en el MiniMundial
+          // 🟢 SECTOR MISIONES API: Impactamos el progreso del Mundial en el servidor antes de simular
           if (typeof trackearProgresoMision === 'function') {
-               trackearProgresoMision("mundial", 1);
+               await trackearProgresoMision("mundial", 1);
           }
 
           document.getElementById("fase-draft-mundial").style.display = "none";
@@ -2326,9 +2330,9 @@ function abrirMercadoBot(listaTusRepetidas) {
             const data = await res.json();
 
             if (data.ok) {
-                // 🟢 SECTOR 1: Computamos la misión diaria del contrato cerrado con éxito
+                // 🟢 SECTOR MISIONES API: Impactamos el progreso en el backend de forma segura antes de renderizar
                 if (typeof trackearProgresoMision === 'function') {
-                    trackearProgresoMision("trade", 1);
+                    await trackearProgresoMision("trade", 1);
                 }
 
                 // Actualizar el álbum local en memoria inmediatamente tras el tradeo exitoso
@@ -2369,7 +2373,6 @@ function abrirMercadoBot(listaTusRepetidas) {
                     const albumActualizado = window.albumCompleto || albumCompleto;
 
                     if (albumActualizado && albumActualizado.length > 0) {
-                         // Forzar el render con los datos decrementados que trajo cargarAlbumLocal()
                          abrirMercadoBot(albumActualizado);
                     } else if (window.todosLosJugadoresGlobal) {
                          abrirMercadoBot(window.todosLosJugadoresGlobal);
@@ -2718,36 +2721,52 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ========================================================================
-   🏅 SISTEMA DE RETENCIÓN: MISIONES DIARIAS Y RECOMPENSAS
+   🏅 SISTEMA DE RETENCIÓN: MISIONES DIARIAS SINCRONIZADAS AL SERVIDOR
    ======================================================================== */
 
-// Simulamos el estado de las misiones del usuario actual en memoria
-window.misionesDiariasUsuario = [
-    { id: 1, desc: "Abrir 3 sobres de cualquier rareza en la Tienda", progreso: 0, meta: 3, recompensa: 250, reclamada: false, tipo: "sobres" },
-    { id: 2, desc: "Firmar un contrato de intercambio con el Bot Comerciante", progreso: 0, meta: 1, recompensa: 400, reclamada: false, tipo: "trade" },
-    { id: 3, desc: "Alinear tus cromos y disputar un cruce en el MiniMundial", progreso: 0, meta: 1, recompensa: 300, reclamada: false, tipo: "mundial" }
-];
+// Variable global en memoria que se refrescará con lo que devuelva el servidor
+window.misionesDiariasUsuario = [];
+
+// Esta función se ejecuta al iniciar sesión (adentro de autenticarUsuario)
+async function cargarMisionesDelServidor() {
+    try {
+        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
+        const res = await fetch(`${URL_BASE}/api/misiones/obtener`, {
+            method: 'GET',
+            headers: obtenerHeadersSeguros()
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+            window.misionesDiariasUsuario = data.misiones;
+            renderizarMisionesDiarias();
+        }
+    } catch (err) {
+        console.error("Error al traer misiones del server:", err);
+    }
+}
 
 function renderizarMisionesDiarias() {
     const contenedor = document.getElementById("contenedor-lista-misiones");
-    // 🛡️ CONTROL CRÍTICO: Si la interfaz del juego todavía está oculta, evitamos romper el render
-    if (!contenedor) {
-        console.warn("⚠️ Contenedor de misiones no encontrado en el DOM actual.");
+    if (!contenedor) return;
+    contenedor.innerHTML = "";
+
+    if (window.misionesDiariasUsuario.length === 0) {
+        contenedor.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem;">⏳ Cargando objetivos de la cartelera oficial...</p>`;
         return;
     }
-    contenedor.innerHTML = "";
 
     window.misionesDiariasUsuario.forEach(mision => {
         const porcentaje = Math.min(Math.round((mision.progreso / mision.meta) * 100), 100);
         const estaCompleta = mision.progreso >= mision.meta;
         
         const divMision = document.createElement("div");
-        divMision.style.cssText = "background: rgba(2, 6, 23, 0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 12px 15px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.2s;";
+        divMision.style.cssText = "background: rgba(2, 6, 23, 0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 12px 15px; display: flex; flex-direction: column; gap: 8px;";
         if (estaCompleta && !mision.reclamada) divMision.style.borderColor = "var(--verde-match)";
 
         divMision.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;">
-                <p style="margin: 0; font-size: 0.9rem; color: #cbd5e1; font-weight: 500; text-align: left;">${mision.desc}</p>
+                <p style="margin: 0; font-size: 0.9rem; color: #cbd5e1; font-weight: 500; text-align: left;">${mision.descripcion}</p>
                 <span style="font-family: 'Oswald'; color: var(--dorado); font-size: 1rem; flex-shrink: 0;">🪙 +${mision.recompensa}</span>
             </div>
             <div style="display: flex; align-items: center; gap: 15px; margin-top: 4px;">
@@ -2759,7 +2778,7 @@ function renderizarMisionesDiarias() {
                     mision.reclamada 
                     ? `<button type="button" class="btn-estadio" disabled style="padding: 4px 10px; font-size: 0.75rem; background: #1e293b !important; color: #64748b !important; box-shadow: none !important;">CLAIMED</button>`
                     : estaCompleta 
-                        ? `<button type="button" class="btn-estadio" onclick="reclamarPremioMision(${mision.id})" style="padding: 4px 10px; font-size: 0.75rem; background: var(--verde-match); color: #000; box-shadow: 0 2px 0 #00b35f;">RECLAMAR</button>`
+                        ? `<button type="button" class="btn-estadio" onclick="reclamarPremioMisionServer(${mision.id})" style="padding: 4px 10px; font-size: 0.75rem; background: var(--verde-match); color: #000; box-shadow: 0 2px 0 #00b35f;">RECLAMAR</button>`
                         : `<button type="button" class="btn-estadio" disabled style="padding: 4px 10px; font-size: 0.75rem; background: #1e293b !important; color: #475569 !important; box-shadow: none !important;">EN CURSO</button>`
                 }
             </div>
@@ -2768,28 +2787,49 @@ function renderizarMisionesDiarias() {
     });
 }
 
-function trackearProgresoMision(tipo, cantidad = 1) {
-    if (!window.misionesDiariasUsuario) return;
-    window.misionesDiariasUsuario.forEach(mision => {
-        if (mision.tipo === tipo && !mision.reclamada) {
-            mision.progreso = Math.min(mision.progreso + cantidad, mision.meta);
+// Envía la acción al servidor en segundo plano cada vez que haces un sobre/trade/mundial
+async function trackearProgresoMision(tipo, cantidad = 1) {
+    try {
+        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
+        const res = await fetch(`${URL_BASE}/api/misiones/trackear`, {
+            method: 'POST',
+            headers: obtenerHeadersSeguros(),
+            body: JSON.stringify({ tipo, cantidad })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            window.misionesDiariasUsuario = data.misiones;
+            renderizarMisionesDiarias();
         }
-    });
-    renderizarMisionesDiarias();
+    } catch (err) {
+        console.error("Error al trackear misión en servidor:", err);
+    }
 }
 
-async function reclamarPremioMision(idMision) {
-    const mision = window.misionesDiariasUsuario.find(m => m.id === idMision);
-    if (!mision || mision.progreso < mision.meta || mision.reclamada) return;
+// Reclama cobrando directo desde el saldo calculado por el backend
+async function reclamarPremioMisionServer(idMision) {
+    try {
+        // 🟢 CORREGIDO: Se añade el prefijo /api requerido por Express
+        const res = await fetch(`${URL_BASE}/api/misiones/reclamar`, {
+            method: 'POST',
+            headers: obtenerHeadersSeguros(),
+            body: JSON.stringify({ misionId: idMision })
+        });
+        const data = await res.json();
 
-    mision.reclamada = true;
-    
-    if (typeof usuarioActual !== 'undefined' && usuarioActual) {
-        usuarioActual.monedas += mision.recompensa;
-        const elMonedas = document.getElementById("lbl-monedas");
-        if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
+        if (data.ok) {
+            window.misionesDiariasUsuario = data.misiones;
+            if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+                usuarioActual.monedas = data.monedas; // Actualización atómica de Oro real
+                const elMonedas = document.getElementById("lbl-monedas");
+                if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
+            }
+            renderizarMisionesDiarias();
+            alert(`🪙 ¡Servidor procesó tu reclamo! Se acreditaron tus monedas correspondientes.`);
+        } else {
+            alert(`❌ Error: ${data.error}`);
+        }
+    } catch (err) {
+        console.error("Error al reclamar recompensa:", err);
     }
-
-    renderizarMisionesDiarias();
-    alert(`🪙 ¡Objetivo cumplido! Se acreditaron 🪙${mision.recompensa} monedas de oro a tu cuenta.`);
 }
