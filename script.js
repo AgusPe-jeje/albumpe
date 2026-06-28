@@ -512,11 +512,15 @@ async function ejecutarSecuenciaReveladoCarta() {
     const carta = colaCartasPack[indiceCartaActualPack];
     const rarezaClase = (carta.rareza || '').toLowerCase();
 
-    // 🏎️ INTERCEPCIÓN PREMIUM: Si es Legendaria y el overlay de suspenso no se creó todavía...
-    if ((rarezaClase === "legendaria" || rarezaClase === "legendario") && !document.getElementById("caminante-flash-cinematic")) {
+    // 🏎️ INTERCEPCIÓN PREMIUM CON CONTENCION DE BUCLE INFINITO
+    // Agregamos la verificación de (!carta.caminanteVisto) para que no se repita a sí misma
+    if ((rarezaClase === "legendaria" || rarezaClase === "legendario") && !carta.caminanteVisto) {
         const escenario = document.querySelector(".pack-opening-escenario");
         if (escenario) {
-            // 🎆 Apagamos las luces del coliseo y ponemos foco dorado antes de tirar pistas
+            // Marcar que ya vimos la animación para esta carta específica
+            carta.caminanteVisto = true;
+
+            // Apagamos las luces del coliseo y ponemos foco dorado antes de tirar pistas
             const flashOverlay = document.createElement("div");
             flashOverlay.id = "caminante-flash-cinematic";
             flashOverlay.className = "escenario-caminante-activo pulso-foco-oro";
@@ -563,12 +567,12 @@ async function ejecutarSecuenciaReveladoCarta() {
                 setTimeout(() => {
                     flashOverlay.remove();
                     flashBlanco.remove();
-                    // 🔁 Re-gatillamos recursivamente la función. Como flashOverlay ya no existe, saltará este if e irá al revelado normal
+                    // 🔁 Re-gatillamos. Al estar carta.caminanteVisto en true, va directo abajo al renderizado
                     ejecutarSecuenciaReveladoCarta();
                 }, 300);
             }, 3000);
 
-            return; // 🛑 Frenamos la ejecución acá para que no empiece a pintar las pistas antes de tiempo
+            return; // 🛑 Frenamos la ejecución del hilo principal de forma controlada
         }
     }
 
