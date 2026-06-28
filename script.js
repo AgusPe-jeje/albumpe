@@ -1256,45 +1256,47 @@ async function ejecutarTorneoMundial() {
 }
 
 function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) {
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
           const filaPartido = document.createElement("div");
-          filaPartido.className = "item-historial-partido"; 
-          filaPartido.style.cssText = "flex-direction: column; background: #0b111e; padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--celeste); transition: all 0.3s ease;";
+          filaPartido.className = "partido-simulado-card"; 
           
           const idUnico = ronda.replace(/ /g,'') + Math.floor(Math.random() * 1000);
           
           filaPartido.innerHTML = `
-              <div style="display:flex; justify-content:space-between; color:var(--dorado); border-bottom:1px solid #1a2436; padding-bottom:5px;">
-                   <span style="text-transform: uppercase; font-family:'Oswald';">📋 ${ronda}</span>
-                   <span id="reloj-vivo-${idUnico}" style="font-weight:bold; color:var(--celeste);">⏱️ MINUTO 00:00</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; color:var(--dorado); border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:12px;">
+                   <span style="text-transform: uppercase; font-family:'Oswald'; font-size: 1rem; letter-spacing: 0.5px;">📋 ${ronda}</span>
+                   <span id="reloj-vivo-${idUnico}" style="font-weight:bold; color:var(--celeste); font-family: monospace; font-size: 0.9rem;">⏱️ MINUTO 00:00</span>
               </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
-                   <span style="width:40%; text-align:left; font-weight:bold; font-size:1.1rem;">🇦🇷 ${tuPais} <span id="boost-badge-${idUnico}" style="display:none; color:var(--verde-match); font-size:0.75rem;">⚡ BOOSTED</span></span>
-                   <span id="score-vivo-${idUnico}" style="font-family:'Oswald'; font-size:1.8rem; background:#000; padding:4px 16px; border-radius:6px; color:var(--verde-match); min-width:70px; text-align:center; box-shadow: inset 0 0 10px rgba(0,255,136,0.2);">0 - 0</span>
-                   <span style="width:40%; text-align:right; font-weight:bold; font-size:1.1rem;">${rival} 🤖</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px 0;">
+                   <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff;">
+                       ⚽ ${tuPais.toUpperCase()} <span id="boost-badge-${idUnico}" class="boost-badge-gaming" style="display:none;">BOOSTED</span>
+                   </span>
+                   <span id="score-vivo-${idUnico}" style="font-family:'Oswald'; font-size:1.9rem; background:#020617; padding:4px 18px; border-radius:8px; color:var(--verde-match); min-width:80px; text-align:center; box-shadow: inset 0 0 12px rgba(0,255,136,0.15); border: 1px solid #1e293b; letter-spacing: 1px;">0 - 0</span>
+                   <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">
+                       ${rival.toUpperCase()} 🤖
+                   </span>
               </div>
-              <div id="consola-incidencias-${idUnico}" style="margin-top:12px; padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:0.85rem; color:#94a3b8; min-height:35px; text-align:center; font-style:italic; border: 1px dashed #1e293b;">
+              <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv">
                    ⚽ El árbitro da la orden... ¡Comienza el partido!
               </div>
-              <div id="zona-entretiempo-${idUnico}" style="display:none; margin-top:10px; text-align:center; padding:10px; background:rgba(234,179,8,0.1); border: 1px solid var(--dorado); border-radius:6px;">
-                   <p style="margin:0 0 8px 0; font-size:0.85rem; color:var(--dorado); font-weight:bold;">👔 ¡ENTRETIEMPO! Tenés 5 segundos para dar la Charla Técnica</p>
-                   <button type="button" id="btn-charla-${idUnico}" class="btn-estadio" style="background:var(--dorado); color:#000; font-size:0.8rem; padding:4px 12px;">📣 Arengar Equipo (+15% Ataque)</button>
+              <div id="zona-entretiempo-${idUnico}" class="box-entretiempo-tactico" style="display:none;">
+                   <p style="margin:0 0 10px 0; font-size:0.85rem; color:var(--dorado); font-weight:bold; text-transform: uppercase; font-family: 'Oswald'; letter-spacing: 0.5px;">👔 ¡ENTRETIEMPO! Charla técnica disponible</p>
+                   <button type="button" id="btn-charla-${idUnico}" class="btn-estadio" style="background:var(--dorado); color:#000; font-size:0.8rem; padding:6px 14px; font-weight: bold; border-radius: 6px;">📣 Arengar Equipo (+15% Ataque)</button>
               </div>
           `;
           contenedor.appendChild(filaPartido); 
           filaPartido.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-          // Generación de goles esperados
+          // Generación balanceada de goles reales finales
           let golesTu = Math.floor(Math.random() * 3); 
           let golesRival = Math.floor(Math.random() * 3);
           if (ganoUsuario && golesTu <= golesRival) golesTu = golesRival + Math.floor(Math.random() * 2) + 1;
           else if (!ganoUsuario && golesRival <= golesTu) golesRival = golesTu + Math.floor(Math.random() * 2) + 1;
 
-          // Simulación local de incidencias si el backend no las manda
           let incidenciasSimuladas = {
-               15: `⚠️ Presiona ${rival}, bombazo que pasa cerca del ángulo izquierdo.`,
+               15: `⚠️ Presiona ${rival.toUpperCase()}, bombazo que pasa cerca del ángulo izquierdo.`,
                45: "⏳ ENTRETIEMPO: Los jugadores se retiran al descanso a recomponer ideas.",
-               72: `🟥 ¡Falta durísima! Tarjeta amarilla para el capitán de ${rival}.`,
+               72: `🟥 ¡Falta durísima! Tarjeta amarilla para el capitán de ${rival.toUpperCase()}.`,
                85: `🔥 ¡Zafarrancho en el área! La hinchada empuja con el alma.`
           };
 
@@ -1302,34 +1304,34 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
           let golesRivalActuales = 0; 
           let segundoVirtual = 0;
           let tieneBoost = false;
+          let partidoPausado = false; // 🟢 CONTROL ÚNICO DE FLUJO
 
           // BOTÓN CHARLA TÉCNICA
           document.getElementById(`btn-charla-${idUnico}`).onclick = () => {
                tieneBoost = true;
                document.getElementById(`boost-badge-${idUnico}`).style.display = "inline-block";
                document.getElementById(`btn-charla-${idUnico}`).disabled = true;
+               document.getElementById(`btn-charla-${idUnico}`).style.background = "#1e293b";
+               document.getElementById(`btn-charla-${idUnico}`).style.color = "#64748b";
                document.getElementById(`btn-charla-${idUnico}`).innerText = "✅ ¡EQUIPO MOTIVADO!";
-               // Si el usuario tiene boost, aumentamos la chance de que meta un gol extra si iba perdiendo
                if (!ganoUsuario && Math.random() < 0.4) {
-                    golesTu++; // Ventaja táctica de cambiar el destino
+                    golesTu++; 
                }
           };
 
-          // Reloj más lento y emocionante: Avanza de a 3 minutos cada 400ms (Unos 12 segundos reales por partido)
-          const timer = setInterval(async () => {
-               if (segundoVirtual === 45 && !document.getElementById(`zona-entretiempo-${idUnico}`).classList.contains("pausado")) {
-                    // Pausa de Entretiempo Interactiva
-                    document.getElementById(`zona-entretiempo-${idUnico}`).classList.add("pausado");
+          // 🟢 UN SOLO TIMER CONTROLADO
+          const timer = setInterval(() => {
+               if (partidoPausado) return; // Si está en entretiempo, frena la ejecución
+
+               if (segundoVirtual === 45) {
+                    partidoPausado = true;
                     document.getElementById(`zona-entretiempo-${idUnico}`).style.display = "block";
                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = "📣 Charla técnica en curso en los vestuarios...";
                     
-                    clearInterval(timer); // Frenamos el reloj del partido
-                    
                     setTimeout(() => {
-                         // Reanudamos a los 5 segundos
                          document.getElementById(`zona-entretiempo-${idUnico}`).style.display = "none";
+                         partidoPausado = false; // Reanuda limpiamente sin crear otros intervalos
                          segundoVirtual += 3;
-                         rearrancarReloj();
                     }, 5000);
                     return;
                }
@@ -1337,13 +1339,13 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                segundoVirtual += 3; 
                if (segundoVirtual > 90) segundoVirtual = 90;
 
-               // Distribución orgánica de goles a lo largo del tiempo
-               if (segundoVirtual >= 20 && segundoVirtual < 45 || segundoVirtual >= 55) {
-                    if (golesTuActuales < golesTu && Math.random() < (tieneBoost ? 0.18 : 0.10)) {
+               // Distribución de goles a lo largo de los minutos
+               if ((segundoVirtual >= 10 && segundoVirtual < 45) || segundoVirtual >= 50) {
+                    if (golesTuActuales < golesTu && Math.random() < (tieneBoost ? 0.20 : 0.11)) {
                          golesTuActuales++;
                          inyectarAlertaIncidencia(idUnico, `⚽ ¡GOOOL DE ${tuPais.toUpperCase()}! 🔥`);
                     }
-                    if (golesRivalActuales < golesRival && Math.random() < 0.09) {
+                    if (golesRivalActuales < golesRival && Math.random() < 0.10) {
                          golesRivalActuales++;
                          inyectarAlertaIncidencia(idUnico, `💥 Gol de ${rival.toUpperCase()}. Se grita fuerte en el banco rival.`);
                     }
@@ -1354,65 +1356,31 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario) 
                     golesRivalActuales = golesRival; 
                }
 
-               // Actualizar UI
+               // Sincronizar tablero virtual
                document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
                document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
 
-               // Mostrar incidencias narrativas por minuto
                if (incidenciasSimuladas[segundoVirtual]) {
                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = incidenciasSimuladas[segundoVirtual];
                }
 
+               // Cierre definitivo del partido
                if (segundoVirtual >= 90) {
                     clearInterval(timer); 
                     filaPartido.style.borderColor = ganoUsuario ? "var(--verde-match)" : "var(--rojo)";
                     
                     const finLabel = document.createElement("div");
-                    finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:5px; color:${ganoUsuario ? 'var(--verde-match)' : 'var(--rojo)'};`;
+                    finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:8px; font-family:'Oswald'; color:${ganoUsuario ? 'var(--verde-match)' : 'var(--rojo)'};`;
                     finLabel.innerText = ganoUsuario ? "🏁 FINALIZADO - AVANZAS ✅" : "🏁 FINALIZADO - ELIMINADO ❌";
                     filaPartido.appendChild(finLabel);
                     
-                    document.getElementById(`consola-incidencias-${idUnico}`).innerText = ganoUsuario ? "🎉 ¡Silbatazo final! Triunfo histórico para meterse en el bolsillo a la hinchada." : "😢 Final del partido. Rendimiento amargo, toca pensar en el próximo torneo.";
-                    resolve();
+                    document.getElementById(`consola-incidencias-${idUnico}`).innerText = ganoUsuario 
+                        ? "🎉 ¡Silbatazo final! Triunfo histórico para meterse en el bolsillo a la hinchada." 
+                        : "😢 Final del partido. Rendimiento amargo, toca pensar en el próximo torneo.";
+                    
+                    resolve(); // Dispara la resolución única de la promesa
                }
           }, 400);
-
-          function rearrancarReloj() {
-               // Función auxiliar para reanudar el bucle después del entretiempo
-               const resumeTimer = setInterval(() => {
-                    segundoVirtual += 3;
-                    if (segundoVirtual > 90) segundoVirtual = 90;
-
-                    if (golesTuActuales < golesTu && Math.random() < (tieneBoost ? 0.22 : 0.12)) {
-                         golesTuActuales++;
-                         inyectarAlertaIncidencia(idUnico, `⚽ ¡GOOOL DE ${tuPais.toUpperCase()}! 🚀`);
-                    }
-                    if (golesRivalActuales < golesRival && Math.random() < 0.09) {
-                         golesRivalActuales++;
-                         inyectarAlertaIncidencia(idUnico, `💥 Gol de ${rival.toUpperCase()}. Silencio sepulcral.`);
-                    }
-
-                    if (segundoVirtual === 90) { golesTuActuales = golesTu; golesRivalActuales = golesRival; }
-                    
-                    document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
-                    document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-
-                    if (incidenciasSimuladas[segundoVirtual]) {
-                         document.getElementById(`consola-incidencias-${idUnico}`).innerText = incidenciasSimuladas[segundoVirtual];
-                    }
-
-                    if (segundoVirtual >= 90) {
-                         clearInterval(resumeTimer);
-                         filaPartido.style.borderColor = ganoUsuario ? "var(--verde-match)" : "var(--rojo)";
-                         const finLabel = document.createElement("div");
-                         finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:5px; color:${ganoUsuario ? 'var(--verde-match)' : 'var(--rojo)'};`;
-                         finLabel.innerText = ganoUsuario ? "🏁 FINALIZADO - AVANZAS ✅" : "🏁 FINALIZADO - ELIMINADO ❌";
-                         filaPartido.appendChild(finLabel);
-                         document.getElementById(`consola-incidencias-${idUnico}`).innerText = ganoUsuario ? "🎉 ¡Victoria épica! Los jugadores festejan de cara a la tribuna." : "❌ Derrota dolorosa. El vestuario quedó golpeado.";
-                         resolve();
-                    }
-               }, 400);
-          }
     });
 }
 
