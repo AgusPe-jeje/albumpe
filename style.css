@@ -53,6 +53,10 @@ body.ambiente-mundial {
     animation: brilloBoost 1.5s infinite alternate;
 }
 
+.boost-badge-gaming.oculto {
+    display: none !important;
+}
+
 @keyframes brilloBoost {
     from { box-shadow: 0 0 4px rgba(0, 255, 136, 0.2); }
     to { box-shadow: 0 0 10px rgba(0, 255, 136, 0.5); }
