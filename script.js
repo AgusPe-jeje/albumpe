@@ -482,79 +482,8 @@ async function comprarSobreEspecifico(tipoCofre) {
           contenedorOpening.style.display = "flex";
           contenedorOpening.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-          // 🏎️ SECTOR 2: Verificamos si en este sobre viene un "Caminante Legendario"
-          const tieneLegendario = data.sobre.some(figu => (figu.rareza || '').toLowerCase() === 'legendaria');
-
-          if (tieneLegendario) {
-               // Buscamos el contenedor del escenario cinemático
-               const escenario = document.querySelector(".pack-opening-escenario");
-               if (escenario) {
-                    // 🎆 Inyectamos la clase de escenario oscuro premium y el pulso dorado
-                    const flashOverlay = document.createElement("div");
-                    flashOverlay.id = "caminante-flash-cinematic";
-                    flashOverlay.className = "escenario-caminante-activo pulso-foco-oro";
-                    
-                    flashOverlay.innerHTML = `
-                        <div class="spinner-arena" style="border-top-color: var(--dorado); width: 80px; height: 80px; box-shadow: 0 0 20px rgba(255,177,0,0.3); border-radius:50%;"></div>
-                        <h2 style="color: var(--dorado); font-family: 'Oswald'; font-size: 2.2rem; margin-top: 25px; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 20px rgba(255,177,0,0.7); animation: pulse 1s infinite alternate;">
-                            ✨ ¡ATENCIÓN, CAMINANTE DETECTADO! ✨
-                        </h2>
-                        <p style="color: #94a3b8; font-family: sans-serif; font-size: 1rem; margin: 8px 0 0 0; letter-spacing: 1px;">Las luces del estadio se apagan para una superestrella...</p>
-                    `;
-                    escenario.appendChild(flashOverlay);
-
-                    // 🎉 FUNCIÓN INTERNA: Detonador dinámico de partículas de fuegos artificiales
-                    const lanzarFuegosArtificiales = () => {
-                        for (let i = 0; i < 50; i++) {
-                            const particula = document.createElement("div");
-                            particula.className = "fuego-artificial";
-                            
-                            const angulo = Math.random() * Math.PI * 2;
-                            const distancia = 70 + Math.random() * 160;
-                            const x = Math.cos(angulo) * distancia;
-                            const y = Math.sin(angulo) * distancia;
-                            
-                            particula.style.setProperty('--x', `${x}px`);
-                            particula.style.setProperty('--y', `${y}px`);
-                            
-                            // Variedad cromática gamer para los destellos
-                            const colores = ['#ffb100', '#38bdf8', '#00ff88', '#ffffff'];
-                            particula.style.background = colores[Math.floor(Math.random() * colores.length)];
-                            
-                            particula.style.left = "50%";
-                            particula.style.top = "45%";
-                            
-                            flashOverlay.appendChild(particula);
-                        }
-                    };
-
-                    // Detonamos tandas consecutivas para inflar el suspenso visual
-                    setTimeout(lanzarFuegosArtificiales, 600);
-                    setTimeout(lanzarFuegosArtificiales, 1400);
-
-                    // ✨ EL IMPACTO DE LUZ BLANCA FINAL (A los 3.2 segundos)
-                    setTimeout(() => {
-                        const flashBlanco = document.createElement("div");
-                        flashBlanco.className = "flash-revelado-total animar-flash";
-                        escenario.appendChild(flashBlanco);
-
-                        // Esfumamos el overlay negro mientras el flash blanco encandila
-                        flashOverlay.style.opacity = "0";
-                        flashOverlay.style.transition = "opacity 0.3s ease";
-                        
-                        setTimeout(() => {
-                            flashOverlay.remove();
-                            flashBlanco.remove();
-                            if (typeof ejecutarSecuenciaReveladoCarta === 'function') {
-                                ejecutarSecuenciaReveladoCarta();
-                            }
-                        }, 300);
-                    }, 3200);
-               } else {
-                    ejecutarSecuenciaReveladoCarta();
-               }
-          } else {
-               // Si no trae legendarios, pasa directo a la secuencia normal sin demoras
+          // 🔥 FLUJO REMASTERIZADO: Pasamos directo a la secuencia sin revelar el secreto antes de tiempo
+          if (typeof ejecutarSecuenciaReveladoCarta === 'function') {
                ejecutarSecuenciaReveladoCarta();
           }
 
@@ -563,6 +492,10 @@ async function comprarSobreEspecifico(tipoCofre) {
           ocultarCarga();
      }
 }
+
+/* ========================================================================
+   🍿 5. LOGICA CINEMÁTICA ASÍNCRONA DE PACK OPENING (SOBRES)
+   ======================================================================== */
 
 async function ejecutarSecuenciaReveladoCarta() {
     if (indiceCartaActualPack >= colaCartasPack.length) {
@@ -577,21 +510,88 @@ async function ejecutarSecuenciaReveladoCarta() {
     if (btnSiguiente) btnSiguiente.disabled = true; 
 
     const carta = colaCartasPack[indiceCartaActualPack];
+    const rarezaClase = (carta.rareza || '').toLowerCase();
+
+    // 🏎️ INTERCEPCIÓN PREMIUM: Si es Legendaria y el overlay de suspenso no se creó todavía...
+    if ((rarezaClase === "legendaria" || rarezaClase === "legendario") && !document.getElementById("caminante-flash-cinematic")) {
+        const escenario = document.querySelector(".pack-opening-escenario");
+        if (escenario) {
+            // 🎆 Apagamos las luces del coliseo y ponemos foco dorado antes de tirar pistas
+            const flashOverlay = document.createElement("div");
+            flashOverlay.id = "caminante-flash-cinematic";
+            flashOverlay.className = "escenario-caminante-activo pulso-foco-oro";
+            
+            flashOverlay.innerHTML = `
+                <div class="spinner-arena" style="border-top-color: var(--dorado); width: 80px; height: 80px; box-shadow: 0 0 20px rgba(255,177,0,0.3); border-radius:50%;"></div>
+                <h2 style="color: var(--dorado); font-family: 'Oswald'; font-size: 2.2rem; margin-top: 25px; letter-spacing: 3px; text-transform: uppercase; text-shadow: 0 0 20px rgba(255,177,0,0.7); animation: pulse 1s infinite alternate;">
+                    ✨ ¡ATENCIÓN, CAMINANTE DETECTADO! ✨
+                </h2>
+                <p style="color: #94a3b8; font-family: sans-serif; font-size: 1rem; margin: 8px 0 0 0; letter-spacing: 1px;">Las luces se apagan... Se viene una superestrella de la Arena.</p>
+            `;
+            escenario.appendChild(flashOverlay);
+
+            // Detonador de fuegos artificiales cruzados
+            const lanzarFuegosArtificiales = () => {
+                for (let i = 0; i < 45; i++) {
+                    const particula = document.createElement("div");
+                    particula.className = "fuego-artificial";
+                    const angulo = Math.random() * Math.PI * 2;
+                    const distancia = 60 + Math.random() * 160;
+                    particula.style.setProperty('--x', `${Math.cos(angulo) * distancia}px`);
+                    particula.style.setProperty('--y', `${Math.sin(angulo) * distancia}px`);
+                    
+                    const colores = ['#ffb100', '#38bdf8', '#00ff88', '#ffffff'];
+                    particula.style.background = colores[Math.floor(Math.random() * colores.length)];
+                    particula.style.left = "50%";
+                    particula.style.top = "45%";
+                    flashOverlay.appendChild(particula);
+                }
+            };
+
+            setTimeout(lanzarFuegosArtificiales, 500);
+            setTimeout(lanzarFuegosArtificiales, 1300);
+
+            // Flash blanco final de revelado
+            setTimeout(() => {
+                const flashBlanco = document.createElement("div");
+                flashBlanco.className = "flash-revelado-total animar-flash";
+                escenario.appendChild(flashBlanco);
+
+                flashOverlay.style.opacity = "0";
+                flashOverlay.style.transition = "opacity 0.3s ease";
+                
+                setTimeout(() => {
+                    flashOverlay.remove();
+                    flashBlanco.remove();
+                    // 🔁 Re-gatillamos recursivamente la función. Como flashOverlay ya no existe, saltará este if e irá al revelado normal
+                    ejecutarSecuenciaReveladoCarta();
+                }, 300);
+            }, 3000);
+
+            return; // 🛑 Frenamos la ejecución acá para que no empiece a pintar las pistas antes de tiempo
+        }
+    }
+
+    // ==========================================
+    // ⚪ FLUJO DE RENDERIZACIÓN DE LAS PISTAS Y LA CARTA
+    // ==========================================
     const wrapper = document.getElementById("pantalla-carta-presentada");
-    
     const pBandera = document.getElementById("pista-bandera");
     const pPosicion = document.getElementById("pista-posicion");
     const pRareza = document.getElementById("pista-rareza");
     
+    // Reseteamos estados visuales de las pistas
     pBandera.className = "pista-bloque"; pBandera.innerText = "⏳ ?";
     pPosicion.className = "pista-bloque"; pPosicion.innerText = "⚽ ?";
     pRareza.className = "pista-bloque"; pRareza.innerText = "🃏 ?";
     wrapper.innerHTML = ""; 
 
+    // Pista 1: Bandera
     await new Promise(r => setTimeout(r, 200));
     pBandera.innerText = carta.bandera || "🃏";
     pBandera.classList.add("revelada");
 
+    // Pista 2: Posición
     await new Promise(r => setTimeout(r, 600));
     let posText = "DEL";
     const posFiltro = carta.posicion ? carta.posicion.toUpperCase() : "";
@@ -600,8 +600,8 @@ async function ejecutarSecuenciaReveladoCarta() {
     pPosicion.innerText = posText;
     pPosicion.classList.add("revelada");
 
+    // Pista 3: Rareza
     await new Promise(r => setTimeout(r, 600));
-    
     let rarezaTexto = carta.rareza.toUpperCase();
     if (rarezaTexto === "ESPECIAL") rarezaTexto = "RARA";
     pRareza.innerText = rarezaTexto;
@@ -609,16 +609,17 @@ async function ejecutarSecuenciaReveladoCarta() {
 
     await new Promise(r => setTimeout(r, 500));
     
-    let rarezaClase = carta.rareza.toLowerCase();
-    if (rarezaClase === "especial") rarezaClase = "rara";
+    let rarezaClaseLimpia = rarezaClase;
+    if (rarezaClaseLimpia === "especial") rarezaClaseLimpia = "rara";
     
+    // Dibujamos la carta física
     const divCarta = document.createElement("div");
-    divCarta.className = `carta-clash ${rarezaClase} caminante-entrada`;
+    divCarta.className = `carta-clash ${rarezaClaseLimpia} caminante-entrada`;
     
     let rarezaColor = "#8e9bb0";
-    if (rarezaClase === "rara") rarezaColor = "#0074e8";
-    else if (rarezaClase === "epica") rarezaColor = "#a335ee";
-    else if (rarezaClase === "legendaria") rarezaColor = "#ffb100";
+    if (rarezaClaseLimpia === "rara") rarezaColor = "#0074e8";
+    else if (rarezaClaseLimpia === "epica") rarezaColor = "#a335ee";
+    else if (rarezaClaseLimpia === "legendaria") rarezaColor = "#ffb100";
 
     divCarta.innerHTML = `
         ${carta.obtenido > 1 ? `<div class="badge-repetidas">x${carta.obtenido}</div>` : ''}
