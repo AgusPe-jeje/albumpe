@@ -2477,6 +2477,7 @@ app.post('/api/mercado/comprar', verificarToken, async (req, res) => {
     const { oferta_id } = req.body; 
 
     try {
+        // 1. Buscamos la oferta en tu tabla real mercado_pases
         const buscarOferta = await pool.query(
             "SELECT vendedor_id, jugador_id, precio_oro FROM mercado_pases WHERE id = $1",
             [oferta_id]
@@ -2497,29 +2498,76 @@ app.post('/api/mercado/comprar', verificarToken, async (req, res) => {
             return res.json({ ok: false, mensaje: "❌ No tenés suficiente Oro en tu cuenta para este fichaje." });
         }
 
+        // Intercambio de Oro
         await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [precio_oro, usuario_id]);
         await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [precio_oro, vendedor_id]);
 
-        // Corregido con EXCLUDED
+        // Sincronización del Álbum (usuario_progreso)
         await pool.query(
             `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
              ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
             [usuario_id, jugador_id]
         );
 
+        // Eliminamos la publicación de la vitrina
         await pool.query("DELETE FROM mercado_pases WHERE id = $1", [oferta_id]);
 
-        const infoJugador = await pool.query("SELECT nombre FROM jugadores WHERE id = $1", [jugador_id]);
+        // Obtenemos datos esenciales para la respuesta y el historial
+        const infoJugador = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugador_id]);
         const checkOroNuevo = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+
+        const nombreJugador = infoJugador.rows[0]?.nombre || "Desconocido";
+        const rarezaJugador = infoJugador.rows[0]?.rareza || "comun";
+
+        // 🟢 INYECCIÓN DEL FEED: Buscamos los nombres de usuario para registrar la transferencia
+        const datosUsuarios = await pool.query(
+            "SELECT id, username FROM usuarios WHERE id IN ($1, $2)",
+            [vendedor_id, usuario_id]
+        );
+        
+        let vendedorUsername = "Vendedor";
+        let compradorUsername = "Comprador";
+
+        datosUsuarios.rows.forEach(u => {
+            if (u.id === usuario_id) compradorUsername = u.username;
+            if (u.id === parseInt(vendedor_id)) vendedorUsername = u.username;
+        });
+
+        // Insertamos la fila en la tabla de registros comerciales globales
+        await pool.query(
+            `INSERT INTO historial_transferencias (vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [vendedorUsername, compradorUsername, nombreJugador, rarezaJugador, precio_oro]
+        );
 
         return res.json({ 
             ok: true, 
-            jugador: infoJugador.rows[0].nombre,
+            jugador: nombreJugador,
             nuevoOro: checkOroNuevo.rows[0].monedas 
         });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ ok: false, error: err.message });
+    }
+});
+
+// ========================================================================
+// 📈 FEED EN VIVO: ÚLTIMAS 5 TRANSFERENCIAS DEL MERCADO P2P
+// ========================================================================
+app.get('/api/mercado/historial', async (req, res) => {
+    try {
+        const query = `
+            SELECT vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro, fecha_registro,
+                   EXTRACT(EPOCH FROM (NOW() - fecha_registro))::INT as segundos_atras
+            FROM historial_transferencias
+            ORDER BY fecha_registro DESC
+            LIMIT 5;
+        `;
+        const result = await pool.query(query);
+        res.json({ ok: true, historial: result.rows });
+    } catch (err) {
+        console.error("❌ Error al leer historial de transferencias:", err.message);
+        res.status(500).json({ ok: false, error: "Error al recuperar el feed del mercado." });
     }
 });
 
