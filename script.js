@@ -3315,18 +3315,20 @@ const AudioArena = {
 };
 
 /* ========================================================================
-   🦾 ENGINE INTERACTIVO MULTI-SBC: CONTRATOS SEMANALES EN CADENA
+   🦾 ENGINE INTERACTIVO MULTI-SBC: CONTRATOS SEMANALES EN CADENA ROTATIVA
    ======================================================================== */
 let poolContratosCache = [];
 let idContratoSeleccionado = null; // ID del contrato activo en el HUD
 let sbcJugadoresSeleccionados = []; 
+let sbcIntervaloRotacion = null; // Control del temporizador semanal de la cartelera
 
 async function cargarModuloSBC() {
     const grid = document.getElementById("grid-sbc-elegibles");
     if (!grid) return;
 
     sbcJugadoresSeleccionados = [];
-    document.getElementById("sbc-contador-slots").innerText = "0 / 0";
+    const elContador = document.getElementById("sbc-contador-slots");
+    if (elContador) elContador.innerText = "0 / 0";
 
     try {
         const res = await fetch(`${URL_BASE}/contratos/activo`, {
@@ -3336,7 +3338,8 @@ async function cargarModuloSBC() {
         const data = await res.json();
 
         if (!data.ok || !data.contratos || data.contratos.length === 0) {
-            document.getElementById("sbc-titulo-desafio").innerText = "❌ SIN CONTRATOS";
+            const elTitulo = document.getElementById("sbc-titulo-desafio");
+            if (elTitulo) elTitulo.innerText = "❌ SIN CONTRATOS VIGENTES";
             return;
         }
 
@@ -3349,6 +3352,9 @@ async function cargarModuloSBC() {
 
         dibujarSelectoresContratosUI();
         actualizarContratoEnFoco();
+        
+        // ⏳ Activamos la cuenta regresiva que lee el tiempo real del backend
+        iniciarCronometroRotacionSBC();
 
     } catch (err) {
         console.error("Error al cargar pool de SBC:", err);
@@ -3387,6 +3393,7 @@ function dibujarSelectoresContratosUI() {
         btnTab.onclick = () => {
             idContratoSeleccionado = c.id;
             sbcJugadoresSeleccionados = []; // Reset de sacrificios al cambiar de pestaña
+            dibujarSelectoresContratosUI(); // Refresca clases de botones activo/inactivo
             actualizarContratoEnFoco();
         };
 
@@ -3461,7 +3468,9 @@ function renderizarCartasElegiblesSBC() {
                 if (totalSeleccionadas >= req.cantidad) return alert(`⚠️ Este contrato exige ${req.cantidad} jugadores.`);
                 sbcJugadoresSeleccionados.push(carta.id);
             } else {
-                sbcJugadoresSeleccionados = sbcJugadoresSeleccionados.filter(id => id !== carta.id);
+                // Removemos solo una instancia del ID del pool de sacrificio
+                const index = sbcJugadoresSeleccionados.indexOf(carta.id);
+                if (index > -1) sbcJugadoresSeleccionados.splice(index, 1);
             }
             document.getElementById("sbc-contador-slots").innerText = `${sbcJugadoresSeleccionados.length} / ${req.cantidad}`;
             renderizarCartasElegiblesSBC();
@@ -3488,7 +3497,7 @@ async function enviarContratoAlBot() {
             method: 'POST',
             headers: obtenerHeadersSeguros(),
             body: JSON.stringify({ 
-                contratoId: idContratoSeleccionado, // 🔥 Metemos el ID dinámico en el body
+                contratoId: idContratoSeleccionado, 
                 jugadorIds: sbcJugadoresSeleccionados 
             })
         });
@@ -3505,7 +3514,7 @@ async function enviarContratoAlBot() {
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('monedas');
             if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
             
-            cargarModuloSBC(); // Recarga y limpia la cartelera completa
+            cargarModuloSBC(); // Recarga y limpia la cartelera completa de forma fluida
         } else {
             alert(data.mensaje || "❌ Trato rechazado.");
         }
@@ -3513,4 +3522,40 @@ async function enviarContratoAlBot() {
         console.error(err);
         ocultarCarga();
     }
+}
+
+// ⏱️ CUENTA REGRESIVA INTEGRADA DE ROTACIÓN DE CARTELERA
+function iniciarCronometroRotacionSBC() {
+    if (sbcIntervaloRotacion) clearInterval(sbcIntervaloRotacion);
+    
+    const elTimer = document.getElementById("sbc-timer-rotacion");
+    if (!elTimer) return;
+
+    sbcIntervaloRotacion = setInterval(() => {
+        const ahora = new Date();
+        
+        // Calculamos el próximo lunes a las 00:00:00 exactas
+        const proximoLunes = new Date();
+        const diasHastaLunes = (8 - ahora.getDay()) % 7 || 7; 
+        
+        proximoLunes.setDate(ahora.getDate() + diasHastaLunes);
+        proximoLunes.setHours(0, 0, 0, 0);
+
+        const tiempoRestanteMs = proximoLunes - ahora;
+
+        if (tiempoRestanteMs <= 0) {
+            clearInterval(sbcIntervaloRotacion);
+            elTimer.innerHTML = `🔄 ROTANDO CARTELERA DEL BOT...`;
+            setTimeout(() => { cargarModuloSBC(); }, 3000); 
+            return;
+        }
+
+        const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
+        const dias = Math.floor(totalSegundos / 86400);
+        const horas = Math.floor((totalSegundos % 86400) / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+
+        elTimer.innerText = `⏳ Próximos desafíos en: ${dias}d ${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+    }, 1000);
 }
