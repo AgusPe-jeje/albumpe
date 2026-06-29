@@ -3088,18 +3088,19 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     activo: true,       
     tipo: "video",      
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
-    texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo y lanzamos el Mercado P2P. ¡Mirá el video, crack!",
+    texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo, lanzamos el Mercado P2P y habilitamos la cartelera de objetivos diarios. ¡Mirá el video, crack!",
     urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
     urlVideo: "https://www.youtube.com/embed/6DTWH9kYAiY",
     
     informe: {
-        version: "v2.4.1-Arena",
+        version: "v2.5.0-Arena",
         fecha: "Junio 2026",
         cambios: [
-            "🏆 **Mini-Mundial Atómico:** Inscripciones gratuitas en el Draft. El Oro o cartas repetidas se debitan en Neon recién al presionar 'Iniciar'.",
+            "🏆 **Mini-Mundial Atómico:** Inscripciones gratuitas en el Draft. El Oro o cartas repetidas se debitan en Neon recién al presionar 'Iniciar', con cronogramas y líneas de tiempo precalculadas por el servidor.",
             "💸 **Mercado de Pases P2P:** Vitrina internacional activa. Las ofertas duran 24 horas y devuelven el cromo automáticamente si nadie compra.",
-            "⏱️ **Reloj de Expiración:** Añadido temporizador visual en las tarjetas de fichajes con alerta roja en la última hora de oferta.",
-            "🛡️ **Blindaje de ID:** Limpieza y parseo de strings corruptos (:1) en las solicitudes de red de la Arena."
+            "🎯 **Objetivos Diarios:** Añadida cartelera de misiones diarias con reinicio atómico sincronizado a la medianoche (GMT-3) y función estética para colapsar/ocultar el panel cuando quieras.",
+            "🛡️ **Control de Rachas & Servidor:** Corregido el desfase ISO en el login diario forzando la hora local de Argentina para evitar bloqueos falsos al reclamar tu recompensa.",
+            "📖 **Guía Actualizada:** Renovado el modal de reglas con las mecánicas del Bot Comerciante, contratos y el funcionamiento real de las arenas."
         ]
     }
 };
