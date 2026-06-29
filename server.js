@@ -55,7 +55,7 @@ const verificarToken = (req, res, next) => {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (FIXED DEFINITIVO)
    ======================================================================== */
-const MODO_MANTENIMIENTO = true; 
+const MODO_MANTENIMIENTO = false; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
 
 app.use((req, res, next) => {
@@ -2889,81 +2889,86 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
 });
 
 // ========================================================================
-// 🦾 BOT COMERCIANTE PREMIUM: POOL DE CONTRATOS TEMÁTICOS SEMANALES (SBC)
+// 🦾 BOT COMERCIANTE: CARTELERA DE CONTRATOS CON ROTACIÓN SEMANAL
 // ========================================================================
 
-// 1️⃣ Cartelera con múltiples desafíos simultáneos en memoria del servidor
-const CONTRATOS_SEMANALES_POOL = [
-    {
-        id: 101,
-        titulo: "⚔️ DESAFÍO ALBICELESTE",
-        descripcion: "Entregá 3 jugadores COMUNES nacidos en ARGENTINA para obtener Oro.",
-        requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" },
-        recompensa: { tipo: "oro_directo", valor: 1500 }
-    },
-    {
-        id: 102,
-        titulo: "🇧🇷 JOGO BONITO TRADER",
-        descripcion: "El Bot busca 2 cracks de rareza ESPECIAL nacidos en BRASIL.",
-        requisitos: { cantidad: 2, rareza: "especial", pais: "brasil" },
-        recompensa: { tipo: "oro_directo", valor: 3500 }
-    },
-    {
-        id: 103,
-        titulo: "🇪🇺 MURALLA EUROPEA",
-        descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA para este trato gordo.",
-        requisitos: { cantidad: 3, rareza: "raro", pais: "francia" },
-        recompensa: { tipo: "oro_directo", valor: 5000 }
-    }
+// 1️⃣ El Banco Central de Contratos (El pool grande de la Arena)
+const POOL_GLOBAL_SBC = [
+    { id: 101, titulo: "⚔️ DESAFÍO ALBICELESTE", descripcion: "Entregá 3 jugadores COMUNES de ARGENTINA.", requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 1500 } },
+    { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ESPECIAL de BRASIL.", requisitos: { cantidad: 2, rareza: "especial", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
+    { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "raro", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
+    { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 3 jugadores ESPECIALES nacidos en INGLATERRA.", requisitos: { cantidad: 3, rareza: "especial", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 6000 } },
+    { id: 105, titulo: "🇪🇸 FURIA ROJA DE INTERCAMBIO", descripcion: "El Bot exige 4 jugadores COMUNES nacidos en ESPAÑA.", requisitos: { cantidad: 4, rareza: "comun", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 2000 } },
+    { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 2 jugadores RAROS nacidos en ITALIA.", requisitos: { cantidad: 2, rareza: "raro", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 4000 } }
 ];
 
-// 2️⃣ Endpoint para que el cliente consulte TODOS los contratos activos hoy
+// 🔄 FUNCIÓN MATEMÁTICA: Devuelve el número de semana del año calendario actual
+function obtenerNumeroSemanaActual() {
+    const ahora = new Date();
+    const principioDeAño = new Date(ahora.getFullYear(), 0, 1);
+    const milisegundosPasados = ahora - principioDeAño;
+    const diasPasados = Math.floor(milisegundosPasados / (1000 * 60 * 60 * 24));
+    return Math.ceil((diasPasados + principioDeAño.getDay() + 1) / 7);
+}
+
+// 🔄 FUNCIÓN FILTRADORA: Elige dinámicamente qué contratos mostrar esta semana
+function obtenerContratosDeLaSemana() {
+    const numeroSemana = obtenerNumeroSemanaActual();
+    const cantidadAExhibir = 2; // Cuántos contratos querés activos en simultáneo
+    
+    const contratosRotativos = [];
+    for (let i = 0; i < cantidadAExhibir; i++) {
+        // La magia del residuo (%): va recorriendo el array de forma circular semana a semana
+        const indiceCalculado = (numeroSemana + i) % POOL_GLOBAL_SBC.length;
+        contratosRotativos.push(POOL_GLOBAL_SBC[indiceCalculado]);
+    }
+    return contratosRotativos;
+}
+
+// 2️⃣ Endpoint Actualizado: Devuelve solo los contratos que tocan esta semana
 app.get('/api/contratos/activo', verificarToken, (req, res) => {
-    res.json({ ok: true, contratos: CONTRATOS_SEMANALES_POOL });
+    const contratosActivos = obtenerContratosDeLaSemana();
+    res.json({ ok: true, contratos: contratosActivos });
 });
 
-// 3️⃣ Endpoint Atómico Dinámico por ID para procesar el Contrato Elegido
+// 3️⃣ Endpoint Atómico de Procesamiento (Se mantiene dinámico y blindado)
 app.post('/api/contratos/completar', verificarToken, async (req, res) => {
     const usuarioId = req.usuarioLogueado.id;
-    const { contratoId, jugadorIds } = req.body; // 🔥 Ahora el front nos manda qué contrato quiere cerrar
+    const { contratoId, jugadorIds } = req.body;
 
-    // Buscamos cuál contrato del pool machea con el ID enviado
-    const contratoElegido = CONTRATOS_SEMANALES_POOL.find(c => c.id === Number(contratoId));
+    // 🛡️ IMPORTANTE: El usuario solo puede completar un contrato si está en la rotación activa actual
+    const contratosPermitidosHoy = obtenerContratosDeLaSemana();
+    const contratoElegido = contratosPermitidosHoy.find(c => c.id === Number(contratoId));
     
     if (!contratoElegido) {
-        return res.status(404).json({ ok: false, mensaje: "❌ El contrato seleccionado no existe o ya expiró." });
+        return res.status(404).json({ ok: false, mensaje: "❌ Este contrato no está disponible en la cartelera de esta semana." });
     }
 
     const reqConfig = contratoElegido.requisitos;
 
-    // Validaciones rápidas de estructura
     if (!jugadorIds || !Array.isArray(jugadorIds) || jugadorIds.length !== reqConfig.cantidad) {
         return res.status(400).json({ ok: false, mensaje: `⚠️ Debés seleccionar exactamente ${reqConfig.cantidad} jugadores.` });
     }
 
     const client = await pool.connect();
-
     try {
-        // 🔒 Transacción segura en Postgres (Neon)
         await client.query('BEGIN');
 
         for (const jId of jugadorIds) {
-            // A. Auditamos que el jugador califique en Rareza y País en la tabla maestra
             const queryJugador = "SELECT nombre, pais, rareza FROM jugadores WHERE id = $1";
             const jugRes = await client.query(queryJugador, [jId]);
 
             if (jugRes.rows.length === 0) {
                 await client.query('ROLLBACK');
-                return res.json({ ok: false, mensaje: "❌ Uno de los jugadores enviados no existe en la Arena." });
+                return res.json({ ok: false, mensaje: "❌ Uno de los jugadores no existe en la Arena." });
             }
 
             const j = jugRes.rows[0];
             if (j.rareza.toLowerCase() !== reqConfig.rareza.toLowerCase() || j.pais.toLowerCase() !== reqConfig.pais.toLowerCase()) {
                 await client.query('ROLLBACK');
-                return res.json({ ok: false, mensaje: `❌ ${j.nombre.toUpperCase()} no cumple los requisitos de este contrato específico.` });
+                return res.json({ ok: false, mensaje: `❌ ${j.nombre.toUpperCase()} no cumple los requisitos vigentes.` });
             }
 
-            // B. Verificamos duplicados reales (cantidad > 1) en usuario_progreso
             const queryProgreso = "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2";
             const progRes = await client.query(queryProgreso, [usuarioId, jId]);
             const cantidadDisponible = progRes.rows[0]?.cantidad || 0;
@@ -2974,35 +2979,21 @@ app.post('/api/contratos/completar', verificarToken, async (req, res) => {
             }
         }
 
-        // 🔥 EL TRITURADOR DE CROMOS
         for (const jId of jugadorIds) {
-            const queryUpdateStock = `
-                UPDATE usuario_progreso 
-                SET cantidad = cantidad - 1 
-                WHERE usuario_id = $1 AND jugador_id = $2;
-            `;
-            await client.query(queryUpdateStock, [usuarioId, jId]);
+            await client.query(`UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2`, [usuarioId, jId]);
         }
 
-        // 🪙 ACREDITACIÓN DE RECOMPENSA
         const premioOro = contratoElegido.recompensa.valor;
-        const queryPremio = "UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2 RETURNING monedas";
-        const userRes = await client.query(queryPremio, [premioOro, usuarioId]);
+        const userRes = await client.query(`UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2 RETURNING monedas`, [premioOro, usuarioId]);
         const nuevoOroTotal = userRes.rows[0].monedas;
 
-        // 🏁 Guardado permanente en Neon
         await client.query('COMMIT');
-
-        res.json({
-            ok: true,
-            nuevoOro: nuevoOroTotal,
-            mensaje: `💪 ¡CONTRATO CERRADO! Cumpliste el '${contratoElegido.titulo}'. El Bot te acreditó 🪙 ${premioOro} de Oro.`
-        });
+        res.json({ ok: true, nuevoOro: nuevoOroTotal, mensaje: `💪 ¡CONTRATO CERRADO! El Bot procesó la rotación y te acreditó 🪙 ${premioOro} de Oro.` });
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error("❌ Error crítico en el endpoint de SBC Dinámico:", err);
-        res.status(500).json({ ok: false, error: "Error interno en los servidores de la Arena." });
+        console.error(err);
+        res.status(500).json({ ok: false, error: "Error interno en los servidores." });
     } finally {
         client.release();
     }
