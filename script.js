@@ -2012,7 +2012,8 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         const cronogramaGolesTu = partido.minutosL ? [...partido.minutosL] : [];
         const cronogramaGolesRival = partido.minutosV ? [...partido.minutosV] : [];
 
-        secuenciaPromesas = sequencePromesas = secuenciaPromesas.then(() => {
+        // 🔧 Corregida la asignación doble con error de tipeo que tenías acá
+        secuenciaPromesas = secuenciaPromesas.then(() => {
             return new Promise((resolveCruce) => {
                  const bloquePartido = document.createElement("div"); 
                  bloquePartido.className = "partido-simulado-card"; 
@@ -2047,26 +2048,27 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                       minVirtual += 3; // Corremos a pasos de a 3 min para acoplar perfecto con el backend
                       if (minVirtual > 90) minVirtual = 90;
 
-                      let huboGol = false;
+                      // ⚡ COMPUERTA ÚNICA: Evita que el silbato de gol se duplique en el mismo minuto
+                      let huboGolEnEsteMinuto = false;
 
-                      // 🟢 REPRODUCCIÓN ATÓMICA DE CRONOGRAMA: Cero Math.random() en el front
                       if (cronogramaGolesTu.includes(minVirtual)) {
                            gL_act++;
-                           huboGol = true;
+                           huboGolEnEsteMinuto = true;
                            inyectarGritoGolMulti(index, `⚽ ¡GOOOL DE ${loc.toUpperCase()}! Se cae el estadio... 🔥`);
                       }
                       
                       if (cronogramaGolesRival.includes(minVirtual)) {
                            gV_act++;
-                           huboGol = true;
+                           huboGolEnEsteMinuto = true;
                            inyectarGritoGolMulti(index, `💥 ¡GOL DE ${vis.toUpperCase()}! Silencio sepulcral en la Arena...`);
                       }
 
-                      if (huboGol && typeof AudioArena !== 'undefined' && AudioArena.play) {
+                      // 🎵 El audio corre una única vez por tick de reloj
+                      if (huboGolEnEsteMinuto && typeof AudioArena !== 'undefined' && AudioArena.play) {
                            AudioArena.play('gol');
                       }
 
-                      // Entretiempo e incidencias cronológicas
+                      // Entretiempo e incidencias cronológicas de ambiente
                       if (minVirtual === 45 && typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
                       if (minVirtual === 48 && typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
@@ -2102,7 +2104,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                            document.getElementById(`multi-log-vivo-${index}`).innerText = "🏁 El árbitro pita el final del encuentro. Planillas guardadas con éxito.";
                            resolveCruce(); 
                       }
-                 }, 250); // Velocidad fluida de transmisión de fixture
+                 }, 250);
             });
         });
     });
