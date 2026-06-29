@@ -2044,8 +2044,21 @@ app.get('/api/multijugador/sala/:codigo', async (req, res) => {
 });
 
 /* ========================================================================
-   💥 SIMULACIÓN Y PROCESAMIENTO EXCLUSIVO DE LLAVES MULTIJUGADOR
+   💥 SIMULACIÓN Y PROCESAMIENTO CON TIMELINE EXCLUSIVO MULTIJUGADOR
    ======================================================================== */
+
+// Sub-motor interno: Genera minutos de gol distribuidos uniformemente cada 3 minutos virtuales
+function generarMinutosGolesMultijugador(cantidad) {
+    let minutos = [];
+    while(minutos.length < cantidad) {
+        let min = Math.floor(Math.random() * 29) * 3 + 3; // Bloques de 3 minutos (Evita min 0)
+        if (!minutos.includes(min) && min !== 45 && min !== 90) {
+            minutos.push(min);
+        }
+    }
+    return minutos.sort((a, b) => a - b);
+}
+
 function simularPartidoEliminatorio(equipo1, equipo2) {
     let g1 = Math.floor(Math.random() * 4);
     let g2 = Math.floor(Math.random() * 4);
@@ -2064,24 +2077,24 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
         ganador = (penales1 > penales2) ? equipo1 : equipo2;
     }
 
+    // 🟢 Inyectamos las matrices de minutos exactos calculadas en frío en Node
     return {
         local: equipo1, visitante: equipo2,
         golesL: g1, golesV: g2,
+        minutosL: generarMinutosGolesMultijugador(g1),
+        minutosV: generarMinutosGolesMultijugador(g2),
         penalesL: fueAPenales ? penales1 : null, penalesV: fueAPenales ? penales2 : null,
         definicionPenales: fueAPenales, ganador: ganador
     };
 }
 
 app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
-    // 🛡️ REPARADO: Capturamos cualquier variante de ID que pueda traer tu objeto descifrado
     const usuario_id = req.usuarioLogueado?.id || req.usuarioLogueado?.usuario_id;
     const { sala_id, codigo_sala } = req.body;
     
     try {
-        // 🔄 INTENTO 1: Buscamos la sala por el ID numérico
         let salaQuery = await pool.query("SELECT * FROM mundial_salas WHERE id = $1", [sala_id]);
         
-        // 🔄 INTENTO 2: Si no vino un ID válido, buscamos por el código de 6 letras (ej: 'T3HLIY')
         if (salaQuery.rows.length === 0 && codigo_sala) {
             salaQuery = await pool.query("SELECT * FROM mundial_salas WHERE codigo_sala = $1", [codigo_sala.toUpperCase()]);
         }
@@ -2091,14 +2104,12 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
         }
         
         const sala = salaQuery.rows[0];
-        const sala_id_real = sala.id; // Nos aseguramos de tener el ID real de la base de datos
+        const sala_id_real = sala.id;
 
-        // 🕵️‍♂️ EL CHIVATO REVELADOR:
         const idDelCreadorEnBase = parseInt(sala.creador_id);
         const idTuyaIdentificada = parseInt(usuario_id);
 
         if (idDelCreadorEnBase !== idTuyaIdentificada) { 
-            // 🚨 Te va a cantar exactamente los dos números en la alerta visual del juego
             return res.json({ 
                 ok: false, 
                 mensaje: `⛔ Error de Dueño: El creador en Neon es el ID [${idDelCreadorEnBase}], pero tu token descifró el ID [${idTuyaIdentificada}].` 
@@ -2109,7 +2120,6 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
             return res.json({ ok: false, mensaje: "🚫 Sala cerrada o ya simulada." });
         }
 
-        // Buscamos los participantes usando el ID real verificado
         const participantesQuery = await pool.query(
             `SELECT sp.usuario_id, u.username, sp.seleccion 
              FROM sala_participantes sp
@@ -2138,12 +2148,8 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
             const oroHost = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
             const oroInvitado = chequearMonedas.rows.find(r => r.id === idInvitado)?.monedas || 0;
 
-            if (oroHost < arancelOro) {
-                return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: Vos (el Host) ya no tenés el Oro suficiente." });
-            }
-            if (oroInvitado < arancelOro) {
-                return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: El rival invitado se quedó sin Oro suficiente." });
-            }
+            if (oroHost < arancelOro) return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: El Host no tiene Oro suficiente." });
+            if (oroInvitado < arancelOro) return res.json({ ok: false, mensaje: "❌ Suspensión por Fondos: El rival invitado se quedó sin Oro suficiente." });
 
             await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [arancelOro, idHost]);
             await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [arancelOro, idInvitado]);
@@ -2155,12 +2161,8 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
             const repetidasHost = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1", [idHost]);
             const repetidasInvitado = await pool.query("SELECT jugador_id FROM usuario_progreso WHERE usuario_id = $1 AND cantidad > 1 LIMIT 1", [idInvitado]);
 
-            if (repetidasHost.rows.length === 0) {
-                return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Ya no contás con cartas repetidas." });
-            }
-            if (repetidasInvitado.rows.length === 0) {
-                return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Tu rival no posee cartas repetidas." });
-            }
+            if (repetidasHost.rows.length === 0) return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Ya no contás con cartas repetidas." });
+            if (repetidasInvitado.rows.length === 0) return res.json({ ok: false, mensaje: "❌ Suspensión por Inventario: Tu rival no posee cartas repetidas." });
 
             await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [idHost, repetidasHost.rows[0].jugador_id]);
             await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [idInvitado, repetidasInvitado.rows[0].jugador_id]);
@@ -2179,18 +2181,15 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
 
         let listaMezclada = mezclarArray([...competidores]);
         let grillaTorneo = new Array(8);
-        
         for (let competidor of listaMezclada) {
             let posAleatoria = Math.floor(Math.random() * 8);
-            while (grillaTorneo[posAleatoria] !== undefined) {
-                posAleatoria = (posAleatoria + 1) % 8;
-            }
+            while (grillaTorneo[posAleatoria] !== undefined) { posAleatoria = (posAleatoria + 1) % 8; }
             grillaTorneo[posAleatoria] = competidor;
         }
 
         let bitacoraPartidosPlana = [];
 
-        // Cuartos
+        // 📊 SIMULACIÓN DE CUARTOS
         let ganadoresCuartos = new Array(4);
         let numeroPartido = 1;
         for (let i = 0; i < 8; i += 2) {
@@ -2201,17 +2200,18 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
                 visitante: cruce.visitante.seleccion,
                 golesLocal: cruce.golesL,
                 golesVisitante: cruce.golesV,
+                minutosL: cruce.minutosL, // 🟢 EMBAJADA DE LÍNEA DE TIEMPO
+                minutosV: cruce.minutosV, // 🟢 EMBAJADA DE LÍNEA DE TIEMPO
                 penalesLocal: cruce.penalesL,
                 penalesVisitante: cruce.penalesV,
                 definicionPenales: cruce.definicionPenales,
-                ganadorUsername: cruce.ganador.username,
-                incidencias: generarIncidenciasPartido(cruce.local.seleccion, cruce.visitante.seleccion) 
+                ganadorUsername: cruce.ganador.username
             });
             ganadoresCuartos[numeroPartido - 1] = cruce.ganador;
             numeroPartido++;
         }
 
-        // Semis
+        // 📊 SIMULACIÓN DE SEMIFINALES
         let numeroSemi = 1;
         let ganadoresSemis = [];
         for (let i = 0; i < 4; i += 2) {
@@ -2222,17 +2222,18 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
                 visitante: cruce.visitante.seleccion,
                 golesLocal: cruce.golesL,
                 golesVisitante: cruce.golesV,
+                minutosL: cruce.minutosL,
+                minutosV: cruce.minutosV,
                 penalesLocal: cruce.penalesL,
                 penalesVisitante: cruce.penalesV,
                 definicionPenales: cruce.definicionPenales,
-                ganadorUsername: cruce.ganador.username,
-                incidencias: generarIncidenciasPartido(cruce.local.seleccion, cruce.visitante.seleccion)
+                ganadorUsername: cruce.ganador.username
             });
             ganadoresSemis.push(cruce.ganador);
             numeroSemi++;
         }
 
-        // Final
+        // 📊 SIMULACIÓN DE LA GRAN FINAL
         let finalCruce = simularPartidoEliminatorio(ganadoresSemis[0], ganadoresSemis[1]);
         const campeonMundial = finalCruce.ganador;
         
@@ -2242,11 +2243,12 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
             visitante: finalCruce.visitante.seleccion,
             golesLocal: finalCruce.golesL,
             golesVisitante: finalCruce.golesV,
+            minutosL: finalCruce.minutosL,
+            minutosV: finalCruce.minutosV,
             penalesLocal: finalCruce.penalesL,
             penalesVisitante: finalCruce.penalesV,
             definicionPenales: finalCruce.definicionPenales,
-            ganadorUsername: finalCruce.ganador.username,
-            incidencias: generarIncidenciasPartido(finalCruce.local.seleccion, finalCruce.visitante.seleccion)
+            ganadorUsername: finalCruce.ganador.username
         });
 
         let datosPremio = { 
@@ -2259,7 +2261,6 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
         
         if (!campeonMundial.esBot) {
             datosPremio.ganoBot = false;
-
             if (modalidadSala === 'oro') {
                 await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [sala.pozo_total, campeonMundial.id]);
             } else if (modalidadSala === 'carta') {
@@ -2271,13 +2272,11 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
                      ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
                     [campeonMundial.id, cartaRecompensa.id]
                 );
-                
                 datosPremio.nombreCartaPremio = `${cartaRecompensa.nombre} (${cartaRecompensa.rareza.toUpperCase()})`;
             }
         }
 
         await pool.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id_real]);
-
         BITACORAS_SALA_CACHE[sala_id_real] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
 
         return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
