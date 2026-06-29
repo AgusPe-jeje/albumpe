@@ -1557,7 +1557,6 @@ const COOLDOWN_MUNDIAL_MS = 3 * 60 * 60 * 1000;
 
 const VALOR_STATS_RAREZA = {
     'comun': 60,
-    'especial': 68,
     'rara': 75,
     'epica': 85,
     'legendaria': 96
@@ -2895,11 +2894,11 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
 // 1️⃣ El Banco Central de Contratos (El pool grande de la Arena)
 const POOL_GLOBAL_SBC = [
     { id: 101, titulo: "⚔️ DESAFÍO ALBICELESTE", descripcion: "Entregá 3 jugadores COMUNES de ARGENTINA.", requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 1500 } },
-    { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ESPECIAL de BRASIL.", requisitos: { cantidad: 2, rareza: "especial", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
-    { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "raro", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
-    { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 3 jugadores ESPECIALES nacidos en INGLATERRA.", requisitos: { cantidad: 3, rareza: "especial", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 6000 } },
+    { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ÉPICA de BRASIL.", requisitos: { cantidad: 2, rareza: "epica", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
+    { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "rara", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
+    { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 2 cracks de rareza LEGENDARIA nacidos en INGLATERRA.", requisitos: { cantidad: 2, rareza: "legendaria", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 8000 } },
     { id: 105, titulo: "🇪🇸 FURIA ROJA DE INTERCAMBIO", descripcion: "El Bot exige 4 jugadores COMUNES nacidos en ESPAÑA.", requisitos: { cantidad: 4, rareza: "comun", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 2000 } },
-    { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 2 jugadores RAROS nacidos en ITALIA.", requisitos: { cantidad: 2, rareza: "raro", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 4000 } }
+    { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 2 jugadores RAROS nacidos en ITALIA.", requisitos: { cantidad: 2, rareza: "rara", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 4000 } }
 ];
 
 // 🔄 FUNCIÓN MATEMÁTICA: Devuelve el número de semana del año calendario actual
