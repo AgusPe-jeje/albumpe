@@ -2888,13 +2888,12 @@ app.post('/api/misiones/reclamar', verificarToken, async (req, res) => {
 });
 
 // ========================================================================
-// 🎁 RECOMPENSAS DIARIAS: RECLAMO ATÓMICO Y CONTROL DE RACHAS (FIXED ISO)
+// 🎁 RECOMPENSAS DIARIAS: RECLAMO ATÓMICO EN ZONA HORARIA ARGENTINA (FIXED)
 // ========================================================================
 app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
     try {
         const usuarioId = req.usuarioLogueado.id;
         
-        // 1. Buscamos el estado actual del usuario
         const queryUser = "SELECT monedas, racha_login, ultimo_login_timestamp FROM usuarios WHERE id = $1";
         const userRes = await pool.query(queryUser, [usuarioId]);
         
@@ -2905,18 +2904,23 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
         let rachaActual = user.racha_login || 0;
         let ultimoLogin = user.ultimo_login_timestamp;
         
-        // Tabla de premios del Coliseo (Día 1 al 6: Oro incremental, Día 7: Premio gordo)
         const premiosOro = { 1: 100, 2: 200, 3: 350, 4: 500, 5: 750, 6: 1000, 7: 2500 };
+
+        // 🛡️ FORMATEADOR EN ESPAÑOL LATAM (Forzado a GMT-3 de Buenos Aires)
+        const opcionesZona = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
+        
+        // Formateamos "HOY" en base a la hora de Buenos Aires
+        const [mesH, diaH, anioH] = ahora.toLocaleDateString('en-US', opcionesZona).split('/');
+        const stringHoy = `${anioH}-${mesH}-${diaH}`; // Genera '2026-06-29' real local
 
         if (ultimoLogin) {
             const ultimaFecha = new Date(ultimoLogin);
             
-            // 🛡️ CONTROL CALENDARIO PURO: Formateamos a strings planos 'YYYY-MM-DD' en base a la zona horaria del servidor
-            // Esto anula por completo la interferencia de horas, minutos y milisegundos residuales.
-            const stringHoy = ahora.toISOString().split('T')[0];
-            const stringUltimo = ultimaFecha.toISOString().split('T')[0];
+            // Formateamos el "ÚLTIMO LOGIN" usando exactamente la misma regla GMT-3
+            const [mesU, diaU, anioU] = ultimaFecha.toLocaleDateString('en-US', opcionesZona).split('/');
+            const stringUltimo = `${anioU}-${mesU}-${diaU}`;
             
-            // A. Si los strings son exactamente iguales, significa que ya reclamó en el día calendario actual
+            // A. Si las strings locales coinciden, ya cobró hoy en Argentina
             if (stringHoy === stringUltimo) {
                 return res.json({ 
                     ok: false, 
@@ -2925,32 +2929,24 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
                 });
             }
 
-            // B. Para saber si el login es consecutivo o si rompió la racha, medimos la distancia matemática en días base medianoche
-            const fechaBaseHoy = new Date(stringHoy);
-            const fechaBaseUltimo = new Date(stringUltimo);
+            // B. Calculamos la distancia matemática real basada en las medianoches locales
+            const fechaBaseHoy = new Date(stringHoy + "T00:00:00");
+            const fechaBaseUltimo = new Date(stringUltimo + "T00:00:00");
             const diferenciaDias = Math.round((fechaBaseHoy - fechaBaseUltimo) / (1000 * 60 * 60 * 24));
 
             if (diferenciaDias === 1) {
-                // Entró al día siguiente consecutivo. Avanza racha.
                 rachaActual = rachaActual >= 7 ? 1 : rachaActual + 1;
             } else {
-                // Pasaron 2 o más días. Racha rota, vuelve al Día 1 de castigo.
-                rachaActual = 1;
+                rachaActual = 1; // Racha rota por colgarse más de 24 horas de calendario
             }
         } else {
-            // Primer login histórico del usuario en este sistema
-            rachaActual = 1;
+            rachaActual = 1; // Primer login de la cuenta
         }
 
         const premioOtorgado = premiosOro[rachaActual] || 100;
-        let regaloSobre = false;
+        let regaloSobre = (rachaActual === 7);
 
-        // Regalo extra: Si llega al Día 7, además del oro, le avisamos al front que le tire un cofre promocional
-        if (rachaActual === 7) {
-            regaloSobre = true;
-        }
-
-        // 2. Registramos el impacto en Postgres de forma atómica y actualizamos el marcador temporal de Neon
+        // 2. Impacto atómico en Neon
         const queryUpdate = `
             UPDATE usuarios 
             SET monedas = monedas + $1, racha_login = $2, ultimo_login_timestamp = NOW() 
