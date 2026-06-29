@@ -145,6 +145,10 @@ async function autenticarUsuario(accion) {
      
      if (!username || !password) return alert("❌ Completá los datos.");
 
+     // 🛡️ SECURITY FIX: Deshabilitamos el botón correspondiente para mitigar ataques de fuerza bruta / spam
+     const btnAuth = document.getElementById(accion === 'login' ? 'btn-login' : 'btn-registro');
+     if (btnAuth) btnAuth.disabled = true;
+
      const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
      const endpointFinal = accion === 'login' ? 'login' : 'registro';
 
@@ -157,12 +161,27 @@ async function autenticarUsuario(accion) {
                body: JSON.stringify({ username, password })
           });
           
+          // 🛡️ SECURITY FIX: Si el servidor responde con un estado de error (401, 403, 500, 503), frenamos
+          if (!res.ok) {
+               ocultarCarga();
+               if (btnAuth) btnAuth.disabled = false;
+               
+               try {
+                    const errorData = await res.json();
+                    return alert(errorData.error || `❌ Error del servidor (Código ${res.status})`);
+               } catch {
+                    return alert(`🚧 Error inesperado en la infraestructura de la Arena (Código ${res.status}).`);
+               }
+          }
+          
           const data = await res.json();
           ocultarCarga();
 
           if (data.error) {
                alert(data.error);
+               if (btnAuth) btnAuth.disabled = false; // Rehabilitamos si el backend rebotó las credenciales
           } else {
+               // 🔥 Si el servidor blindado nos manda un token, lo encanutamos en el navegador
                if (data.token) {
                     localStorage.setItem("arena_token", data.token);
                }
@@ -207,8 +226,10 @@ async function autenticarUsuario(accion) {
                }
           }
      } catch (err) {
-          console.error(err);
+          console.error("❌ Fallo crítico de red o código en autenticación:", err);
           ocultarCarga();
+          if (btnAuth) btnAuth.disabled = false; // Rehabilitamos en caso de crash total
+          alert("📡 Error de conexión. No se pudo establecer contacto con los servidores centrales de la Arena.");
      }
 }
 
@@ -3088,14 +3109,9 @@ async function reclamarPremioMisionServer(idMision) {
             }
 
             renderizarMisionesDiarias();
-
-            // 👑 CAMBIO DE INMERSIÓN: Reemplazamos el alert() viejo por una notificación sutil en la UI
-            // Si tenés un sistema de toasts o carteles flotantes lo metés acá. Si no, al actualizarse el número
-            // con el sonido metálico de fondo, el game-feel ya se entiende a la perfección.
             console.log(`🪙 Recompensa cobrada con éxito. Balance actualizado a: ${data.monedas}`);
 
         } else {
-            // Error controlado (ej: misión no completada o ya reclamada)
             const modal = document.getElementById('modalAnuncioGlobal');
             const tituloHtml = document.getElementById('anuncioTitulo');
             const cuerpoHtml = document.getElementById('anuncioCuerpo');
@@ -3105,7 +3121,7 @@ async function reclamarPremioMisionServer(idMision) {
                 cuerpoHtml.innerHTML = `<p style="text-align:center; color:#cbd5e1; padding:15px;">${data.error}</p>`;
                 modal.style.display = "flex";
             } else {
-                alert(`❌ Error: ${data.error}`); // Resguardo por si las misiones se abren fuera de interfaz
+                alert(`❌ Error: ${data.error}`); 
             }
         }
     } catch (err) {
@@ -3113,13 +3129,11 @@ async function reclamarPremioMisionServer(idMision) {
     }
 }
 
-// ⏱️ MOTOR ASÍNCRONO DEL CRONÓMETRO DE REINICIO DIARIO (FIXED ID)
+// ⏱️ MOTOR ASÍNCRONO DEL CRONÓMETRO DE REINICIO DIARIO BLINDADO ANTI-LOOP
 function iniciarCronometroResetMisiones() {
     if (intervaloResetMisiones) clearInterval(intervaloResetMisiones);
 
-    // 🟢 CORREGIDO: Buscamos exactamente el ID de tu HTML nativo ("timer-misiones")
     const elTimer = document.getElementById("timer-misiones"); 
-
     if (!elTimer) return;
 
     intervaloResetMisiones = setInterval(() => {
@@ -3127,24 +3141,27 @@ function iniciarCronometroResetMisiones() {
         const medianoche = new Date();
         medianoche.setHours(24, 0, 0, 0); // Define el corte automático de fin de día
 
-        const tiempoRestanteMs = medianoche - ahora;
+        let tiempoRestanteMs = medianoche - ahora;
 
+        // 🛡️ PARCHE DE SEGURIDAD: Si el reloj cae en un remanente negativo o cero absoluto, 
+        // frenamos el loop, forzamos el cartel y desfasamos la recarga para romper el bucle.
         if (tiempoRestanteMs <= 0) {
             clearInterval(intervaloResetMisiones);
             elTimer.innerHTML = `🔄 REINICIANDO CARTELERA...`;
+            
             setTimeout(() => {
-                cargarMisionesDelServidor();
-            }, 2500);
+                // Pedimos las misiones y este mismo método encenderá un reloj limpio apuntando al día de mañana
+                cargarMisionesDelServidor(); 
+            }, 3000); // 3 segundos de resguardo estructural
             return;
         }
 
         const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
         const horas = Math.floor(totalSegundos / 3600);
-        const minutes = Math.floor((totalSegundos % 3600) / 60);
+        const minutos = Math.floor((totalSegundos % 3600) / 60); // 🔥 FIX: Alineado a nomenclatura en español
         const segundos = totalSegundos % 60;
 
-        // Armamos el String dinámico manteniendo el layout original
-        const stringReloj = `${horas}h ${minutes.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+        const stringReloj = `${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
         elTimer.innerText = `🔄 REINICIO EN: ${stringReloj}`;
     }, 1000);
 }
@@ -3161,7 +3178,6 @@ async function verificarRecompensaDiaria() {
         const data = await res.json();
 
         if (data.ok) {
-            // Sincronizamos las monedas calculadas en la nube
             if (usuarioActual) usuarioActual.monedas = data.monedas;
             actualizarInterfazUI();
 
@@ -3183,13 +3199,11 @@ async function verificarRecompensaDiaria() {
                 `;
                 modal.style.display = "flex";
 
-                // INTERCEPCIÓN CONTROLADA DEL BOTÓN DE CIERRE FINAL
                 if (btnEntendido) {
                     btnEntendido.onclick = () => {
                         modal.style.display = "none";
                         cuerpoHtml.innerHTML = "";
 
-                        // Si completó el Día 7, se lleva el sobre Legendario final
                         if (data.regaloSobre && typeof comprarSobreEspecifico === 'function') {
                             comprarSobreEspecifico("legendaria");
                         }
@@ -3197,7 +3211,6 @@ async function verificarRecompensaDiaria() {
                 }
             }
         } else {
-            // Si ya reclamó hoy, el flujo simplemente termina en silencio sin pisar nada.
             console.log(`ℹ️ Control diario completado: ${data.mensaje}`);
         }
     } catch (err) {
