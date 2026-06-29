@@ -56,8 +56,8 @@ var historialPartidosSimulados = [];
    ======================================================================== */
 
 function cambiarModulo(idModulo, botonPresionado) {
-     // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' para que se oculte correctamente al navegar
-     document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi, #modulo-mercado-pases').forEach(mod => mod.style.display = 'none');
+     // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
+     document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
      document.querySelectorAll('.tile-modulo-fifa, .btn-modulo-match').forEach(btn => btn.classList.remove('activo'));
      
      // Muestra el módulo clickeado
@@ -88,6 +88,13 @@ function cambiarModulo(idModulo, botonPresionado) {
           // 🟢 INYECCIÓN FEED RECIENTE: Refrescamos el historial dinámico al entrar a la sección
           if (typeof actualizarHistorialTransferenciasUI === "function") {
                actualizarHistorialTransferenciasUI();
+          }
+     }
+     
+     // 🦾 GATILLO DE ENTRADA: Al entrar al sector de Contratos SBC, inicializamos el panel del Bot Comerciante
+     if (idModulo === 'modulo-contratos-sbc' && usuarioActual) {
+          if (typeof cargarModuloSBC === "function") {
+               cargarModuloSBC();
           }
      }
      
