@@ -3516,3 +3516,27 @@ function iniciarCronometroRotacionSBC() {
         elTimer.innerText = `⏳ Próximos desafíos en: ${dias}d ${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
     }, 1000);
 }
+
+function toggleVisibilidadMisiones() {
+    const wrapper = document.getElementById("wrapper-desplegable-misiones");
+    const boton = document.getElementById("btn-toggle-misiones");
+    
+    if (!wrapper || !boton) return;
+
+    // Conmutamos la clase de colapso
+    wrapper.classList.toggle("colapsado");
+
+    // Feedback visual y cambio de flecha
+    if (wrapper.classList.contains("colapsado")) {
+        boton.innerText = "▼";
+        boton.style.color = "var(--dorado)"; // Pasa a dorado para resaltar que está guardado
+    } else {
+        boton.innerText = "▲";
+        boton.style.color = "#64748b"; // Vuelve al color gris neutro
+    }
+
+    // Opcional: Gatillo de audio si ya tenés cargada la librería de sonidos
+    if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+        AudioArena.play('click');
+    }
+}
