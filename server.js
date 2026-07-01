@@ -3084,7 +3084,7 @@ const CONFIG_ANUNCIO_SERVIDOR = {
     titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
     texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo, lanzamos el Mercado P2P y habilitamos la cartelera de objetivos diarios. ¡Mirá el video, crack!",
     urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
-    urlVideo: "https://www.youtube.com/embed/6DTWH9kYAiY",
+    urlVideo: "https://www.youtube.com/embed/Nl_tZ2StsSs",
     
     informe: {
         version: "v2.5.0-Arena",
