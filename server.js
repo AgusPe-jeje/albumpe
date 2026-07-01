@@ -1283,10 +1283,10 @@ const apuestasActivasServidor = {};
 
 function generarGolesServidor() {
     const r = Math.random();
-    if (r < 0.25) return 0;
-    if (r < 0.55) return 1;
-    if (r < 0.80) return 2;
-    if (r < 0.93) return 3;
+    if (r < 0.08) return 0;  // 📉 Bajamos el 0 absoluto a solo un 8% (Chau arco en cero constante)
+    if (r < 0.38) return 1;  // 🎯 30% de chances para 1 gol
+    if (r < 0.68) return 2;  // 🎯 30% de chances para 2 goles (El resultado más común en el fútbol)
+    if (r < 0.88) return 3;
     return Math.floor(Math.random() * 3) + 4;
 }
 
