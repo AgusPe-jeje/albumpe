@@ -1345,66 +1345,73 @@ app.post('/api/timba/preparar', verificarToken, async (req, res) => {
             [ahora, nuevasTimbasGuardadas, usuario_id]
         );
 
+        // 🎲 GENERACIÓN REAL DE LA BANCA
         const golesLReal = generarGolesServidor();
         const golesVReal = generarGolesServidor();
         const signoReal = golesLReal > golesVReal ? 'L' : (golesLReal < golesVReal ? 'V' : 'E');
 
         const combinacionesUsadas = new Set();
-        combinacionesUsadas.add(`${golesLReal}-${golesVReal}`);
+        const labelReal = `${golesLReal} - ${golesVReal}`;
+        combinacionesUsadas.add(labelReal);
 
+        // La opción 0 es el boleto ganador definitivo
         const poolOpciones = [
-            { label: `${golesLReal} - ${golesVReal}`, tipo: 'exacto' }
+            { label: labelReal, tipo: 'exacto' }
         ];
 
-        for (let i = 0; i < 2; i++) {
-            let glSigno = generarGolesServidor(); let gvSigno = generarGolesServidor();
-            let combo = `${glSigno}-${gvSigno}`;
-            let signoOpc = glSigno > gvSigno ? 'L' : (glSigno < gvSigno ? 'V' : 'E');
-            let intentos = 0;
-            while ((combinacionesUsadas.has(combo) || signoOpc !== signoReal) && intentos < 30) {
-                glSigno = generarGolesServidor(); gvSigno = generarGolesServidor();
-                if (intentos > 15) {
-                    if (signoReal === 'L') { glSigno = golesLReal + 1; gvSigno = golesVReal; }
-                    else if (signoReal === 'V') { glSigno = golesLReal; gvSigno = golesVReal + 1; }
-                    else { glSigno = golesLReal + 1; gvSigno = golesVReal + 1; }
-                }
-                combo = `${glSigno}-${gvSigno}`; signoOpc = glSigno > gvSigno ? 'L' : (glSigno < gvSigno ? 'V' : 'E'); intentos++;
+        // 🌪️ MOTOR CAÓTICO ANTI-DESCARTE (2 Opciones de Signo acertado, 3 Erróneas)
+        // Metemos ruido generando marcadores totalmente locos para romper patrones visuales
+
+        // Generamos las 2 que aciertan el signo pero NO el resultado exacto
+        while (poolOpciones.filter(o => o.tipo === 'signo').length < 2) {
+            let gl = generarGolesServidor();
+            let gv = generarGolesServidor();
+            let combo = `${gl} - ${gv}`;
+            let signoOpc = gl > gv ? 'L' : (gl < gv ? 'V' : 'E');
+
+            // Obligatorio: Mismo signo, diferente marcador exacto y no repetido
+            if (signoOpc === signoReal && combo !== labelReal && !combinacionesUsadas.has(combo)) {
+                combinacionesUsadas.add(combo);
+                poolOpciones.push({ label: combo, tipo: 'signo' });
             }
-            combinacionesUsadas.add(combo); poolOpciones.push({ label: `${glSigno} - ${gvSigno}`, tipo: 'signo' });
         }
 
-        for (let i = 0; i < 3; i++) {
-            let glErr = generarGolesServidor(); let gvErr = generarGolesServidor();
-            let combo = `${glErr}-${gvErr}`;
-            let signoOpc = glErr > gvErr ? 'L' : (glErr < gvErr ? 'V' : 'E');
-            let intentos = 0;
-            while ((combinacionesUsadas.has(combo) || signoOpc === signoReal) && intentos < 30) {
-                glErr = generarGolesServidor(); gvErr = generarGolesServidor();
-                if (intentos > 15) {
-                    if (signoReal === 'L' || signoReal === 'E') { glErr = 0; gvErr = i + 1; } 
-                    else { glErr = i + 1; gvErr = 0; }
-                }
-                combo = `${glErr}-${gvErr}`; signoOpc = glErr > gvErr ? 'L' : (glErr < gvErr ? 'V' : 'E'); intentos++;
+        // Generamos las 3 que fallan completamente el signo (Error)
+        while (poolOpciones.filter(o => o.tipo === 'error').length < 3) {
+            // Un 40% de probabilidad de meter marcadores "bomba" pesados para distorsionar grupos de descarte
+            let gl = Math.random() < 0.4 ? Math.floor(Math.random() * 4) + 3 : generarGolesServidor();
+            let gv = Math.random() < 0.4 ? Math.floor(Math.random() * 4) + 3 : generarGolesServidor();
+            let combo = `${gl} - ${gv}`;
+            let signoOpc = gl > gv ? 'L' : (gl < gv ? 'V' : 'E');
+
+            // Obligatorio: Signo totalmente diferente al real y no repetido
+            if (signoOpc !== signoReal && !combinacionesUsadas.has(combo)) {
+                combinacionesUsadas.add(combo);
+                poolOpciones.push({ label: combo, tipo: 'error' });
             }
-            combinacionesUsadas.add(combo); poolOpciones.push({ label: `${glErr} - ${gvErr}`, tipo: 'error' });
         }
 
+        // 🧠 LA ESTOCADA FINAL: Mapeamos y desordenamos de forma criptográfica el array para el cliente
+        // Guardamos el índice real ORIGINAL en el ID para que cuando vuelva en el POST /procesar, 
+        // sepamos quirúrgicamente qué tipo de opción tocó sin importar en qué posición quedó impresa.
         const poolParaCliente = poolOpciones.map((opc, index) => ({
-            idOpcion: index,
+            idOpcion: index, // 👈 Mantiene la referencia original oculta
             label: opc.label
-        })).sort(() => Math.random() - 0.5);
+        })).sort(() => Math.random() - 0.5); // Mezclado caótico
 
+        // Guardamos la jugada en la memoria volátil del servidor de la Arena
         apuestasActivasServidor[usuario_id] = {
             golesLReal,
             golesVReal,
             tipoApuesta,
             montoApuesta,
             jugadorIdApostado,
-            mapeoOpciones: poolOpciones
+            mapeoOpciones: poolOpciones // Mantiene la verdad: index 0 exacto, 1-2 signo, 3-5 error
         };
 
         const tiempoActualizado = nuevasTimbasGuardadas >= MAX_TIMBAS ? 0 : MILISEGUNDOS_POR_TIMBA;
-        res.json({ 
+        
+        return res.json({ 
             ok: true, 
             opciones: poolParaCliente,
             timbas_restantes: nuevasTimbasGuardadas,
@@ -1412,6 +1419,7 @@ app.post('/api/timba/preparar', verificarToken, async (req, res) => {
         });
 
     } catch (err) {
+        console.error("❌ Fallo en motor de Timba:", err.message);
         return res.status(500).json({ ok: false, mensaje: "Error en el servidor al preparar." });
     }
 });
