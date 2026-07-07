@@ -603,19 +603,26 @@ async function comprarSobreEspecifico(tipoCofre) {
      }
 }
 
-// 🛠️ FUNCIÓN AUXILIAR: Apaga o prende masivamente los botones que usen la clase de la tienda
 function alternarBotonesCompraTienda(deshabilitar) {
-    // Buscamos todos tus botones de sobres (asegurate que tengan una clase en común, ej: .btn-sobre o .btn-tienda)
-    // También podés agarrarlos uno por uno por ID si preferís
-    const botones = document.querySelectorAll(".btn-compra-sobre, #btn-sobre-plata, #btn-sobre-oro, #btn-sobre-legendario");
+    // 🎯 Apuntamos directo a la clase real de tus botones del cofre
+    const botones = document.querySelectorAll(".btn-comprar-pack");
+    
     botones.forEach(btn => {
         btn.disabled = deshabilitar;
+        
         if (deshabilitar) {
-            btn.style.opacity = "0.5";
+            // Estilos premium de bloqueo
+            btn.style.opacity = "0.4";
+            btn.style.filter = "grayscale(100%) brightness(0.7)";
             btn.style.cursor = "not-allowed";
+            btn.style.transform = "scale(0.96)";
+            btn.style.transition = "all 0.25s ease";
         } else {
+            // Restauramos su facha original de la Arena
             btn.style.opacity = "1";
+            btn.style.filter = "none";
             btn.style.cursor = "pointer";
+            btn.style.transform = "scale(1)";
         }
     });
 }
