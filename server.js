@@ -3492,15 +3492,37 @@ app.post('/api/tienda/sobre-perfil', verificarToken, async (req, res) => {
 
 // A. Obtener 3 fotos de perfil completamente aleatorias
 app.get('/api/usuarios/opciones-avatar-inicial', verificarToken, async (req, res) => {
+    // 🛡️ Extraemos el ID real del usuario desde el token JWT verificado
+    const usuario_id = req.usuarioLogueado.id;
+
     try {
-        // Traemos 3 diseños al azar de tu tabla fotos_perfil para ofrecerle
+        // 1. Verificación Crítica: ¿Este usuario ya pasó por la ruleta de bienvenida?
+        const checkUser = await pool.query(
+            "SELECT eligio_avatar FROM usuarios WHERE id = $1", 
+            [usuario_id]
+        );
+
+        if (checkUser.rows.length === 0) {
+            return res.status(404).json({ ok: false, mensaje: "Usuario no encontrado." });
+        }
+
+        // Si ya eligió en el pasado, le cortamos el chorro acá mismo
+        if (checkUser.rows[0].eligio_avatar) {
+            return res.status(403).json({ 
+                ok: false, 
+                mensaje: "❌ Hack Attack: Ya elegiste tu avatar inicial. Los demás se consiguen en la tienda abriendo sobres." 
+            });
+        }
+
+        // 2. Si pasó el control (es nuevo de verdad), le tiramos los 3 cromos al azar de fotos_perfil
         const query = `SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 3;`;
         const result = await pool.query(query);
         
         return res.json({ ok: true, opciones: result.rows });
+
     } catch (err) {
-        console.error("❌ Error al generar opciones iniciales:", err.message);
-        return res.status(500).json({ ok: false, mensaje: "Error al generar opciones." });
+        console.error("❌ Error en filtro de seguridad de opciones iniciales:", err.message);
+        return res.status(500).json({ ok: false, mensaje: "Error interno al generar opciones." });
     }
 });
 
