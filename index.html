@@ -184,38 +184,50 @@
             <div id="modulo-perfil" class="modulo-contenido" style="display: none;">
                 <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--celeste); padding: 25px; border-radius: 16px; max-width: 800px; margin: 20px auto;">
                     
+                    <!-- HEADER DEL PERFIL -->
                     <div style="display: flex; align-items: center; gap: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 20px; flex-wrap: wrap;">
-                        <div style="position: relative; width: 90px; height: 90px; background: #020617; border: 2px solid var(--dorado); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 15px rgba(255,177,0,0.2);" id="perfil-avatar-user">
+                        <!-- 📸 FOTO ESTILO CROMO: Cambiado a rectangular con aspecto de carta física -->
+                        <div style="position: relative; width: 85px; height: 110px; background: #020617; border: 2px solid var(--dorado); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 15px rgba(255,177,0,0.15);" id="perfil-avatar-user">
                             ⚽
                         </div>
                         <div style="text-align: left; flex-grow: 1;">
-                            <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 1.8rem; letter-spacing: 1px;">CARGANDO CRACK...</h2>
+                            <div style="display: flex; align-items: baseline; gap: 15px; flex-wrap: wrap;">
+                                <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 1.8rem; letter-spacing: 1px;">CARGANDO CRACK...</h2>
+                                <!-- 📈 PORCENTAJE TOTAL: Ahora se renderiza al lado de tu nombre -->
+                                <span id="perfil-txt-progreso-total" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.2rem; font-weight: bold;">0% COMPLETADO</span>
+                            </div>
                             <p id="perfil-txt-rango" style="color: var(--celeste); margin: 4px 0 0 0; font-weight: bold; font-size: 0.85rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: DEBUTANTE</p>
                         </div>
                     </div>
 
-                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 20px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 RENDIMIENTO EN COMPETENCIA</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                    <!-- SECCIÓN DE TU ÁLBUM (DATOS REALES DE LA CONSULTA MASTER) -->
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 20px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 COLECCIÓN EN PROGRESO (CROMOS EN PROPIEDAD)</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                        
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">EFECTIVIDAD PENALES</span>
-                            <span id="stat-penales-porcentaje" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
-                            <span id="stat-penales-cant" style="color: #94a3b8; font-size: 0.7rem;">0G / 0A</span>
+                            <span style="color: #94a3b8; font-size: 0.75rem; font-weight: bold; display: block;">COMUNES</span>
+                            <span id="stat-comunes" style="color: #fff; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #64748b; font-size: 0.7rem;">En Inventario</span>
                         </div>
+
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">MUNDIALES GANADOS</span>
-                            <span id="stat-mundiales-copas" style="color: var(--dorado); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🏆 0</span>
-                            <span style="color: #94a3b8; font-size: 0.7rem;">Torneos FIFA</span>
+                            <span style="color: var(--celeste); font-size: 0.75rem; font-weight: bold; display: block;">RARAS</span>
+                            <span id="stat-raras" style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #64748b; font-size: 0.7rem;">En Inventario</span>
                         </div>
+
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">SOBRES ABIERTOS</span>
-                            <span id="stat-sobres-abiertos" style="color: #fff; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
-                            <span style="color: #94a3b8; font-size: 0.7rem;">Cofres Desbloqueados</span>
+                            <span style="color: #a855f7; font-size: 0.75rem; font-weight: bold; display: block;">ÉPICAS</span>
+                            <span id="stat-epicas" style="color: #c084fc; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #64748b; font-size: 0.7rem;">En Inventario</span>
                         </div>
+
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">TRADES CON BOT</span>
-                            <span id="stat-SBC-completados" style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
-                            <span style="color: #94a3b8; font-size: 0.7rem;">Contratos Firmados</span>
+                            <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; display: block;">LEGENDARIAS</span>
+                            <span id="stat-legendarias" style="color: var(--dorado); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #64748b; font-size: 0.7rem;">En Inventario</span>
                         </div>
+
                     </div>
 
                     <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 0 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
