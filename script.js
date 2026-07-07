@@ -121,6 +121,7 @@ function cambiarModulo(idModulo, botonPresionado) {
      // 👤 GATILLO DE ENTRADA: Al entrar a Mi Perfil, traemos los datos de la base de datos en tiempo real
      if (idModulo === 'modulo-perfil' && usuarioActual) { // 👈 Cambiá 'modulo-perfil' por el ID de tu sección
           actualizarMiPerfilUI();
+          renderizarCromoDestacadoUI();
      }
 
 }
@@ -407,21 +408,50 @@ function mostrarJugadoresPorPais() {
      jugadoresFiltrados.forEach((figu, index) => {
           const esObtenida = figu.obtenido > 0;
           const card = document.createElement("div");
+          
+          // Le agregamos posición relativa a la card para que contenga bien el menú superior
           card.className = `carta-clash ${figu.rareza.toLowerCase()} ${esObtenida ? '' : 'bloqueada'}`;
           card.style.animationDelay = `${(index % 12) * 30}ms`;
+          card.style.position = "relative";
+          card.style.overflow = "hidden"; // Esconde el botón si no está en hover
           
-          // 🔥 AGREGADO: Si el usuario tiene la figurita, se le renderiza el botón de insignia abajo
+          // Estructura limpia: el botón se vuelve visible haciendo transiciones con opacity
           card.innerHTML = `
               ${figu.obtenido > 1 ? `<div class="badge-repetidas">x${figu.obtenido}</div>` : ''}
-              <img src="${figu.foto}" class="carta-foto" alt="${figu.nombre}">
+              <img src="${figu.foto}" class="carta-foto" alt="${figu.nombre}" style="width: 100%; height: 100%; object-fit: cover;">
               <div class="rareza-vertical">${figu.rareza.toUpperCase()}</div>
               
               ${esObtenida ? `
-                  <button type="button" onclick="marcarCromoComoDestacado(${figu.id}, '${figu.nombre.replace(/'/g, "\\'")}', '${figu.foto}', '${figu.rareza}')" class="btn-estadio" style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); padding: 4px 6px; font-size: 0.65rem; background: var(--dorado); color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 10;">
-                      🌟 DESTACAR
-                  </button>
+                  <div class="capa-interactiva-cromo" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.8); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; z-index: 5;">
+                      <button type="button" onclick="marcarCromoComoDestacado(${figu.id}, '${figu.nombre.replace(/'/g, "\\'")}', '${figu.foto}', '${figu.rareza}')" class="btn-estadio" style="padding: 8px 12px; font-size: 0.75rem; background: var(--dorado); color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-family: 'Oswald'; letter-spacing: 0.5px;">
+                          🌟 DESTACAR
+                      </button>
+                  </div>
               ` : ''}
           `;
+
+          // ✨ EFECTO VISUAL: Controlamos la opacidad de la capa con eventos de mouse
+          if (esObtenida) {
+              card.onmouseenter = () => {
+                  const capa = card.querySelector(".capa-interactiva-cromo");
+                  if (capa) capa.style.opacity = "1";
+              };
+              card.onmouseleave = () => {
+                  const capa = card.querySelector(".capa-interactiva-cromo");
+                  if (capa) capa.style.opacity = "0";
+              };
+              // Soporte para celulares (un toque abre el menú, el botón procesa el click)
+              card.onclick = (e) => {
+                  // Si hizo click directo en el botón, que no resetee la opacidad
+                  if (e.target.tagName === 'BUTTON') return;
+                  
+                  const capa = card.querySelector(".capa-interactiva-cromo");
+                  if (capa) {
+                      capa.style.opacity = capa.style.opacity === "1" ? "0" : "1";
+                  }
+              };
+          }
+
           contenedorGrid.appendChild(card);
      });
 
@@ -2828,7 +2858,6 @@ async function comprarCartaMercado(ofertaId) {
             // Refrescamos el historial dinámico si ya metiste el feed global abajo
             if (typeof actualizarHistorialTransferenciasUI === "function") {
                 actualizarHistorialTransferenciasUI();
-                renderizarCromoDestacadoUI();
             }
 
         } else {
