@@ -529,46 +529,69 @@ let animacionCartaEnCurso = false;
 
 async function comprarSobreEspecifico(tipoCofre) {
      if (!usuarioActual) return alert("❌ Error.");
+     
+     // 🛑 APAGAMOS LOS BOTONES DE LA TIENDA DE ENTRADA
+     alternarBotonesCompraTienda(true);
+
      mostrarCarga(`Adquiriendo derechos de pack ${tipoCofre.toUpperCase()}...`);
 
      try {
           const res = await fetch(`${URL_BASE}/comprar-sobre`, {
                 method: 'POST',
-                headers: obtenerHeadersSeguros(), // 🔥 Inyecta el token en el encabezado
+                headers: { 'Content-Type': 'application/json', ...obtenerHeadersSeguros() },
                 body: JSON.stringify({ tipoCofre: tipoCofre }) 
           });
           
           const data = await res.json();
           ocultarCarga();
 
-          // 🛡️ REGLA DE ORO IMPLEMENTADA: La UI se actualiza con el Oro exacto recalculado por Neon
-          if (data.error_oro) return alert(data.mensaje);
-          if (data.error) return alert("❌ Error: " + data.error);
+          if (data.error_oro || data.error) {
+               alternarBotonesCompraTienda(false); // Si falla, los rehabilitamos
+               return alert(data.error_oro ? data.mensaje : "❌ Error: " + data.error);
+          }
 
-          usuarioActual.monedas = data.monedas; // Tomamos el value real del backend
+          usuarioActual.monedas = data.monedas; 
           actualizarInterfazUI();
 
-          // 🎵 GATILLO DE AUDIO INYECTADO: Sonido metálico instantáneo al procesar la compra
-          if (typeof AudioArena !== 'undefined' && AudioArena.play) {
-               AudioArena.play('monedas');
-          }
+          if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('monedas');
+          if (typeof trackearProgresoMision === 'function') await trackearProgresoMision("sobres", 1);
 
-          // 🟢 SECTOR MISIONES API: Impactamos el progreso de forma atómica en el Servidor
-          if (typeof trackearProgresoMision === 'function') {
-               await trackearProgresoMision("sobres", 1);
-          }
-
-          colaCartasPack = data.sobre;
+          // Guardamos el sobre completo real en la caché para la grilla del final
           sobreAbiertoCompletoCache = data.sobre;
           indiceCartaActualPack = 0;
 
-          document.getElementById("grid-sobre-abierto").innerHTML = "";
+          // 🔍 CONTROL DE FILTRADO (SALTEAR REPETIDOS)
+          const checkSaltear = document.getElementById("check-saltear-repetidos");
           
+          if (checkSaltear && checkSaltear.checked) {
+               // Filtramos dejando SOLO las cartas nuevas de verdad
+               // (En tus jugadores es obtenido === 1, en avatares es !es_repetido_avatar)
+               colaCartasPack = data.sobre.filter(carta => {
+                    if (carta.es_foto_perfil) return !carta.es_repetido_avatar;
+                    return carta.obtenido === 1;
+               });
+          } else {
+               // Si no está marcado, va el sobre completo de 5 o 6 cartas
+               colaCartasPack = data.sobre;
+          }
+
+          // 🔀 ATAJO CRÍTICO: Si no tocó NINGUNA carta nueva y el filtro estaba activo
+          if (colaCartasPack.length === 0) {
+               // Mandamos un cartel flotante rápido o alert informando el skip automático
+               alert("✨ ¡Todas las cartas del sobre eran repetidas! Pasando directo al resumen global.");
+               
+               // Saltamos directo al final sin abrir la pantalla de cinemática
+               renderizarGrillaFinalSobres();
+               alternarBotonesCompraTienda(false); // Rehabilitamos la tienda
+               return;
+          }
+
+          // Si hay cartas para mostrar, abrimos el escenario tradicional
+          document.getElementById("grid-sobre-abierto").innerHTML = "";
           const contenedorOpening = document.getElementById("contenedor-pack-opening");
           contenedorOpening.style.display = "flex";
           contenedorOpening.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-          // 🔥 FLUJO REMASTERIZADO: Pasamos directo a la secuencia sin revelar el secreto antes de tiempo
           if (typeof ejecutarSecuenciaReveladoCarta === 'function') {
                ejecutarSecuenciaReveladoCarta();
           }
@@ -576,7 +599,25 @@ async function comprarSobreEspecifico(tipoCofre) {
      } catch (err) {
           console.error("Error en la apertura del pack:", err);
           ocultarCarga();
+          alternarBotonesCompraTienda(false); // Protección por si crashea la red
      }
+}
+
+// 🛠️ FUNCIÓN AUXILIAR: Apaga o prende masivamente los botones que usen la clase de la tienda
+function alternarBotonesCompraTienda(deshabilitar) {
+    // Buscamos todos tus botones de sobres (asegurate que tengan una clase en común, ej: .btn-sobre o .btn-tienda)
+    // También podés agarrarlos uno por uno por ID si preferís
+    const botones = document.querySelectorAll(".btn-compra-sobre, #btn-sobre-plata, #btn-sobre-oro, #btn-sobre-legendario");
+    botones.forEach(btn => {
+        btn.disabled = deshabilitar;
+        if (deshabilitar) {
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        } else {
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+        }
+    });
 }
 
 /* ========================================================================
@@ -587,6 +628,7 @@ async function ejecutarSecuenciaReveladoCarta() {
     if (indiceCartaActualPack >= colaCartasPack.length) {
         document.getElementById("contenedor-pack-opening").style.display = "none";
         renderizarGrillaFinalSobres();
+        alternarBotonesCompraTienda(false);
         animacionCartaEnCurso = false; 
         return;
     }
@@ -752,43 +794,92 @@ async function revelarAvatarSorpresaEnLoop(avatar, btnSiguiente) {
 
     wrapper.innerHTML = "";
 
-    // Fabricamos el contenedor interactivo del cromo cosmético
+    // 🃏 Creamos el contenedor físico de la carta clonando las dimensiones de las comunes
     const divAvatar = document.createElement("div");
     divAvatar.className = "carta-clash legendaria caminante-entrada"; 
-    divAvatar.style.cssText = "position: relative; border: 4px solid var(--dorado); box-shadow: 0 0 35px rgba(255,177,0,0.5);";
+    divAvatar.style.cssText = `
+        position: relative; 
+        border: 4px solid var(--dorado); 
+        box-shadow: 0 0 35px rgba(255,177,0,0.5);
+        cursor: pointer;
+        overflow: hidden;
+    `;
 
+    // Estructura visual interna nativa
     divAvatar.innerHTML = `
-        <img src="${avatar.foto}" class="carta-foto" alt="${avatar.nombre}">
+        <img src="${avatar.foto}" class="carta-foto" alt="${avatar.nombre}" style="width: 100%; height: 100%; object-fit: cover;">
         <div class="rareza-vertical" style="color: var(--dorado);">PERFIL</div>
-        <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: var(--dorado); color: #000; font-family: 'Oswald'; font-size: 0.75rem; font-weight: bold; padding: 2px 12px; border-radius: 4px; z-index: 10; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+        <div style="position: absolute; top: -1px; left: 50%; transform: translateX(-50%); background: var(--dorado); color: #000; font-family: 'Oswald'; font-size: 0.75rem; font-weight: bold; padding: 2px 12px; border-radius: 0 0 4px 4px; z-index: 10; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
             ¡ÍTEM ESPECIAL! ⭐
         </div>
     `;
 
-    wrapper.appendChild(divAvatar);
-
-    // 🕹️ Si el avatar no es repetido, le inyectamos un botón flotante para equipar rápido abajo
+    // 🕹️ CAPA HOVER: Botón superpuesto con desenfoque de fondo
     if (!avatar.es_repetido_avatar) {
+        const capaHover = document.createElement("div");
+        capaHover.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            z-index: 20;
+            padding: 10px;
+            box-sizing: border-box;
+        `;
+
         const btnAccionRapida = document.createElement("button");
         btnAccionRapida.className = "btn-estadio";
-        btnAccionRapida.innerText = "Equipar este Avatar ⚡";
-        btnAccionRapida.style.cssText = "margin-top: 20px; background: var(--dorado); color:#000; font-weight:bold; box-shadow: 0 0 15px rgba(255,177,0,0.3);";
+        btnAccionRapida.innerText = "EQUIPAR ⚡";
+        btnAccionRapida.style.cssText = "background: var(--dorado); color:#000; font-weight:bold; font-size: 0.85rem; padding: 8px 12px; width: 85%; box-shadow: 0 4px 10px rgba(0,0,0,0.3);";
         
-        btnAccionRapida.onclick = async () => {
+        btnAccionRapida.onclick = async (e) => {
+            e.stopPropagation(); // Evitamos bugs de clicks fantasmas
             btnAccionRapida.disabled = true;
             const idLimpio = avatar.id.replace("avatar_", "");
             if (typeof equiparAvatarDesdeTienda === "function") {
                 await equiparAvatarDesdeTienda(idLimpio);
             }
-            btnAccionRapida.innerText = "¡Equipado con éxito! 📸";
+            btnAccionRapida.innerText = "EQUIPADO 📸";
         };
-        wrapper.appendChild(btnAccionRapida);
+
+        capaHover.appendChild(btnAccionRapida);
+        divAvatar.appendChild(capaHover);
+
+        // Eventos nativos de JS para encender/apagar la capa al pasar el mouse
+        divAvatar.onmouseenter = () => capaHover.style.opacity = "1";
+        divAvatar.onmouseleave = () => capaHover.style.opacity = "0";
     } else {
-        const txtRepetido = document.createElement("div");
-        txtRepetido.style.cssText = "color: #ef4444; font-family: 'Oswald'; font-size: 1.1rem; margin-top: 15px; text-transform: uppercase;";
-        txtRepetido.innerText = "🔄 REPETIDO (+100 Oro Reembolsado)";
-        wrapper.appendChild(txtRepetido);
+        // Si es repetida, mostramos el cartel de aviso fijo abajo pero estilizado para que no tire la grilla
+        const divRepetido = document.createElement("div");
+        divRepetido.style.cssText = `
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(239, 68, 68, 0.9);
+            color: #fff;
+            font-family: 'Oswald';
+            font-size: 0.75rem;
+            text-align: center;
+            padding: 4px 0;
+            z-index: 15;
+            text-transform: uppercase;
+        `;
+        divRepetido.innerText = "🔄 REPETIDO (+100 Oro)";
+        divAvatar.appendChild(divRepetido);
     }
+
+    // Inyectamos directo en el wrapper central (queda centrado exacto como Sulaka)
+    wrapper.appendChild(divAvatar);
 
     await new Promise(r => setTimeout(r, 500));
     animacionCartaEnCurso = false;
