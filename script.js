@@ -224,6 +224,7 @@ async function autenticarUsuario(accion) {
                actualizarInterfazUI();
                cargarAlbumLocal();
                actualizarTimbasRestantesUI();
+               verificarAvatarInicial();
                
                if (accion === 'login') {
                     alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
@@ -3909,6 +3910,102 @@ function renderizarCromoDestacadoUI() {
             <span style="color: ${colorBorde}; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">[${cromo.rareza}]</span>
         </div>
     `;
+}
+
+// ========================================================================
+// 🎁 LÓGICA: CONTROL DE IDENTIDAD Y AVATAR INICIAL DE BIENVENIDA
+// ========================================================================
+
+// 1. Pide las 3 opciones al azar y las dibuja en el modal bloqueante
+async function verificarAvatarInicial() {
+    // Si no está logueado o en tu login local ya detectás que "eligio_avatar" es true, frena
+    if (!usuarioActual || usuarioActual.eligio_avatar === true) return;
+
+    try {
+        const token = localStorage.getItem("token");
+        
+        // Petición blindada para saltar el mantenimiento
+        const res = await fetch(`${URL_BASE}/usuarios/opciones-avatar-inicial`, {
+            method: "GET",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await res.json();
+
+        if (!data.ok || !data.opciones || data.opciones.length === 0) return;
+
+        const contenedor = document.getElementById("contenedor-opciones-iniciales");
+        if (!contenedor) return;
+        contenedor.innerHTML = ""; // Limpieza previa
+
+        // Mapeamos los 3 avatares random devueltos por Postgres
+        data.opciones.forEach(avatar => {
+            const divCarta = document.createElement("div");
+            divCarta.style.width = "110px";
+            divCarta.style.height = "145px";
+            divCarta.style.borderRadius = "10px";
+            divCarta.style.border = "3px solid #334155";
+            divCarta.style.backgroundImage = `url('${avatar.ruta_jpg}')`;
+            divCarta.style.backgroundSize = "cover";
+            divCarta.style.backgroundPosition = "center";
+            divCarta.style.cursor = "pointer";
+            divCarta.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
+            divCarta.title = `Elegir ${avatar.nombre}`;
+
+            // Animaciones de Hover premium estilo cromo brillante
+            divCarta.onmouseenter = () => {
+                divCarta.style.transform = "scale(1.08) translateY(-5px)";
+                divCarta.style.borderColor = "var(--dorado)";
+                divCarta.style.boxShadow = "0 10px 20px rgba(255,177,0,0.35)";
+            };
+            divCarta.onmouseleave = () => {
+                divCarta.style.transform = "scale(1) translateY(0)";
+                divCarta.style.borderColor = "#334155";
+                divCarta.style.boxShadow = "none";
+            };
+
+            // Al hacer click, ejecuta el guardado en Neon
+            divCarta.onclick = () => procesarEleccionInicial(avatar.id);
+
+            contenedor.appendChild(divCarta);
+        });
+
+        // Abrimos el modal bloqueante poniéndole flex
+        document.getElementById("modal-avatar-inicial").style.display = "flex";
+
+    } catch (err) {
+        console.error("❌ Error al montar la ruleta de avatar inicial:", err);
+    }
+}
+
+// 2. Impacta la elección en el servidor, actualiza las flags locales y refresca la facha
+async function procesarEleccionInicial(fotoId) {
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${URL_BASE}/usuarios/seleccionar-avatar-inicial`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ fotoId: parseInt(fotoId) })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.ok) return alert("❌ No se pudo guardar la elección. Intentá de nuevo.");
+
+        // Cerramos el modal de bienvenida
+        document.getElementById("modal-avatar-inicial").style.display = "none";
+        
+        // Actualizamos la sesión del usuario en vivo
+        usuarioActual.eligio_avatar = true;
+        
+        // Forzamos el redibujado de la interfaz para que el cromo del perfil actualice al instante
+        if (typeof actualizarMiPerfilUI === "function") actualizarMiPerfilUI();
+        if (typeof actualizarInterfazUI === "function") actualizarInterfazUI();
+
+    } catch (err) {
+        console.error("❌ Fallo en el guardado de la foto inicial:", err);
+    }
 }
 
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
