@@ -3561,6 +3561,116 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
     }
 });
 
+// ========================================================================
+// ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL
+// ========================================================================
+
+// 1. OBTENER TODAS LAS FIRMAS DE UN PERFIL ESPECÍFICO
+app.get('/api/firmas/:perfilId', verificarToken, async (req, res) => {
+    const { perfilId } = req.params;
+
+    try {
+        const query = `
+            SELECT f.id, f.autor_id, f.mensaje, f.creado_en, f.editado_en, u.username
+            FROM usuario_firmas f
+            JOIN usuarios u ON f.autor_id = u.id
+            WHERE f.perfil_id = $1
+            ORDER BY f.creado_en DESC;
+        `;
+        const resultado = await pool.query(query, [perfilId]);
+        return res.json({ ok: true, firmas: resultado.rows });
+    } catch (err) {
+        console.error("❌ Error al obtener firmas:", err.message);
+        return res.status(500).json({ error: "Error al cargar el libro de firmas." });
+    }
+});
+
+// 2. CREAR UNA NUEVA FIRMA (BLINDADO CON CONFLICT)
+app.post('/api/firmas/crear', verificarToken, async (req, res) => {
+    const autor_id = req.usuarioLogueado.id;
+    const { perfilId, mensaje } = req.body;
+
+    const textoLimpio = (mensaje || '').trim();
+    if (!textoLimpio || textoLimpio.length > 140) {
+        return res.status(400).json({ error: "El mensaje debe tener entre 1 y 140 caracteres." });
+    }
+    if (parseInt(perfilId) === autor_id) {
+        return res.status(400).json({ error: "No podés firmar tu propio perfil, che." });
+    }
+
+    try {
+        const query = `
+            INSERT INTO usuario_firmas (perfil_id, autor_id, mensaje, creado_en)
+            VALUES ($1, $2, $3, NOW())
+            RETURNING id;
+        `;
+        await pool.query(query, [perfilId, autor_id, textoLimpio]);
+        return res.json({ ok: true, mensaje: "¡Perfil firmado correctamente!" });
+    } catch (err) {
+        if (err.code === '23505') { // Código de Postgres para violación de restricción UNIQUE
+            return res.status(400).json({ error: "Ya firmaste este perfil. Podés editar tu firma actual si querés cambiarla." });
+        }
+        console.error("❌ Error al crear firma:", err.message);
+        return res.status(500).json({ error: "Error interno al procesar la firma." });
+    }
+});
+
+// 3. EDITAR FIRMA EXISTENTE (GUARDA LA FECHA DEL EDIT)
+app.put('/api/firmas/editar', verificarToken, async (req, res) => {
+    const autor_id = req.usuarioLogueado.id;
+    const { firmaId, nuevoMensaje } = req.body;
+
+    const textoLimpio = (nuevoMensaje || '').trim();
+    if (!textoLimpio || textoLimpio.length > 140) {
+        return res.status(400).json({ error: "El mensaje debe tener entre 1 y 140 caracteres." });
+    }
+
+    try {
+        // Validamos la autoría de forma atómica en el WHERE
+        const query = `
+            UPDATE usuario_firmas 
+            SET mensaje = $1, editado_en = NOW()
+            WHERE id = $2 AND autor_id = $3
+            RETURNING id;
+        `;
+        const result = await pool.query(query, [textoLimpio, firmaId, autor_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(403).json({ error: "No tenés permisos para editar esta firma o no existe." });
+        }
+
+        return res.json({ ok: true, mensaje: "Firma modificada con éxito." });
+    } catch (err) {
+        console.error("❌ Error al editar firma:", err.message);
+        return res.status(500).json({ error: "Error en el servidor al editar." });
+    }
+});
+
+// 4. BORRAR FIRMA
+app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
+    const autor_id = req.usuarioLogueado.id;
+    const { firmaId } = req.params;
+
+    try {
+        // El creador de la firma puede borrarla
+        const query = `
+            DELETE FROM usuario_firmas 
+            WHERE id = $1 AND autor_id = $2
+            RETURNING id;
+        `;
+        const result = await pool.query(query, [firmaId, autor_id]);
+
+        if (result.rows.length === 0) {
+            return res.status(403).json({ error: "No se pudo borrar la firma (No sos el autor)." });
+        }
+
+        return res.json({ ok: true, mensaje: "Firma eliminada de la cartelera." });
+    } catch (err) {
+        console.error("❌ Error al borrar firma:", err.message);
+        return res.status(500).json({ error: "Error en el servidor al eliminar." });
+    }
+});
+
 /* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
    ======================================================================== */
