@@ -643,7 +643,7 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
 
 app.get('/api/ranking', async (req, res) => {
     const query = `
-        SELECT username, puntos_ranking 
+        SELECT id, username, puntos_ranking 
         FROM usuarios 
         ORDER BY puntos_ranking DESC 
         LIMIT 10
