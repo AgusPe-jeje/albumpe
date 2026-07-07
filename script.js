@@ -3580,8 +3580,18 @@ async function inspeccionarPerfilRival(usuarioId) {
      }
 
      try {
-          // Apuntamos directo a tu ruta pasándole el ID correspondiente
-          const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`);
+          // 🔑 Recuperamos tu token de tester
+          const token = localStorage.getItem("token");
+
+          // 🔥 CORREGIDO: Le inyectamos las cabeceras de autorización para romper el mantenimiento
+          const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`, {
+               method: "GET",
+               headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+               }
+          });
+
           if (!res.ok) throw new Error("No se pudo obtener el perfil del rival");
           
           const data = await res.json();
@@ -3595,7 +3605,9 @@ async function inspeccionarPerfilRival(usuarioId) {
           
           // Render de la foto o fallback por si viene por defecto
           const imgAvatar = document.getElementById("visitante-avatar");
-          imgAvatar.innerHTML = `<img src="${rival.foto}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.src='fotos/_defecto.jpg'">`;
+          if (imgAvatar) {
+               imgAvatar.innerHTML = `<img src="${rival.foto}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.src='fotos/_defecto.jpg'">`;
+          }
 
           // 2. Armamos un desglose dinámico en el cuerpo del modal para lucir tus nuevas estadísticas de Álbum y Timba
           const contenedorStats = document.querySelector("#modal-perfil-visitante rgba") || document.getElementById("visitante-stat-copas").parentNode.parentNode;
@@ -3630,7 +3642,6 @@ async function inspeccionarPerfilRival(usuarioId) {
      } catch (err) {
           console.error(err);
           alert("❌ No se pudieron sincronizar los datos de este jugador.");
-          // Opcional: cerrar el modal automáticamente si falla
           document.getElementById("modal-perfil-visitante").style.display = "none";
      }
 }
