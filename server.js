@@ -1830,7 +1830,7 @@ const generarIncidenciasPartido = (golesL, golesV, tuPais, rival) => {
 };
 
 /* ========================================================================
-   🏆 MÓDULO MINIMUNDIAL (SINGLE PLAYER / BOTS / COOLDOWNS)
+   🏆 MÓDULO MINIMUNDIAL BLINDADO (SINGLE PLAYER / BOTS / COOLDOWNS)
    ======================================================================== */
 const COOLDOWN_MUNDIAL_MS = 3 * 60 * 60 * 1000; 
 
@@ -1854,72 +1854,72 @@ const SELECCIONES_BOTS = [
     "Arabia Saudita", "Irán", "Suiza", "Dinamarca", "Suecia", "Polonia", "Ucrania", "Austria"
 ];
 
-// ========================================================================
-// 🏆 ENDPOINT SEGURO: ESTADO Y COOLDOWN DEL MINIMUNDIAL (ANTI-CHEAT)
-// ========================================================================
+// 1️⃣ ENDPOINT SEGURO: ESTADO Y COOLDOWN DEL MINIMUNDIAL
 app.get('/api/mundial/estado', verificarToken, async (req, res) => {
-    // 🛡️ REGLA DE ORO: La identidad se extrae pura del JWT, imposible de alterar por el cliente
     const usuarioId = req.usuarioLogueado.id; 
-
     const client = await pool.connect();
     try {
-        // 🔒 Consulta parametrizada clásica para evitar cualquier intento de SQL Injection
         const queryText = "SELECT copas_mundiales, ultima_timba_mundial FROM usuarios WHERE id = $1";
         const userCheck = await client.query(queryText, [usuarioId]);
         
         if (userCheck.rows.length === 0) {
-            return res.status(404).json({ ok: false, error: "Usuario inexistente en los registros de la Arena." });
+            return res.status(404).json({ ok: false, error: "Usuario inexistente en los registros." });
         }
 
         const user = userCheck.rows[0];
         const ahora = new Date();
         let tiempoRestante = 0;
 
-        // Validamos de forma estricta si existe una marca de tiempo previa
         if (user.ultima_timba_mundial) {
             const ultimaVez = new Date(user.ultima_timba_mundial);
             const transcurrido = ahora - ultimaVez;
-            
-            // COOLDOWN_MUNDIAL_MS constante declarada en tu servidor (Ej: 4 * 60 * 60 * 1000)
             if (transcurrido < COOLDOWN_MUNDIAL_MS) {
                 tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
             }
         }
 
-        // 📤 Formato limpio y estructurado mapeado directo para el Front
         return res.json({
             ok: true,
             copas: Number(user.copas_mundiales) || 0,
-            milisegundosRestantes: Math.floor(tiempoRestante) // Enviamos entero puro redondeado
+            milisegundosRestantes: Math.floor(tiempoRestante)
         });
-        
     } catch (err) {
-        console.error("❌ Fallo de integridad en /mundial/estado:", err.message);
-        return res.status(500).json({ ok: false, error: "Error interno de sincronización en los servidores." });
+        console.error("❌ Error en /mundial/estado:", err.message);
+        return res.status(500).json({ ok: false, error: "Error de sincronización en los servidores." });
     } finally {
-        // 🔑 LIBERACIÓN DEL POOL: Evita que el servidor se sature de hilos y tire el error 503
         client.release(); 
     }
 });
 
+// 2️⃣ ENDPOINT SEGURO: PREPARAR E INSCRIPCIÓN AL MUNDIAL
 app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
+    const client = await pool.connect();
     try {
-        const userCheck = await pool.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1", [usuario_id]);
-        if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
+        await client.query('BEGIN');
 
-        if (userCheck.rows[0].ultima_timba_mundial) {
-            const transcurrido = new Date() - new Date(userCheck.rows[0].ultima_timba_mundial);
+        const userCheck = await client.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
+        if (userCheck.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
+        }
+
+        const usuario = userCheck.rows[0];
+
+        if (usuario.ultima_timba_mundial) {
+            const transcurrido = new Date() - new Date(usuario.ultima_timba_mundial);
             if (transcurrido < COOLDOWN_MUNDIAL_MS) {
-                return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Vestuario cerrado. Debés esperar a que se cumpla el tiempo.` });
+                await client.query('ROLLBACK');
+                return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Vestuario cerrado. Esperá a que se cumpla el cooldown.` });
             }
         }
 
-        if (userCheck.rows[0].monedas < 1500) {
-            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción al MiniMundial cuesta 1.500 monedas." });
+        if (usuario.monedas < 1500) {
+            await client.query('ROLLBACK');
+            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción cuesta 1.500 monedas." });
         }
 
-        const paisesValidosQuery = await pool.query(`
+        const paisesValidosQuery = await client.query(`
             SELECT j.pais 
             FROM usuario_progreso up 
             JOIN jugadores j ON up.jugador_id = j.id 
@@ -1931,21 +1931,23 @@ app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
         const paisesCandidatos = paisesValidosQuery.rows.map(r => r.pais);
 
         if (paisesCandidatos.length === 0) {
-            return res.json({ ok: false, mensaje: "❌ Requisito insuficiente: Necesitás tener al menos 3 jugadores de un mismo país desbloqueados para poder inscribirte." });
+            await client.query('ROLLBACK');
+            return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores de un mismo país desbloqueados para poder inscribirte." });
         }
 
-        const nuevoOro = userCheck.rows[0].monedas - 1500;
-        await pool.query(
+        const nuevoOro = usuario.monedas - 1500;
+        await client.query(
             "UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", 
             [nuevoOro, usuario_id]
         );
 
         const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
-        
         let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
         while (ternaFiltrada.includes(rivalClasificacion)) {
             rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
         }
+
+        await client.query('COMMIT');
 
         return res.json({
             ok: true,
@@ -1953,12 +1955,16 @@ app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
             rivalClasificacion: rivalClasificacion,
             monedasActualizadas: nuevoOro
         });
-        
     } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Error en /mundial/preparar:", err.message);
         return res.status(500).json({ ok: false, error: err.message });
+    } finally {
+        client.release();
     }
 });
 
+// 3️⃣ ENDPOINT SEGURO: JUGAR Y PROCESAR PLANILLA DE PARTIDOS (ANTI-CHEAT)
 app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const { seleccionElegida, rivalClasificacion, jugadorIds } = req.body;
@@ -1967,14 +1973,19 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         return res.status(400).json({ ok: false, mensaje: "Debés alinear exactamente 3 jugadores." });
     }
 
+    const client = await pool.connect();
     try {
-        const jCheck = await pool.query(
+        await client.query('BEGIN');
+
+        // Validamos de forma estricta la propiedad de las cartas seleccionadas
+        const jCheck = await client.query(
             "SELECT j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2) AND up.cantidad > 0",
             [usuario_id, jugadorIds]
         );
 
         if (jCheck.rows.length !== 3) {
-            return res.json({ ok: false, mensaje: "❌ Uno o más jugadores seleccionados no están disponibles." });
+            await client.query('ROLLBACK');
+            return res.json({ ok: false, mensaje: "❌ Uno o más jugadores seleccionados no están disponibles en tu plantel." });
         }
 
         const sumaStats = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0);
@@ -2000,11 +2011,9 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         const rivalGrupo3 = botsDisponibles[2];
         const integrantesGrupo = [seleccionElegida, rivalGrupo1, rivalGrupo2, rivalGrupo3];
 
-        // 🛡️ SUB-MOTOR INTERNO DEL BACKEND: Genera minutos de gol distribuidos sin pisarse
         function generarMinutosGolesFútbol(cantidad) {
             let minutos = [];
             while(minutos.length < cantidad) {
-                // Pasos de a 3 min para encajar simétrico con el reloj virtual del Front
                 let min = Math.floor(Math.random() * 29) * 3 + 3; 
                 if (!minutos.includes(min) && min !== 45 && min !== 90) {
                     minutos.push(min);
@@ -2020,8 +2029,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 if (Math.random() <= chanceVictoria && g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
                 else if (Math.random() > chanceVictoria && g2 <= g1) g2 = g1 + Math.floor(Math.random() * 2) + 1;
             }
-            
-            // Calculamos las líneas de tiempo acá en el servidor
             return {
                 goles1: g1,
                 goles2: g2,
@@ -2030,7 +2037,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             };
         }
 
-        // Simular Fase de Grupos con líneas de tiempo reales
+        // Simulamos la Fase de Grupos
         let let_f1_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo1, true);
         let let_f1_m2 = simularMatchCompleto(rivalGrupo2, rivalGrupo3, false);
         
@@ -2038,7 +2045,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         bitacoraGrupo.push({ 
             fecha: 1, local: seleccionElegida, visitante: rivalGrupo1, 
             gL: let_f1_m1.goles1, gV: let_f1_m1.goles2, 
-            minutosL: let_f1_m1.minutosEq1, minutosV: let_f1_m1.minutosEq2, // 🟢 ENVIADO
+            minutosL: let_f1_m1.minutosEq1, minutosV: let_f1_m1.minutosEq2, 
             botL: rivalGrupo2, botV: rivalGrupo3, 
             gBL: let_f1_m2.goles1, gBV: let_f1_m2.goles2,
             minutosBL: let_f1_m2.minutosEq1, minutosBV: let_f1_m2.minutosEq2
@@ -2090,7 +2097,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         let posicionUsuario = tablaOrdenada.findIndex(r => r.pais === seleccionElegida) + 1;
         let clasificaALlaves = posicionUsuario <= 2; 
 
-        // Play-offs
         let bitacoraPlayoffs = [];
         let campeon = false;
         let faseAlcanzada = "Fase de Grupos";
@@ -2109,7 +2115,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 faseAlcanzada = llave.ronda;
                 const chanceRondaReal = Math.max(0.10, chanceVictoria - llave.penalizacion);
                 
-                // Precalculamos score exacto de llaves en backend
                 let gTu = Math.floor(Math.random() * 3);
                 let gRiv = Math.floor(Math.random() * 3);
                 const ganoEsteCruce = Math.random() <= chanceRondaReal;
@@ -2117,8 +2122,8 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 if (ganoEsteCruce) {
                     if (gTu <= gRiv) gTu = gRiv + 1;
                     bitacoraPlayoffs.push({ 
-                        ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅",
-                        gL: gTu, gV: gRiv,
+                        ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste bombazo ✅",
+                        gL: gTu, gV: gRiv, ganoUsuarioReal: true,
                         minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv)
                     });
                 } else {
@@ -2126,7 +2131,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                     if (gRiv <= gTu) gRiv = gTu + 1;
                     bitacoraPlayoffs.push({ 
                         ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌",
-                        gL: gTu, gV: gRiv,
+                        gL: gTu, gV: gRiv, ganoUsuarioReal: false,
                         minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv)
                     });
                     break;
@@ -2134,17 +2139,20 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             }
         }
 
+        // 🔥 APLICACIÓN ATÓMICA DE PREMIOS DIRECTAMENTE EN EL COMMIT DEL BACKEND
         const ahora = new Date();
         if (campeon) {
-            await pool.query(
+            await client.query(
                 "UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
                 [ahora, usuario_id]
             );
         } else {
-            await pool.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
+            await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
         }
 
-        const userFinal = await pool.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
+        const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
+
+        await client.query('COMMIT');
 
         return res.json({
             ok: true,
@@ -2162,7 +2170,11 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         });
 
     } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
+        await client.query('ROLLBACK');
+        console.error("❌ Error grave en /mundial/jugar:", err.message);
+        return res.status(500).json({ ok: false, error: "Fallo estructural en la base de datos de la Arena." });
+    } finally {
+        client.release(); // Evita cuellos de botella y errores 503
     }
 });
 
