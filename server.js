@@ -112,8 +112,8 @@ app.use((req, res, next) => {
         req.path.startsWith('/api/mundial') ||       // 🌟 Para los Reyes del Mundo y el contador de tiempo
         req.path.startsWith('/api/mercado') || 
         req.path.startsWith('/api/usuarios/reclamar-diario') ||
-        req.path.startsWith('/api/contratos')
-        
+        req.path.startsWith('/api/contratos') ||
+        req.path.startsWith('/api/usuarios/perfil')
     ) {
         return next();
     }
