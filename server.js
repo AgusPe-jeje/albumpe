@@ -2990,23 +2990,34 @@ app.post('/api/timba/quiniela', verificarToken, async (req, res) => {
 // ========================================================================
 // 🏅 ENDPOINTS SEGUROS PARA EL SISTEMA DE MISIONES DIARIAS (CONEXIÓN NEON)
 // ========================================================================
+// 🎯 CATÁLOGO OFICIAL DE MISIONES ROTATIVAS DE LA ARENA
+const POOL_MISIONES_DISPONIBLES = [
+    { descripcion: "Abre 3 sobres de cualquier tipo en la tienda", tipo: "sobres", meta: 3, recompensa: 150 },
+    { descripcion: "Abre 7 sobres para expandir tu plantel", tipo: "sobres", meta: 7, recompensa: 300 },
+    { descripcion: "Ganá 5 tandas de penales contra la IA", tipo: "penales", meta: 5, recompensa: 200 },
+    { descripcion: "Anotá 10 goles en total pateando penales", tipo: "goles_penales", meta: 10, recompensa: 150 },
+    { descripcion: "Conseguí 3 jugadores de rareza Rara o superior", tipo: "jugadores_raros", meta: 3, recompensa: 250 },
+    { descripcion: "Desbloqueá 5 jugadores Comunes nuevos", tipo: "jugadores_comunes", meta: 5, recompensa: 150 },
+    { descripcion: "Llegá a acumular 1,000 monedas de Oro en total", tipo: "acumular_oro", meta: 1000, recompensa: 200 },
+    { descripcion: "Jugá 3 partidos del Mundial", tipo: "mundial_partidos", meta: 3, recompensa: 200 },
+    { descripcion: "Hacé 2 intercambios (trades) de cromos repetidos", tipo: "trades", meta: 2, recompensa: 150 }
+];
 
-// 1. OBTENER LAS MISIONES DIARIAS ACTUALES DEL JUGADOR (CON RESET DIARIO AUTOMÁTICO - FIX STRING PLANO)
+
 app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
-    const usuarioId = req.usuarioLogueado.id; // Sincronizado con tu middleware real
+    const usuarioId = req.usuarioLogueado.id;
     const client = await pool.connect();
 
     try {
         await client.query('BEGIN');
 
-        // 🕵️‍♂️ 1. Control del tiempo real (GMT-3 para la Arena en Buenos Aires)
+        // 1. Control del tiempo real (GMT-3 Buenos Aires)
         const ahora = new Date();
         const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
         const [mes, dia, anio] = ahora.toLocaleDateString('en-US', opcionesFecha).split('/');
-        const fechaHoyString = `${anio}-${mes}-${dia}`; // Formato limpio YYYY-MM-DD sin interferencia de horas
+        const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // 🔑 2. Chequeamos la marca del último reset directamente como formato texto desde PostgreSQL
-        // 🛡️ Al usar TO_CHAR evitamos que JavaScript intente instanciar un Date y le reste 3 horas por desfase UTC
+        // 2. Chequeamos cuándo fue su último reset
         const userCheck = await client.query(
             "SELECT TO_CHAR(ultimo_reset_misiones, 'YYYY-MM-DD') as ultimo_reset FROM usuarios WHERE id = $1",
             [usuarioId]
@@ -3014,33 +3025,40 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
 
         if (userCheck.rows.length === 0) {
             await client.query('ROLLBACK');
-            return res.status(404).json({ ok: false, error: "Usuario no encontrado en la Arena." });
+            return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
         }
 
-        // Leemos la string plana pura del registro (Ej: '2026-06-29' o null)
         const fechaUltimoResetString = userCheck.rows[0].ultimo_reset;
 
-        // ♻️ 3. EL DISPARADOR DEL RESET: Si nunca reseteó o si cambió la fecha del calendario local
+        // ♻️ 3. GATILLO DEL RESET DIARIO CON ROTACIÓN DE CARTELERA
         if (!fechaUltimoResetString || fechaUltimoResetString !== fechaHoyString) {
             
-            // Ponemos a 0 el progreso de todas las misiones de tu tabla 'usuario_misiones'
-            await client.query(`
-                UPDATE usuario_misiones 
-                SET progreso = 0, reclamada = FALSE, actualizado_en = NOW()
-                WHERE usuario_id = $1
-            `, [usuarioId]);
+            // A. Borramos las misiones viejas del usuario para hacer lugar
+            await client.query("DELETE FROM usuario_misiones WHERE usuario_id = $1", [usuarioId]);
 
-            // Guardamos la marca de hoy en el usuario para bloquear nuevos resets hasta mañana
-            await client.query(`
-                UPDATE usuarios 
-                SET ultimo_reset_misiones = $1 
-                WHERE id = $2
-            `, [fechaHoyString, usuarioId]);
+            // B. Algoritmo rápido para mezclar el catálogo de misiones y agarrar 3 distintas
+            const misionesMezcladas = [...POOL_MISIONES_DISPONIBLES].sort(() => 0.5 - Math.random());
+            const misionesSeleccionadas = misionesMezcladas.slice(0, 3); // Nos quedamos con las primeras 3 al azar
 
-            console.log(`♻️ ¡Silbatazo de medianoche! Cartelera reseteada a 0 para el usuario ${usuarioId} (Fecha: ${fechaHoyString})`);
+            // C. Las inyectamos en la base de datos asignándoles un mision_id incremental (1, 2, 3)
+            for (let index = 0; index < misionesSeleccionadas.length; index++) {
+                const m = misionesSeleccionadas[index];
+                await client.query(`
+                    INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada, actualizado_en)
+                    VALUES ($1, $2, $3, $4, 0, $5, $6, FALSE, NOW())
+                `, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa]);
+            }
+
+            // D. Actualizamos la marca del calendario en el usuario
+            await client.query(
+                "UPDATE usuarios SET ultimo_reset_misiones = $1 WHERE id = $2", 
+                [fechaHoyString, usuarioId]
+            );
+
+            console.log(`♻️ ¡Cartelera Rotada! Se inyectaron 3 misiones nuevas al azar para el usuario ${usuarioId}`);
         }
 
-        // 4. Traemos los datos frescos (Ya sea limpios o en progreso de hoy)
+        // 4. Traemos los datos frescos generados para el día de hoy
         const resultado = await client.query(
             "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
             [usuarioId]
@@ -3051,8 +3069,8 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error("❌ Error en /misiones/obtener con reset dinámico:", err.message);
-        res.status(500).json({ error: "Error en el servidor al cargar u optimizar misiones." });
+        console.error("❌ Error al rotar cartelera de misiones:", err.message);
+        res.status(500).json({ error: "Error interno al procesar las misiones diarias." });
     } finally {
         client.release();
     }
