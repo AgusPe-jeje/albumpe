@@ -7,6 +7,7 @@ const URL_BASE = `${URL_RENDER_SERVICIO}/api`;
 
 // Estados del Usuario y Configuración de Sesión
 let usuarioActual = null;
+window.usuarioVisitaId = null;
 let albumCompleto = [];
 let paisSeleccionado = "";
 
@@ -3821,6 +3822,13 @@ async function inspeccionarPerfilRival(usuarioId) {
 
           const rival = data.perfil; // 🟢 Sincronizado con la propiedad 'perfil' de tu backend
 
+          // 📌 ASIGNACIÓN CLAVE: Guardamos el ID del rival que estamos visitando para el botón "Firmar" del HTML
+          window.usuarioVisitaId = parseInt(usuarioId);
+
+          // 🔓 CONTROL FORMULARIO: Si visito a otro, me aseguro de mostrar la caja para escribir
+          const cajaFormulario = document.getElementById("caja-formulario-firma");
+          if (cajaFormulario) cajaFormulario.style.display = "flex";
+
           // 1. Datos Principales (Header del Visitante)
           const txtUsername = document.getElementById("rival-txt-username");
           if (txtUsername) {
@@ -3871,11 +3879,15 @@ async function inspeccionarPerfilRival(usuarioId) {
                divAvatar.innerText = ""; // Limpiamos el emoji base
           }
 
-          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL (Guardado opcional en BD o fallback por ahora)
+          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL
           const contenedorDestacado = document.getElementById("rival-contenedor-destacado");
           if (contenedorDestacado) {
-               // Por el momento, como las insignias son locales, dejamos el cartel o el cromo si decidís subirlo a la DB luego
                contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">Inspeccionando facha del competidor en tiempo real...</p>`;
+          }
+
+          // ✍️ CARGA DE FIRMAS: Traemos el muro de la DB exclusivo para el rival inspeccionado
+          if (typeof cargarFirmasDelPerfil === "function") {
+               cargarFirmasDelPerfil(usuarioId);
           }
 
           // Mostramos el modal dándole display block
@@ -3913,6 +3925,10 @@ async function actualizarMiPerfilUI() {
         if (!data.ok || !data.perfil) return;
 
         const perfil = data.perfil;
+
+        // 🔒 CONTROL FORMULARIO: Al ver MI PROPIO perfil, escondemos la caja para evitar auto-firmas
+        const cajaFormulario = document.getElementById("caja-formulario-firma");
+        if (cajaFormulario) cajaFormulario.style.display = "none";
 
         // 1. Datos Principales (Header)
         const txtUsername = document.getElementById("perfil-txt-username");
@@ -3958,6 +3974,11 @@ async function actualizarMiPerfilUI() {
             divAvatar.style.backgroundSize = "cover";
             divAvatar.style.backgroundPosition = "center";
             divAvatar.innerText = "";
+        }
+
+        // ✍️ CARGA DE FIRMAS: Traemos las firmas de mi propio muro para exhibirlas
+        if (typeof cargarFirmasDelPerfil === "function") {
+             cargarFirmasDelPerfil(usuarioActual.id);
         }
 
     } catch (err) {
@@ -4218,9 +4239,13 @@ async function equiparAvatarDesdeTienda(fotoId) {
 // ========================================================================
 
 async function cargarFirmasDelPerfil(perfilId) {
-    const contenedor = document.getElementById("contenedor-lista-firmas");
+    // 🔍 Seleccionamos dinámicamente el contenedor correcto según el ID del muro
+    const esMiMuro = usuarioActual && usuarioActual.id === parseInt(perfilId);
+    const idContenedor = esMiMuro ? "mi-contenedor-lista-firmas" : "contenedor-lista-firmas";
+
+    const contenedor = document.getElementById(idContenedor);
     if (!contenedor) return;
-    contenedor.innerHTML = "<p style='color: #64748b;'>Cargando dedicatorias...</p>";
+    contenedor.innerHTML = "<p style='color: #64748b; font-size: 0.9rem;'>Cargando dedicatorias...</p>";
 
     try {
         const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
@@ -4230,7 +4255,12 @@ async function cargarFirmasDelPerfil(perfilId) {
         const data = await res.json();
 
         if (!data.ok || data.firmas.length === 0) {
-            contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem;'>Nadie firmó este muro todavía. ¡Sé el primero! 🚀</p>";
+            // Cartel inteligente si el muro está en 0 firmas
+            if (esMiMuro) {
+                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó tu vestuario todavía. ¡Hacete notar en las tablas para que vengan! 📋</p>";
+            } else {
+                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó este muro todavía. ¡Sé el primero en dejar tu marca! 🚀</p>";
+            }
             return;
         }
 
@@ -4270,6 +4300,7 @@ async function cargarFirmasDelPerfil(perfilId) {
 
     } catch (err) {
         console.error("❌ Fallo de red en firmas:", err);
+        contenedor.innerHTML = "<p style='color: #ef4444; text-align: center; font-size: 0.85rem;'>📡 Error al conectar con el servidor de firmas.</p>";
     }
 }
 
