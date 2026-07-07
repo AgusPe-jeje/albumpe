@@ -41,27 +41,7 @@ function generarCodigoSala() {
 }
 
 /* ========================================================================
-   🛡️ MIDDLEWARE CORE: VERIFICACIÓN DE TOKEN JWT
-   ======================================================================== */
-const verificarToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
-
-    if (!token) {
-        return res.status(401).json({ ok: false, error: "🔒 Acceso denegado. Iniciá sesión en la Arena." });
-    }
-
-    try {
-        const verificado = jwt.verify(token, JWT_SECRET);
-        req.usuarioLogueado = verificado; // Guardamos id y username descifrados en la petición
-        next();
-    } catch (err) {
-        return res.status(403).json({ ok: false, error: "❌ Sesión inválida o expirada. Volvé a loguearte." });
-    }
-};
-
-/* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
+   🛠️ MIDDLEWARE CORE V3: MODO MANTENIMIENTO CON DESENCRIPTACIÓN ATÓMICA
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -71,26 +51,24 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // A. Permitimos descargar los archivos estáticos para que cargue la interfaz visual a cualquiera
+    // A. Permitir descarga de archivos estáticos obligatorios
     if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
-    // B. Filtro estricto para las rutas de autenticación (Login)
+    // B. Rutas de Login (Verificación por Body)
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
-        
         if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
             return next();
         }
-        
         return res.status(503).json({ 
             ok: false,
             error: "🚧 La Arena está en mantenimiento por reformas de infraestructura. ¡Volvé más tarde, pa! 🏗️" 
         });
     }
 
-    // Bloqueamos el registro por completo en mantenimiento
+    // Bloqueo total de registros en mantenimiento
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
             ok: false,
@@ -98,27 +76,39 @@ app.use((req, res, next) => {
         });
     }
 
-    // C. 🛡️ FILTRO DE CONTROL PARA LOGUEADOS (TESTERS)
-    // Si viene con un token válido en la cabecera, le damos paso libre a cualquier endpoint interno
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.split(' ')[1]) {
-        return next(); // Es un tester con sesión iniciada (puede ver perfil, sobres, trading, mundial, etc.)
-    }
-
-    // D. 📢 EXCEPCIONES PÚBLICAS (Solo rutas que DE VERDAD se pueden ver sin estar logueado)
+    // 📢 EXCEPCIONES PÚBLICAS RECOLECCIÓN (Rutas permitidas sin login y sin mantenimiento)
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
-        req.path.startsWith('/api/ranking') ||
-        req.path.startsWith('/api/usuarios/opciones-avatar-inicial') // Para que se vea la tabla de posiciones general
+        req.path.startsWith('/api/usuarios/opciones-avatar-inicial')
     ) {
         return next();
     }
 
-    // E. Si no cumplió ninguna condición anterior, rebota por mantenimiento
+    // C. 🛡️ FILTRO PRESTIGIADO PARA LOGUEADOS: DESENCRIPTACIÓN Y VALIDACIÓN REAL DE TESTER
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+        try {
+            // Desencriptamos el JWT usando tu Secret Key oficial
+            const decodificado = jwt.verify(token, JWT_SECRET);
+            
+            // Verificamos si el username encriptado es un tester autorizado
+            if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
+                return next(); // Es un tester real y verificado, pase libre
+            }
+        } catch (err) {
+            // Si el token es inválido o expiró, lo tratamos como usuario común (va al rebote 503)
+            console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
+        }
+    }
+
+    // D. Si no es un tester verificado o no es una ruta pública, rebote general estructurado
     return res.status(503).json({ 
         ok: false,
-        error: "🚧 La Arena está en mantenimiento por reformas de infraestructura." 
+        mantenimiento: true, // Flag útil para que tu front sepa qué pasa
+        error: "🚧 La Arena está en mantenimiento por reformas de infraestructura. Acceso exclusivo para Testers oficiales." 
     });
 });
 
