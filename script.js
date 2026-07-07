@@ -89,10 +89,7 @@ function cambiarModulo(idModulo, botonPresionado) {
           if (typeof actualizarHistorialTransferenciasUI === "function") {
                actualizarHistorialTransferenciasUI();
           }
-
-          if (idModulo === 'modulo-perfil' && usuarioActual) { // <- Reemplazá 'modulo-perfil' por el ID real de tu contenedor
-                if (typeof actualizarPerfilUI === "function") actualizarPerfilUI();
-            }
+          
      }
      
      // 🦾 GATILLO DE ENTRADA: Al entrar al sector de Contratos SBC, inicializamos el panel del Bot Comerciante
@@ -121,6 +118,10 @@ function cambiarModulo(idModulo, botonPresionado) {
              cargarPartidosQuinielaUI();
             }
      }   
+     // 👤 GATILLO DE ENTRADA: Al entrar a Mi Perfil, traemos los datos de la base de datos en tiempo real
+     if (idModulo === 'modulo-perfil' && usuarioActual) { // 👈 Cambiá 'modulo-perfil' por el ID de tu sección
+          actualizarMiPerfilUI();
+     }
 
 }
 
@@ -3632,6 +3633,72 @@ async function inspeccionarPerfilRival(usuarioId) {
           // Opcional: cerrar el modal automáticamente si falla
           document.getElementById("modal-perfil-visitante").style.display = "none";
      }
+}
+
+
+async function actualizarMiPerfilUI() {
+    if (!usuarioActual || !usuarioActual.id) return;
+
+    try {
+        // Hacemos el fetch al endpoint maestro que me pasaste
+        const res = await fetch(`${URL_BASE}/api/usuarios/perfil/${usuarioActual.id}`);
+        const data = await res.json();
+
+        if (!data.ok) {
+            console.error("No se pudo obtener la info de la Arena:", data.mensaje);
+            return;
+        }
+
+        const perfil = data.perfil;
+
+        // 1. Inyectamos el Nombre de Usuario (arriba de todo)
+        const txtUsername = document.getElementById("visitante-txt-username");
+        if (txtUsername) {
+            txtUsername.innerText = perfil.nombre.toUpperCase();
+        }
+
+        // 2. Cargamos las Estadísticas Generales
+        const txtPuntos = document.getElementById("visitante-txt-puntos");
+        if (txtPuntos) txtPuntos.innerText = perfil.puntosRanking || 0;
+
+        const txtMonedas = document.getElementById("visitante-txt-monedas"); // Si tenés este casillero
+        if (txtMonedas) txtMonedas.innerText = perfil.monedas || 0;
+
+        // 3. Renderizamos el Porcentaje total del Álbum
+        const txtProgreso = document.getElementById("visitante-txt-progreso");
+        if (txtProgreso) {
+            txtProgreso.innerText = perfil.estadisticasAlbum.porcentajeCompletado + "%";
+        }
+
+        // 4. Llenamos los contadores específicos por Rareza
+        const txtComunes = document.getElementById("visitante-txt-comunes");
+        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum.comunes || 0;
+
+        const txtRaras = document.getElementById("visitante-txt-raras");
+        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum.raras || 0;
+
+        const txtEpicas = document.getElementById("visitante-txt-epicas");
+        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum.epicas || 0;
+
+        const txtLegendarias = document.getElementById("visitante-txt-legendarias");
+        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum.legendarias || 0;
+
+        // 5. Estadísticas de la Timba
+        const txtTimbaJugadas = document.getElementById("visitante-txt-timba-jugadas");
+        if (txtTimbaJugadas) txtTimbaJugadas.innerText = perfil.estadisticasTimba.jugadas || 0;
+
+        const txtTimbaEfectividad = document.getElementById("visitante-txt-timba-efectividad");
+        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = perfil.estadisticasTimba.porcentajeEfectividad + "%";
+
+        // 6. Actualizamos el Avatar o Bandera activa
+        const imgAvatar = document.getElementById("visitante-img-avatar"); // O el ID que tenga la etiqueta <img> del perfil
+        if (imgAvatar) {
+            imgAvatar.src = perfil.foto;
+        }
+
+    } catch (err) {
+        console.error("❌ Fallo en la comunicación con la Arena:", err);
+    }
 }
 
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
