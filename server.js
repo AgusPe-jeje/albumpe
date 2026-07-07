@@ -55,7 +55,7 @@ const verificarToken = (req, res, next) => {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (FIXED DEFINITIVO)
    ======================================================================== */
-const MODO_MANTENIMIENTO = true; 
+const MODO_MANTENIMIENTO = false; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
 
 app.use((req, res, next) => {
@@ -125,19 +125,9 @@ app.use(express.static(path.join(__dirname)));
 /* ========================================================================
    📦 CONFIGURACIÓN, INICIALIZACIÓN Y CARGA DE BASE DE DATOS (NEON)
    ======================================================================== */
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } 
-});
-
-pool.query('SELECT NOW()', (err, res) => {
-    if (err) console.error('❌ Error de conexión a Neon:', err.message);
-    else console.log('📦 Conectado con éxito a PostgreSQL en Neon.');
-});
-
 async function inicializarTablas() {
     try {
-        // 1. Tabla de Usuarios
+        // 1. Tabla de Usuarios (Actualizada con foto_perfil_id y acumuladores de timba)
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -150,7 +140,28 @@ async function inicializarTablas() {
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             timbas_hoy INTEGER DEFAULT 10,
             copas_mundiales INTEGER DEFAULT 0, 
-            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL
+            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            ultimo_reset_misiones VARCHAR(10) DEFAULT NULL,
+            racha_login INTEGER DEFAULT 0,
+            ultimo_login_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            foto_perfil_id INTEGER DEFAULT 1, -- 📸 Link directo al avatar activo
+            timbas_jugadas INTEGER DEFAULT 0, -- 📊 Estadísticas acumuladas para el perfil
+            timbas_ganadas_exacto INTEGER DEFAULT 0,
+            timbas_ganadas_signo INTEGER DEFAULT 0
+        )`);
+
+        // 📸 1.5. MÓDULO NUEVO: Tabla de Catálogo de Fotos de Perfil
+        await pool.query(`CREATE TABLE IF NOT EXISTS fotos_perfil (
+            id SERIAL PRIMARY KEY,
+            nombre VARCHAR(100) NOT NULL,
+            ruta_jpg VARCHAR(255) NOT NULL
+        )`);
+
+        // 🔏 1.6. MÓDULO NUEVO: Tabla Intermedia de posesión de Avatares (Anti-Hackeo de sobres)
+        await pool.query(`CREATE TABLE IF NOT EXISTS usuario_fotos_perfil (
+            usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+            foto_id INTEGER REFERENCES fotos_perfil(id) ON DELETE CASCADE,
+            PRIMARY KEY (usuario_id, foto_id)
         )`);
 
         // 2. Tabla de Jugadores
@@ -179,6 +190,17 @@ async function inicializarTablas() {
             jugador_id INTEGER REFERENCES jugadores(id),
             precio_oro INTEGER NOT NULL,
             fecha_publicacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )`);
+
+        // 4.5. Tabla de Historial Comercial Global (Requisito para tu endpoint /mercado/historial)
+        await pool.query(`CREATE TABLE IF NOT EXISTS historial_transferencias (
+            id SERIAL PRIMARY KEY,
+            vendedor_username VARCHAR(50) NOT NULL,
+            comprador_username VARCHAR(50) NOT NULL,
+            jugador_nombre VARCHAR(100) NOT NULL,
+            rareza VARCHAR(20) NOT NULL,
+            precio_oro INTEGER NOT NULL,
+            fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )`);
 
         // 5. Tabla de las Salas Multijugador
@@ -212,7 +234,7 @@ async function inicializarTablas() {
             fecha_jugada TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )`);
 
-        // 🔥 8. MÓDULO NUEVO: Tabla de Control de Objetivos Diarios
+        // 8. Tabla de Control de Objetivos Diarios
         await pool.query(`CREATE TABLE IF NOT EXISTS usuario_misiones (
             id SERIAL PRIMARY KEY,
             usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -227,11 +249,59 @@ async function inicializarTablas() {
             CONSTRAINT uq_usuario_mision UNIQUE (usuario_id, mision_id)
         )`);
 
-        // ⚡ Indexación de alta velocidad para acelerar el login de los jugadores
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_usuario_misiones_uid ON usuario_misiones(usuario_id)`);
 
-        console.log('🏟️ Todas las tablas del coliseo fueron inicializadas con éxito en Neon.');
+        console.log('Stadium Init: 🏟️ Todas las tablas de la Arena Online inicializadas con éxito en Neon.');
 
+        // ========================================================================
+        // 🚀 SEED DIAL: CARGA DE AVATARES DE PERFIL (Formato _pais.jpg)
+        // ========================================================================
+        const checkFotos = await pool.query("SELECT COUNT(*) as count FROM fotos_perfil");
+        if (parseInt(checkFotos.rows[0].count) === 0) {
+            const listaFotosPerfil = [
+                ['Por Defecto', 'fotos/_defecto.jpg'],
+                ['Alemania Clásica', 'fotos/_alemania.jpg'],
+                ['Argentina Campeón', 'fotos/_argentina.jpg'],
+                ['Australia', 'fotos/_australia.jpg'],
+                ['Bélgica', 'fotos/_belgica.jpg'],
+                ['Brasil Joga Bonito', 'fotos/_brasil.jpg'],
+                ['Canadá', 'fotos/_canada.jpg'],
+                ['Catar', 'fotos/_catar.jpg'],
+                ['Colombia Cafetera', 'fotos/_colombia.jpg'],
+                ['Corea del Sur', 'fotos/_corea_del_sur.jpg'],
+                ['Costa de Marfil', 'fotos/_costa_de_marfil.jpg'],
+                ['Curazao', 'fotos/_curazao.jpg'],
+                ['Ecuador', 'fotos/_ecuador.jpg'],
+                ['Egipto Faraónico', 'fotos/_egiptto.jpg'],
+                ['España Furia Roja', 'fotos/_espana.jpg'],
+                ['Estados Unidos', 'fotos/_estados_unidos.jpg'],
+                ['Ghana', 'fotos/_ghana.jpg'],
+                ['Irak', 'fotos/_irak.jpg'],
+                ['Irán', 'fotos/_iran.jpg'],
+                ['Inglaterra Lions', 'fotos/_inglaterra.jpg'],
+                ['Japón Samurái', 'fotos/_japon.jpg'],
+                ['Marruecos', 'fotos/_marruecos.jpg'],
+                ['México Lindo', 'fotos/_mexico.jpg'],
+                ['Noruega Vikinga', 'fotos/_noruega.jpg'],
+                ['Países Bajos Naranja', 'fotos/_paises_bajos.jpg'],
+                ['Panamá Canalero', 'fotos/_panama.jpg'],
+                ['Paraguay Guaraní', 'fotos/_paraguay.jpg'],
+                ['Portugal Comandante', 'fotos/_portugal.jpg'],
+                ['Senegal', 'fotos/_senegal.jpg'],
+                ['Suiza Relojera', 'fotos/_suiza.jpg'],
+                ['Túnez', 'fotos/_tunez.jpg'],
+                ['Uruguay Garra Charrúa', 'fotos/_uruguay.jpg'],
+                ['Uzbekistán', 'fotos/_uzbekistan.jpg']
+            ];
+
+            for (const fp of listaFotosPerfil) {
+                await pool.query(
+                    "INSERT INTO fotos_perfil (nombre, ruta_jpg) VALUES ($1, $2)",
+                    [fp[0], fp[1]]
+                );
+            }
+            console.log(`📸 [AVATARES] Catálogo de ${listaFotosPerfil.length} banderas inicializado con éxito.`);
+        }
         const checkJugadores = await pool.query("SELECT COUNT(*) as count FROM jugadores");
         if (parseInt(checkJugadores.rows[0].count) === 0) {
             // 📝 Lista vacía para que le agregues tus jugadores cuando quieras, Momito
@@ -890,6 +960,104 @@ async function inicializarTablas() {
                     ['Ryan Thomas', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_thomas.jpg', 'comun'], //
                     ['Francis de Vries', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_vries.jpg', 'comun'], //
                     ['Chris Wood', 'Nueva Zelanda', '🇳🇿', 'Delantero', 'fotos/zel_wood.jpg', 'legendaria'], //
+
+// --- CURAZAO ---
+                    ['Jeremy Antonisse', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_antonisse.jpg', 'comun'],
+                    ['Juninho Bacuna', 'Curazao', '🇨🇼', 'Mediocampista', 'fotos/cur_bacuna.jpg', 'legendaria'],
+                    ['Joshua Brenet', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_brenet.jpg', 'epica'],
+                    ['Roshon van Eijma', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_eijima.jpg', 'comun'],
+                    ['Shuriqi Floranus', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_floranus.jpg', 'rara'],
+                    ['Jurien Gaari', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_gaari.jpg', 'comun'],
+                    ['Kenji Gorré', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_gorre.jpg', 'rara'],
+                    ['Sontje Hansen', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_hansen.jpg', 'rara'],
+                    ['Gervane Kastaneer', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_kastaneer.jpg', 'comun'],
+                    ['Jürgen Locadia', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_locadia.jpg', 'epica'],
+                    ['Jearl Margaritha', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_margaritha.jpg', 'comun'],
+                    ['Armando Obispo', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_obispo.jpg', 'epica'],
+                    ['Godfried Roemeratoe', 'Curazao', '🇨🇼', 'Mediocampista', 'fotos/cur_roemeratoe.jpg', 'comun'],
+                    ['Eloy Room', 'Curazao', '🇨🇼', 'Arquero', 'fotos/cur_room.jpg', 'epica'],
+
+
+// --- GHANA ---
+                    ['Osman Bukari', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_bukari.jpg', 'comun'],
+                    ['Alexander Djiku', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_djiku.jpg', 'rara'],
+                    ['Abdul Fatawu', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_fatawu.jpg', 'rara'],
+                    ['Tariq Lamptey', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_lamptey.jpg', 'comun'],
+                    ['Joseph Paintsil', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_paintsil.jpg', 'comun'],
+                    ['Thomas Partey', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_partey.jpg', 'legendaria'],
+                    ['Mohammed Salisu', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_salisu.jpg', 'rara'],
+                    ['Salis Abdul Samed', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_samed.jpg', 'comun'],
+                    ['Alidu Seidu', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_seidu.jpg', 'comun'],
+                    ['Antoine Semenyo', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_semenyo.jpg', 'rara'],
+                    ['Kamaldeen Sulemana', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_sulemana.jpg', 'comun'],
+                    ['Salis Virenkyi', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_virenkyi.jpg', 'comun'],
+                    ['Iñaki Williams', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_williams.jpg', 'epica'],
+                    ['', '', '', '', '', ''], // Repetido (gha_willians.jpg)
+
+// --- IRÁN ---
+                    ['Sardar Azmoun', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_azmo.jpg', 'epica'],
+                    ['Alireza Beiranvand', 'Irán', '🇮🇷', 'Arquero', 'fotos/ira_beiran.jpg', 'rara'],
+                    ['Rouzbeh Cheshmi', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_chesh.jpg', 'comun'],
+                    ['Saeid Ezatolahi', 'Irán', '🇮🇷', 'Mediocampista', 'fotos/ira_ezato.jpg', 'rara'],
+                    ['Saleh Hardani', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_harda.jpg', 'comun'],
+                    ['Saman Ghoddos', 'Irán', '🇮🇷', 'Mediocampista', 'fotos/ira_hgod.jpg', 'comun'],
+                    ['Alireza Jahanbakhsh', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_jahan.jpg', 'rara'],
+                    ['Hossein Kanaanizadegan', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_kanaa.jpg', 'comun'],
+                    ['Milad Mohammadi', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_mohamma.jpg', 'comun'],
+                    ['Mohammad Mohebi', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_mohebi.jpg', 'comun'],
+                    ['Omid Noorafkan', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_noora.jpg', 'comun'],
+                    ['Morteza Pouraliganji', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_poura.jpg', 'rara'],
+                    ['Mehdi Taremi', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_taremi.jpg', 'legendaria'],
+
+// --- IRAK ---
+                    ['Ali Al-Hamadi', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_alhamadi.jpg', 'rara'],
+                    ['Hussein Ali', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_ali.jpg', 'comun'],
+                    ['Mohanad Ali', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_ali1.jpg', 'epica'],
+                    ['Youssef Amyn', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_amyn.jpg', 'comun'],
+                    ['Ibrahim Bayesh', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_bayesh.jpg', 'rara'],
+                    ['Merchas Doski', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_doski.jpg', 'comun'],
+                    ['Marco Farji', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_garji.jpg', 'comun'],
+                    ['Zaid Tahsin', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_hashem.jpg', 'comun'],
+                    ['Zidane Iqbal', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_iqbal.jpg', 'legendaria'],
+                    ['Ali Jasim', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_jasim.jpg', 'rara'],
+                    ['Osama Rashid', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_rashid.jpg', 'comun'],
+                    ['Danilo Al-Saed', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_sher.jpg', 'comun'],
+                    ['Rebin Sulaka', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_sulaka.jpg', 'rara'],
+                    ['Saad Natiq', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_tahseen.jpg', 'comun'],
+                    ['Amir Al-Ammari', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_younis.jpg', 'rara'],
+
+// --- PANAMÁ ---
+                    ['Yoel Bárcenas', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_barcenas.jpg', 'rara'],
+                    ['César Blackman', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_blackman.jpg', 'comun'],
+                    ['Adalberto Carrasquilla', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_carrasquilla.jpg', 'legendaria'],
+                    ['José Córdoba', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_cordoba.jpg', 'rara'],
+                    ['Eric Davis', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_davis.jpg', 'comun'],
+                    ['Fidel Escobar', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_escobar.jpg', 'rara'],
+                    ['José Fajardo', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_fajardo.jpg', 'comun'],
+                    ['Aníbal Godoy', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_godov.jpg', 'epica'],
+                    ['Carlos Harvey', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_harvey.jpg', 'comun'],
+                    ['Cristian Martínez', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_martinez.jpg', 'comun'],
+                    ['Luis Mejía', 'Panamá', '🇵🇦', 'Arquero', 'fotos/pan_mejia.jpg', 'epica'],
+                    ['Michael Amir Murillo', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_murillo.jpg', 'epica'],
+                    ['Alberto Quintero', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_quintero.jpg', 'comun'],
+                    ['José Luis Rodríguez', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_rodriquez.jpg', 'rara'],
+
+// --- SENEGAL ---
+                    ['Lamine Camara', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_camara.jpg', 'comun'],
+                    ['Boulaye Dia', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_dia.jpg', 'rara'],
+                    ['Habib Diarra', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_diarra.jpg', 'comun'],
+                    ['Krépin Diatta', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_diatta.jpg', 'rara'],
+                    ['Idrissa Gana Gueye', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_gana.jpg', 'epica'],
+                    ['', '', '', '', '', ''], // Repetido (sen_gueye.jpg - Mismo jugador que el anterior)
+                    ['Nicolas Jackson', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_jackson.jpg', 'epica'],
+                    ['Ismail Jakobs', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_jakobs.jpg', 'comun'],
+                    ['Kalidou Koulibaly', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_koulibaly.jpg', 'legendaria'],
+                    ['Édouard Mendy', 'Senegal', '🇸🇳', 'Arquero', 'fotos/sen_mendy.jpg', 'epica'],
+                    ['Iliman Ndiaye', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_ndiaye.jpg', 'rara'],
+                    ['Moussa Niakhaté', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_niakha.jpg', 'rara'],
+                    ['Ismaïla Sarr', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_sarr.jpg', 'rara'],
+                    ['Pape Matar Sarr', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_sarr1.jpg', 'epica'],
+                    ['Abdoulaye Seck', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_seck.jpg', 'comun'],
             ];
 
             for (const j of granListaJugadores) {
@@ -1006,6 +1174,13 @@ app.post('/api/registro', async (req, res) => {
 
         // 3. Respondemos al frontend con éxito total
         return res.json({ mensaje: "Registrado con éxito", usuario: nuevoUsuario.rows[0] });
+
+        // Otorgarle el avatar id: 1 (Por Defecto) en su inventario al registrarse
+        await pool.query(
+            "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, 1) ON CONFLICT DO NOTHING",
+            [nuevoUsuarioId]
+        );
+        console.log(`📸 [PERFIL] Avatar inicial asignado al usuario ID: ${nuevoUsuarioId}`);
 
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -1525,7 +1700,19 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
                     );
 
                     puntosAsignados = (tipoDictamen === 'exacto') ? 30 : 15;
-                    await pool.query("UPDATE usuarios SET puntos_ranking = puntos_ranking + $1 WHERE id = $2", [puntosAsignados, usuario_id]);
+                    let sumExacto = (tipoDictamen === 'exacto') ? 1 : 0;
+                    let sumSigno = (tipoDictamen === 'signo') ? 1 : 0;
+
+                    await pool.query(
+                        `UPDATE usuarios 
+                        SET monedas = monedas + $1, 
+                            puntos_ranking = puntos_ranking + $2,
+                            timbas_jugadas = timbas_jugadas + 1,
+                            timbas_ganadas_exacto = timbas_ganadas_exacto + $3,
+                            timbas_ganadas_signo = timbas_ganadas_signo + $4
+                        WHERE id = $5`, 
+                        [balanceMonedas, puntosAsignados, sumExacto, sumSigno, usuario_id]
+                    );
 
                     if (tipoDictamen === 'exacto') {
                         mensajeResultado = `🔥 ¡PRO DISPARO! Acertaste el exacto (${golesLReal}-${golesVReal}).\n🎁 ¡EVOLUCIÓN! Te ganaste un cromo SUPERIOR: ${cromoGanado.nombre.toUpperCase()} [${cromoGanado.rareza.toUpperCase()}]`;
@@ -3107,6 +3294,188 @@ app.post('/api/contratos/completar', verificarToken, async (req, res) => {
         res.status(500).json({ ok: false, error: "Error interno en los servidores." });
     } finally {
         client.release();
+    }
+});
+
+app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
+    const { usuarioId } = req.params;
+
+    try {
+        // 🧠 Consulta Maestra: Trae datos de usuario, su foto de perfil exclusiva y cuenta las rarezas del álbum
+        const perfilQuery = `
+            SELECT 
+                u.id, 
+                u.nombre_usuario, 
+                u.monedas, 
+                u.puntos_ranking,
+                u.timbas_jugadas,
+                u.timbas_ganadas_exacto,
+                u.timbas_ganadas_signo,
+                fp.ruta_jpg AS foto_perfil,
+                -- Contamos las cartas por rareza en base a lo que tiene stock (> 0)
+                COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END) AS comunes,
+                COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END) AS raras,
+                COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END) AS epicas,
+                COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END) AS legendarias,
+                -- Calculamos el porcentaje completado respecto al total de cartas existentes en el juego
+                ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / (SELECT COUNT(*) FROM jugadores)::NUMERIC) * 100, 2) AS porcentaje_album
+            FROM usuarios u
+            LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id
+            LEFT JOIN usuario_progreso up ON u.id = up.usuario_id
+            LEFT JOIN jugadores j ON up.jugador_id = j.id
+            WHERE u.id = $1
+            GROUP BY u.id, fp.ruta_jpg;
+        `;
+
+        const result = await pool.query(perfilQuery, [usuarioId]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ ok: false, mensaje: "El competidor no existe en la Arena." });
+        }
+
+        const datos = result.rows[0];
+
+        // 📊 Matemática de la Timba en caliente para el Front
+        const victoriasTotales = parseInt(datos.timbas_ganadas_exacto) + parseInt(datos.timbas_ganadas_signo);
+        const porcentajeVictorias = datos.timbas_jugadas > 0 
+            ? Math.round((victoriasTotales / datos.timbas_jugadas) * 100) 
+            : 0;
+
+        return res.json({
+            ok: true,
+            perfil: {
+                id: datos.id,
+                nombre: datos.nombre_usuario,
+                monedas: datos.monedas,
+                puntosRanking: datos.puntos_ranking,
+                foto: datos.foto_perfil || 'fotos/_defecto.jpg',
+                estadisticasAlbum: {
+                    comunes: parseInt(datos.comunes),
+                    raras: parseInt(datos.raras),
+                    epicas: parseInt(datos.epicas),
+                    legendarias: parseInt(datos.legendarias),
+                    porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0
+                },
+                estadisticasTimba: {
+                    jugadas: parseInt(datos.timbas_jugadas),
+                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto),
+                    ganadasSigno: parseInt(datos.timbas_ganadas_signo),
+                    porcentajeEfectividad: porcentajeVictorias
+                }
+            }
+        });
+
+    } catch (err) {
+        console.error("❌ Error al obtener perfil:", err.message);
+        return res.status(500).json({ ok: false, mensaje: "Error interno al cargar la cartelera de perfil." });
+    }
+});
+
+app.get('/api/fotos-perfil/mis-avatares', verificarToken, async (req, res) => {
+    const usuario_id = req.usuarioLogueado.id;
+
+    try {
+        // Trae todas las fotos de la base y mete un flag "desbloqueada" (true/false) según el usuario
+        const query = `
+            SELECT fp.id, fp.nombre, fp.ruta_jpg,
+                   CASE WHEN ufp.foto_id IS NOT NULL THEN true ELSE false END AS desbloqueada
+            FROM fotos_perfil fp
+            LEFT JOIN usuario_fotos_perfil ufp ON fp.id = ufp.foto_id AND ufp.usuario_id = $1
+            ORDER BY fp.id ASC;
+        `;
+        const result = await pool.query(query, [usuario_id]);
+        res.json({ ok: true, catalogo: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: "Error al cargar tu catálogo de avatares." });
+    }
+});
+
+app.put('/api/usuarios/cambiar-foto', verificarToken, async (req, res) => {
+    const usuario_id = req.usuarioLogueado.id;
+    const { fotoId } = req.body;
+
+    try {
+        // 🛡️ VALIDACIÓN CRÍTICA: ¿Este usuario realmente desbloqueó esta foto en un sobre?
+        const verificacion = await pool.query(
+            "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
+            [usuario_id, fotoId]
+        );
+
+        if (verificacion.rows.length === 0) {
+            return res.status(403).json({ 
+                ok: false, 
+                mensaje: "❌ No podés equiparte este avatar. ¡Tenés que conseguirlo en un sobre de la tienda!" 
+            });
+        }
+
+        // Si pasó el control, se la equipamos tranqui
+        await pool.query("UPDATE usuarios SET foto_perfil_id = $1 WHERE id = $2", [fotoId, usuario_id]);
+        return res.json({ ok: true, mensaje: "📸 ¡Facha actualizada! Tu nuevo avatar está activo." });
+
+    } catch (err) {
+        return res.status(500).json({ error: "Fallo en la base de datos al actualizar tu foto de perfil." });
+    }
+});
+
+app.post('/api/tienda/sobre-perfil', verificarToken, async (req, res) => {
+    const usuario_id = req.usuarioLogueado.id;
+    const COSTO_SOBRE = 500; // Podés cambiar el precio acá
+
+    try {
+        // 1. Chequeamos si el usuario tiene la tarasca suficiente
+        const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+        if (userCheck.rows[0].monedas < COSTO_SOBRE) {
+            return res.status(400).json({ ok: false, mensaje: "🪙 No tenés suficiente Oro para este sobre de avatares." });
+        }
+
+        // 2. Traemos una foto de perfil completamente al azar de la base de datos
+        const fotoAzarQuery = await pool.query("SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 1");
+        const fotoGanada = fotoAzarQuery.rows[0];
+
+        // 3. Verificamos si el usuario ya la tenía desbloqueada
+        const yaLaTiene = await pool.query(
+            "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
+            [usuario_id, fotoGanada.id]
+        );
+
+        let mensajeResultado = "";
+        let reembolso = 0;
+
+        // Descontamos el costo del sobre de entrada
+        await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [COSTO_SOBRE, usuario_id]);
+
+        if (yaLaTiene.rows.length > 0) {
+            // 🔥 CASO REPETIDO: Le reembolsamos algo de monedas de consuelo
+            reembolso = 200; 
+            await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [reembolso, usuario_id]);
+            mensajeResultado = `🔄 ¡REPETIDA! Ya tenías "${fotoGanada.nombre}". La banca te reembolsa 🪙${reembolso} monedas.`;
+        } else {
+            // 🎉 CASO NUEVO: Se guarda en su colección
+            await pool.query(
+                "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2)",
+                [usuario_id, fotoGanada.id]
+            );
+            mensajeResultado = `📸 ¡NUEVO AVATAR! Conseguiste la foto de perfil: **${fotoGanada.nombre}**`;
+        }
+
+        // Traemos el saldo final de monedas actualizado
+        const saldoFinal = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
+
+        return res.json({
+            ok: true,
+            mensajeResultado,
+            repetida: yaLaTiene.rows.length > 0,
+            foto: {
+                id: fotoGanada.id,
+                nombre: fotoGanada.nombre,
+                ruta_jpg: fotoGanada.ruta_jpg
+            },
+            monedasActuales: saldoFinal.rows[0].monedas
+        });
+
+    } catch (err) {
+        console.error("❌ Error al abrir sobre de perfil:", err.message);
+        return res.status(500).json({ ok: false, mensaje: "Error en el servidor al abrir el sobre." });
     }
 });
 
