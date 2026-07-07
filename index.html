@@ -199,10 +199,10 @@
                         </div>
                         <div style="text-align: left; flex-grow: 1;">
                             <div style="display: flex; align-items: baseline; gap: 15px; flex-wrap: wrap;">
-                                <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 2.2rem; letter-spacing: 1px;">AGUSPE</h2>
+                                <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 2.2rem; letter-spacing: 1px;">-</h2>
                                 <span id="perfil-txt-progreso-total" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.3rem; font-weight: bold;">0% COMPLETADO</span>
                             </div>
-                            <p id="perfil-txt-rango" style="color: var(--celeste); margin: 6px 0 0 0; font-weight: bold; font-size: 0.95rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: DEBUTANTE (45 PTS)</p>
+                            <p id="perfil-txt-rango" style="color: var(--celeste); margin: 6px 0 0 0; font-weight: bold; font-size: 0.95rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: -</p>
                             
                             <button type="button" onclick="abrirCatalogoAvataresUI()" class="btn-estadio" style="margin-top: 12px; padding: 6px 14px; font-size: 0.8rem; background: #1e293b; color: var(--celeste); border: 1px solid var(--celeste); border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Oswald'; letter-spacing: 0.5px; transition: all 0.2s;">
                                 📸 CAMBIAR AVATAR
@@ -211,9 +211,8 @@
                     </div>
 
                     <div id="perfil-panel-avatares" style="display: none; background: rgba(2,6,23,0.85); border: 2px dashed var(--celeste); padding: 20px; border-radius: 12px; margin: 20px 0; position: relative; z-index: 100;">
-                        <h4 style="color: #fff; margin: 0 0 15px 0; font-size: 0.95rem; font-family: 'Oswald'; text-align: left; letter-spacing: 0.5px; color: var(--dorado);">SELECT YOUR AVATAR (Hacé click en uno desbloqueado)</h4>
-                        <div id="perfil-grilla-avatares" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; min-height: 50px;">
-                            </div>
+                        <h4 style="color: var(--dorado); margin: 0 0 15px 0; font-size: 0.95rem; font-family: 'Oswald'; text-align: left; letter-spacing: 0.5px;">SELECT YOUR AVATAR (Hacé click en uno desbloqueado)</h4>
+                        <div id="perfil-grilla-avatares" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; min-height: 50px;"></div>
                     </div>
 
                     <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 COLECCIÓN EN PROGRESO (CROMOS EN PROPIEDAD)</h3>
@@ -255,27 +254,20 @@
                         </div>
                     </div>
 
-                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 0 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
-
-                    <div class="caja-modulo-estadio" style="margin-top: 25px; padding: 20px;">
-                        <h3 style="font-family: 'Oswald'; color: #fff; font-size: 1.3rem; text-align: left; margin: 0 0 15px 0; letter-spacing: 1px; text-transform: uppercase;">
-                            ✍️ Muro de Firmas de la Arena
-                        </h3>
-
-                        <div id="caja-formulario-firma" style="display: flex; gap: 10px; margin-bottom: 20px;">
-                            <input type="text" id="input-mensaje-firma" maxlength="140" placeholder="Dejá tu firma en este vestuario (máx 140 letras)..." style="flex-grow: 1; padding: 10px 15px; border-radius: 8px; border: 1px solid #1e293b; background: #020617; color: #fff; font-size: 0.9rem;">
-                            <button onclick="enviarNuevaFirma(usuarioVisitaId)" class="btn-estadio" style="background: var(--celeste); color: #fff; font-weight: bold; font-size: 0.85rem; padding: 0 15px;">Firmar</button>
-                        </div>
-
-                        <div id="contenedor-lista-firmas" style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
-                            </div>
-                    </div>
-                    
-                    <div style="background: rgba(2, 6, 23, 0.4); border: 1px solid #1e293b; padding: 15px; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 150px;">
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
+                    <div style="background: rgba(2, 6, 23, 0.4); border: 1px solid #1e293b; padding: 15px; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 150px; margin-bottom: 25px;">
                         <div id="perfil-contenedor-destacado">
                             <p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>
                         </div>
                     </div>
+
+                    <div style="border-top: 1px solid #1e293b; padding-top: 25px; text-align: left;">
+                        <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin: 0 0 15px 0; letter-spacing: 0.5px;">📜 TU TABLÓN DE FIRMAS RECIBCIDAS</h3>
+                        
+                        <div id="mi-contenedor-lista-firmas" style="max-height: 300px; overflow-y: auto; padding-right: 5px;">
+                            </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -809,11 +801,24 @@
             </div>
 
             <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 0 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
-            <div style="background: rgba(2, 6, 23, 0.4); border: 1px solid #1e293b; padding: 15px; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 150px;">
+            <div style="background: rgba(2, 6, 23, 0.4); border: 1px solid #1e293b; padding: 15px; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 150px; margin-bottom: 25px;">
                 <div id="rival-contenedor-destacado">
                     <p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>
                 </div>
             </div>
+
+            <div style="border-top: 1px solid #1e293b; padding-top: 25px; text-align: left;">
+                <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin: 0 0 15px 0; letter-spacing: 0.5px;">✍️ MURO DE FIRMAS DE VISITANTES</h3>
+                
+                <div id="caja-formulario-firma" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                    <input type="text" id="input-mensaje-firma" maxlength="140" placeholder="Dejá tu firma en este vestuario (máx 140 letras)..." style="flex-grow: 1; padding: 10px 15px; border-radius: 8px; border: 1px solid #1e293b; background: #020617; color: #fff; font-size: 0.9rem;">
+                    <button onclick="enviarNuevaFirma(window.usuarioVisitaId)" class="btn-estadio" style="background: var(--celeste); color: #fff; font-weight: bold; font-size: 0.85rem; padding: 0 15px;">Firmar</button>
+                </div>
+
+                <div id="contenedor-lista-firmas" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                    </div>
+            </div>
+
         </div>
     </div>
 
