@@ -2235,7 +2235,17 @@ async function cargarRankingLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               tr.innerHTML = `<td><b>${posicionText}</b></td><td style="text-align: left; padding-left: 15px;">${user.username} ${usuarioActual && user.username === usuarioActual.username ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}</td><td style="color: #ff4a4a; font-weight: bold;">${user.puntos_ranking}</td>`;
+               // Se añade interactividad al hacer clic en el nombre del usuario
+               tr.innerHTML = `
+                    <td><b>${posicionText}</b></td>
+                    <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
+                        onclick="inspeccionarPerfilRival('${user.username}')"
+                        onmouseover="this.style.color='var(--celeste)'" 
+                        onmouseout="this.style.color='#fff'">
+                        👤 ${user.username} ${usuarioActual && user.username === usuarioActual.username ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
+                    </td>
+                    <td style="color: #ff4a4a; font-weight: bold;">${user.puntos_ranking}</td>
+               `;
                tbody.appendChild(tr);
           });
      } catch (err) { console.error(err); }
@@ -2263,7 +2273,17 @@ async function cargarRankingMundialesLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               tr.innerHTML = `<td><b>${posicionText}</b></td><td style="text-align: left; padding-left: 15px;">${user.username.toUpperCase()} ${usuarioActual && user.username === usuarioActual.username ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}</td><td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales}</td>`;
+               // Se añade interactividad al hacer clic en el nombre del usuario
+               tr.innerHTML = `
+                    <td><b>${posicionText}</b></td>
+                    <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
+                        onclick="inspeccionarPerfilRival('${user.id}')"
+                        onmouseover="this.style.color='var(--celeste)'" 
+                        onmouseout="this.style.color='#fff'">
+                        👤 ${user.username} ${usuarioActual && user.id === usuarioActual.id ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
+                    </td>
+                    <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales}</td>
+               `;
                tbody.appendChild(tr);
           });
      } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
@@ -3183,7 +3203,6 @@ const AudioArena = {
 
     init() {
         if (!this.ctx) {
-            // Inicializa el contexto de audio compartida de forma perezosa
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
         }
     },
@@ -3193,7 +3212,6 @@ const AudioArena = {
             this.init();
             if (!this.ctx) return;
             
-            // Si el contexto está suspendido (regla del navegador), lo despertamos
             if (this.ctx.state === 'suspended') {
                 this.ctx.resume();
             }
@@ -3201,12 +3219,11 @@ const AudioArena = {
             const ahora = this.ctx.currentTime;
 
             if (tipo === 'monedas') {
-                // 🪙 EFECTO MONEDAS: Dos pulsos rápidos agudos metálicos
                 [0, 0.08].forEach((delay) => {
                     const osc = this.ctx.createOscillator();
                     const gain = this.ctx.createGain();
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(delay === 0 ? 880 : 1200, ahora + delay); // Nota alta
+                    osc.frequency.setValueAtTime(delay === 0 ? 880 : 1200, ahora + delay);
                     
                     gain.gain.setValueAtTime(0.15, ahora + delay);
                     gain.gain.exponentialRampToValueAtTime(0.001, ahora + delay + 0.2);
@@ -3218,7 +3235,6 @@ const AudioArena = {
                 });
             } 
             else if (tipo === 'pitazo') {
-                // 💨 EFECTO PITAZO: Un tono agudo penetrante con vibrato corto
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'triangle';
@@ -3235,12 +3251,10 @@ const AudioArena = {
                 osc.stop(ahora + 0.4);
             } 
             else if (tipo === 'gol') {
-                // ⚽ EFECTO RUGBIDO DE TRIBUNA: Ruido blanco filtrado emulando ambiente
-                const bufferSize = this.ctx.sampleRate * 1.5; // 1.5 segundos de festejo
+                const bufferSize = this.ctx.sampleRate * 1.5;
                 const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = buffer.getChannelData(0);
                 
-                // Generamos ruido aleatorio puro
                 for (let i = 0; i < bufferSize; i++) {
                     data[i] = Math.random() * 2 - 1;
                 }
@@ -3248,7 +3262,6 @@ const AudioArena = {
                 const ruido = this.ctx.createBufferSource();
                 ruido.buffer = buffer;
 
-                // Filtro pasa-bajos para que suene gordo y de estadio lleno, no como estática de TV
                 const filtro = this.ctx.createBiquadFilter();
                 filtro.type = 'lowpass';
                 filtro.frequency.setValueAtTime(400, ahora);
@@ -3265,8 +3278,21 @@ const AudioArena = {
                 ruido.start(ahora);
                 ruido.stop(ahora + 1.5);
             }
+            // 🔥 ADICIÓN SURGICAL: Evitamos crasheos por llamadas a clicks de UI
+            else if (tipo === 'click') {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, ahora);
+                gain.gain.setValueAtTime(0.1, ahora);
+                gain.gain.exponentialRampToValueAtTime(0.001, ahora + 0.05);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(ahora);
+                osc.stop(ahora + 0.05);
+            }
         } catch (e) {
-            console.warn("Audio bloqueado o no soportado por el navegador:", e);
+            console.warn("Audio bloqueado o no soportado:", e);
         }
     }
 };
@@ -3539,6 +3565,67 @@ function toggleVisibilidadMisiones() {
     if (typeof AudioArena !== 'undefined' && AudioArena.play) {
         AudioArena.play('click');
     }
+}
+
+async function inspeccionarPerfilRival(usuarioId) {
+     // Evitamos que salte si el usuario hace clic en sí mismo
+     if (usuarioActual && parseInt(usuarioId) === parseInt(usuarioActual.id)) {
+          alert("¡Es tu propio perfil! Podés verlo completo en la pestaña 'MI PERFIL'.");
+          return;
+     }
+
+     try {
+          // Apuntamos directo a tu ruta pasándole el ID correspondiente
+          const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`);
+          if (!res.ok) throw new Error("No se pudo obtener el perfil del rival");
+          
+          const data = await res.json();
+          if (!data.ok) return alert(data.mensaje);
+
+          const rival = data.perfil;
+
+          // 1. Cargamos datos generales y Foto de Perfil Dinámica de tu BD
+          document.getElementById("visitante-txt-username").innerText = rival.nombre;
+          document.getElementById("visitante-stat-copas").innerText = `${rival.puntosRanking || 0} PTS`;
+          
+          // Render de la foto o fallback por si viene por defecto
+          const imgAvatar = document.getElementById("visitante-avatar");
+          imgAvatar.innerHTML = `<img src="${rival.foto}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.src='fotos/_defecto.jpg'">`;
+
+          // 2. Armamos un desglose dinámico en el cuerpo del modal para lucir tus nuevas estadísticas de Álbum y Timba
+          const contenedorStats = document.querySelector("#modal-perfil-visitante rgba") || document.getElementById("visitante-stat-copas").parentNode.parentNode;
+          
+          contenedorStats.innerHTML = `
+               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span>🎯 Copas de Ranking:</span>
+                    <strong style="color: var(--rojo);">${rival.puntosRanking} PTS</strong>
+               </div>
+               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span>📖 Progreso Álbum:</span>
+                    <strong style="color: var(--celeste);">${rival.estadisticasAlbum.porcentajeCompletado}%</strong>
+               </div>
+               <div style="border-top: 1px solid #1a2436; margin: 8px 0; padding-top: 8px; display: flex; justify-content: space-around; font-size: 0.8rem; text-align: center;">
+                    <div><span style="color: #64748b;">COM</span><br><b style="color: #fff;">${rival.estadisticasAlbum.comunes}</b></div>
+                    <div><span style="color: #64748b;">RAR</span><br><b style="color: var(--celeste);">${rival.estadisticasAlbum.raras}</b></div>
+                    <div><span style="color: #64748b;">ÉPI</span><br><b style="color: #a855f7;">${rival.estadisticasAlbum.epicas}</b></div>
+                    <div><span style="color: #64748b;">LEG</span><br><b style="color: var(--dorado);">${rival.estadisticasAlbum.legendarias}</b></div>
+               </div>
+               <div style="border-top: 1px solid #1a2436; padding-top: 8px; display: flex; justify-content: space-between;">
+                    <span>🎰 Efectividad Timba:</span>
+                    <strong style="color: var(--verde-match);">${rival.estadisticasTimba.porcentajeEfectividad}%</strong>
+               </div>
+               <div style="font-size: 0.75rem; color: #64748b; text-align: right; font-style: italic;">
+                    Jugadas: ${rival.estadisticasTimba.jugadas} | Exactos: ${rival.estadisticasTimba.ganadasExacto}
+               </div>
+          `;
+
+          // Mostramos el modal
+          document.getElementById("modal-perfil-visitante").style.display = "flex";
+
+     } catch (err) {
+          console.error("❌ Error al inspeccionar al rival:", err);
+          alert("Hubo un problema al conectar con los vestuarios de ese jugador.");
+     }
 }
 
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
