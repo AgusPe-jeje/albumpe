@@ -41,7 +41,27 @@ function generarCodigoSala() {
 }
 
 /* ========================================================================
-   🛠️ MIDDLEWARE CORE V3: MODO MANTENIMIENTO CON DESENCRIPTACIÓN ATÓMICA
+   🛡️ MIDDLEWARE CORE: VERIFICACIÓN DE TOKEN JWT
+   ======================================================================== */
+const verificarToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; 
+
+    if (!token) {
+        return res.status(401).json({ ok: false, error: "🔒 Acceso denegado. Iniciá sesión en la Arena." });
+    }
+
+    try {
+        const verificado = jwt.verify(token, JWT_SECRET);
+        req.usuarioLogueado = verificado; // Guardamos id y username descifrados en la petición
+        next();
+    } catch (err) {
+        return res.status(403).json({ ok: false, error: "❌ Sesión inválida o expirada. Volvé a loguearte." });
+    }
+};
+
+/* ========================================================================
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
