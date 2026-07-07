@@ -187,17 +187,20 @@ async function autenticarUsuario(accion) {
                alert(data.error);
                if (btnAuth) btnAuth.disabled = false; // Rehabilitamos si el backend rebotó las credenciales
           } else {
-               // 🔥 Si el servidor blindado nos manda un token, lo encanutamos en el navegador
+               // 🔥 CORREGIDO: Clave unificada a "token" para que sea compatible con todo el ecosistema seguro del juego
                if (data.token) {
-                    localStorage.setItem("arena_token", data.token);
+                    localStorage.setItem("token", data.token);
                }
 
                usuarioActual = data.usuario;
+               
                document.getElementById("seccion-login").style.display = "none";
                
                const interfazJuego = document.getElementById("interfaz-juego");
-               interfazJuego.style.removeProperty("display");
-               interfazJuego.classList.add("mostrar");
+               if (interfazJuego) {
+                    interfazJuego.style.removeProperty("display");
+                    interfazJuego.classList.add("mostrar");
+               }
                
                // 🟢 SECTOR MISIONES API
                if (typeof cargarMisionesDelServidor === 'function') {
@@ -209,12 +212,10 @@ async function autenticarUsuario(accion) {
                     iniciarCronometroResetMisiones();
                }
                
-               // 📢 NUEVO FLUJO PREMIUM ORDENADO: Disparamos primero los anuncios. 
-               // Al cerrarse el video y la bitácora, se llamará a la racha automáticamente en segundo plano.
+               // 📢 FLUJO DE ANUNCIOS Y EVENTOS
                if (typeof iniciarControladorAnunciosSeguro === 'function') {
                     setTimeout(iniciarControladorAnunciosSeguro, 1000); 
                } else if (typeof verificarRecompensaDiaria === 'function') {
-                    // Resguardo por si no encuentra la función de anuncios
                     setTimeout(verificarRecompensaDiaria, 1000);
                }
                
@@ -223,9 +224,13 @@ async function autenticarUsuario(accion) {
                
                actualizarInterfazUI();
                cargarAlbumLocal();
-               actualizarTimbasRestantesUI();
-               verificarAvatarInicial();
+               if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
                
+               // 🎁 NUEVO FLUG COMPLEMENTARIO: Si es un usuario nuevo, el validador seguro se gatilla acá mismo
+               if (typeof verificarAvatarInicial === 'function') {
+                    verificarAvatarInicial();
+               }
+
                if (accion === 'login') {
                     alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
                } else {
@@ -3917,64 +3922,72 @@ function renderizarCromoDestacadoUI() {
 // ========================================================================
 
 // 1. Pide las 3 opciones al azar y las dibuja en el modal bloqueante
+// 🛡️ VERSIÓN BLINDADA: Espera a que el token esté asentado para evitar el 403
 async function verificarAvatarInicial() {
-    // Si no está logueado o en tu login local ya detectás que "eligio_avatar" es true, frena
     if (!usuarioActual || usuarioActual.eligio_avatar === true) return;
 
-    try {
-        const token = localStorage.getItem("token");
-        
-        // Petición blindada para saltar el mantenimiento
-        const res = await fetch(`${URL_BASE}/usuarios/opciones-avatar-inicial`, {
-            method: "GET",
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-        const data = await res.json();
+    // Le damos 100 milisegundos para asegurar que el localStorage impactó el token del login
+    setTimeout(async () => {
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return console.warn("⚠️ No se encontró token para validar el avatar inicial.");
 
-        if (!data.ok || !data.opciones || data.opciones.length === 0) return;
+            const res = await fetch(`${URL_BASE}/usuarios/opciones-avatar-inicial`, {
+                method: "GET",
+                headers: { 
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
 
-        const contenedor = document.getElementById("contenedor-opciones-iniciales");
-        if (!contenedor) return;
-        contenedor.innerHTML = ""; // Limpieza previa
+            // Si el servidor rechaza por falta de token o mantenimiento, lo atrapamos acá
+            if (!res.ok) {
+                console.error(`❌ Error de validación en la Arena (Status: ${res.status})`);
+                return;
+            }
 
-        // Mapeamos los 3 avatares random devueltos por Postgres
-        data.opciones.forEach(avatar => {
-            const divCarta = document.createElement("div");
-            divCarta.style.width = "110px";
-            divCarta.style.height = "145px";
-            divCarta.style.borderRadius = "10px";
-            divCarta.style.border = "3px solid #334155";
-            divCarta.style.backgroundImage = `url('${avatar.ruta_jpg}')`;
-            divCarta.style.backgroundSize = "cover";
-            divCarta.style.backgroundPosition = "center";
-            divCarta.style.cursor = "pointer";
-            divCarta.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
-            divCarta.title = `Elegir ${avatar.nombre}`;
+            const data = await res.json();
+            if (!data.ok || !data.opciones || data.opciones.length === 0) return;
 
-            // Animaciones de Hover premium estilo cromo brillante
-            divCarta.onmouseenter = () => {
-                divCarta.style.transform = "scale(1.08) translateY(-5px)";
-                divCarta.style.borderColor = "var(--dorado)";
-                divCarta.style.boxShadow = "0 10px 20px rgba(255,177,0,0.35)";
-            };
-            divCarta.onmouseleave = () => {
-                divCarta.style.transform = "scale(1) translateY(0)";
-                divCarta.style.borderColor = "#334155";
-                divCarta.style.boxShadow = "none";
-            };
+            const contenedor = document.getElementById("contenedor-opciones-iniciales");
+            if (!contenedor) return;
+            contenedor.innerHTML = ""; 
 
-            // Al hacer click, ejecuta el guardado en Neon
-            divCarta.onclick = () => procesarEleccionInicial(avatar.id);
+            data.opciones.forEach(avatar => {
+                const divCarta = document.createElement("div");
+                divCarta.style.width = "110px";
+                divCarta.style.height = "145px";
+                divCarta.style.borderRadius = "10px";
+                divCarta.style.border = "3px solid #334155";
+                divCarta.style.backgroundImage = `url('${avatar.ruta_jpg}')`;
+                divCarta.style.backgroundSize = "cover";
+                divCarta.style.backgroundPosition = "center";
+                divCarta.style.cursor = "pointer";
+                divCarta.style.transition = "all 0.2s ease";
+                divCarta.title = `Elegir ${avatar.nombre}`;
 
-            contenedor.appendChild(divCarta);
-        });
+                divCarta.onmouseenter = () => {
+                    divCarta.style.transform = "scale(1.08) translateY(-5px)";
+                    divCarta.style.borderColor = "var(--dorado)";
+                    divCarta.style.boxShadow = "0 10px 20px rgba(255,177,0,0.35)";
+                };
+                divCarta.onmouseleave = () => {
+                    divCarta.style.transform = "scale(1) translateY(0)";
+                    divCarta.style.borderColor = "#334155";
+                    divCarta.style.boxShadow = "none";
+                };
 
-        // Abrimos el modal bloqueante poniéndole flex
-        document.getElementById("modal-avatar-inicial").style.display = "flex";
+                divCarta.onclick = () => procesarEleccionInicial(avatar.id);
+                contenedor.appendChild(divCarta);
+            });
 
-    } catch (err) {
-        console.error("❌ Error al montar la ruleta de avatar inicial:", err);
-    }
+            // Mostramos el modal bloqueante una vez cargado de forma segura
+            document.getElementById("modal-avatar-inicial").style.display = "flex";
+
+        } catch (err) {
+            console.error("❌ Fallo en la comunicación segura de avatares:", err);
+        }
+    }, 150); // El delay mágico anti-403
 }
 
 // 2. Impacta la elección en el servidor, actualiza las flags locales y refresca la facha
