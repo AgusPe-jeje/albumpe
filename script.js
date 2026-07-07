@@ -596,9 +596,17 @@ async function ejecutarSecuenciaReveladoCarta() {
     if (btnSiguiente) btnSiguiente.disabled = true; 
 
     const carta = colaCartasPack[indiceCartaActualPack];
+
+    // ========================================================================
+    // 🔀 INTERCEPCIÓN MÍSTICA: SI ES UN AVATAR COSMÉTICO SORPRESA
+    // ========================================================================
+    if (carta.es_foto_perfil || carta.posicion === "AVATAR") {
+        return revelarAvatarSorpresaEnLoop(carta, btnSiguiente);
+    }
+
     const rarezaClase = (carta.rareza || '').toLowerCase();
 
-    // 🏎️ INTERCEPCIÓN PREMIUM CON TRANSICIÓN NATURAL
+    // 🏎️ INTERCEPCIÓN PREMIUM CON TRANSICIÓN NATURAL (Tus Legendarios normales)
     if ((rarezaClase === "legendaria" || rarezaClase === "legendario") && !carta.caminanteVisto) {
         const escenario = document.querySelector(".pack-opening-escenario");
         if (escenario) {
@@ -637,32 +645,27 @@ async function ejecutarSecuenciaReveladoCarta() {
             setTimeout(lanzarFuegosArtificiales, 500);
             setTimeout(lanzarFuegosArtificiales, 1300);
 
-            // ✨ EL SECRETO DE LA TRANSICIÓN NATURAL:
             setTimeout(() => {
                 const flashBlanco = document.createElement("div");
                 flashBlanco.className = "flash-revelado-total animar-flash";
                 escenario.appendChild(flashBlanco);
 
-                // Esperamos un instante corto (150ms) a que el flash blanco cubra TODO el elemento antes de limpiar la carta vieja
                 setTimeout(() => {
                     const wrapper = document.getElementById("pantalla-carta-presentada");
                     const pBandera = document.getElementById("pista-bandera");
                     const pPosicion = document.getElementById("pista-posicion");
                     const pRareza = document.getElementById("pista-rareza");
                     
-                    // Limpiamos la carta anterior en secreto mientras la pantalla está 100% blanca
                     if (wrapper) wrapper.innerHTML = ""; 
                     if (pBandera) { pBandera.className = "pista-bloque"; pBandera.innerText = "⏳ ?"; }
                     if (pPosicion) { pPosicion.className = "pista-bloque"; pPosicion.innerText = "⚽ ?"; }
                     if (pRareza) { pRareza.className = "pista-bloque"; pRareza.innerText = "🃏 ?"; }
                     
-                    flashOverlay.remove(); // Sacamos el overlay oscuro
+                    flashOverlay.remove(); 
                 }, 150);
 
-                // Dejamos que el flash blanco termine de hacer su Fade Out suave
                 setTimeout(() => {
                     flashBlanco.remove();
-                    // Volvemos a llamar la secuencia, que ahora irá directo a las pistas sin parpadeos
                     ejecutarSecuenciaReveladoCarta();
                 }, 500);
 
@@ -673,15 +676,13 @@ async function ejecutarSecuenciaReveladoCarta() {
     }
 
     // ==========================================
-    // ⚪ FLUJO DE RENDERIZACIÓN DE LAS PISTAS Y LA CARTA
+    // ⚪ FLUJO DE RENDERIZACIÓN DE LAS PISTAS Y LA CARTA NORMAL
     // ==========================================
     const wrapper = document.getElementById("pantalla-carta-presentada");
     const pBandera = document.getElementById("pista-bandera");
     const pPosicion = document.getElementById("pista-posicion");
     const pRareza = document.getElementById("pista-rareza");
     
-    // NOTA: Quitamos la limpieza brusca de acá arriba porque ya la manejamos de forma segura 
-    // en el desvanecimiento o al cambiar de carta normal.
     if (!carta.caminanteVisto) { 
         pBandera.className = "pista-bloque"; pBandera.innerText = "⏳ ?";
         pPosicion.className = "pista-bloque"; pPosicion.innerText = "⚽ ?";
@@ -730,12 +731,68 @@ async function ejecutarSecuenciaReveladoCarta() {
         <div class="rareza-vertical">${rarezaTexto}</div>
     `;
     
-    wrapper.innerHTML = ""; // Limpieza final controlada antes de meter la nueva carta física
+    wrapper.innerHTML = ""; 
     wrapper.appendChild(divCarta);
     await new Promise(r => setTimeout(r, 400));
 
     animacionCartaEnCurso = false;
     if (btnSiguiente) btnSiguiente.disabled = false; 
+}
+
+async function revelarAvatarSorpresaEnLoop(avatar, btnSiguiente) {
+    const wrapper = document.getElementById("pantalla-carta-presentada");
+    const pBandera = document.getElementById("pista-bandera");
+    const pPosicion = document.getElementById("pista-posicion");
+    const pRareza = document.getElementById("pista-rareza");
+
+    // 🌟 Adaptamos las pistas superiores para la temática cosmética
+    if (pBandera) { pBandera.className = "pista-bloque revelada"; pBandera.innerText = "📸"; }
+    if (pPosicion) { pPosicion.className = "pista-bloque revelada"; pPosicion.innerText = "AVATAR"; }
+    if (pRareza) { pRareza.className = "pista-bloque revelada"; pRareza.innerText = "COSMÉTICO"; }
+
+    wrapper.innerHTML = "";
+
+    // Fabricamos el contenedor interactivo del cromo cosmético
+    const divAvatar = document.createElement("div");
+    divAvatar.className = "carta-clash legendaria caminante-entrada"; 
+    divAvatar.style.cssText = "position: relative; border: 4px solid var(--dorado); box-shadow: 0 0 35px rgba(255,177,0,0.5);";
+
+    divAvatar.innerHTML = `
+        <img src="${avatar.foto}" class="carta-foto" alt="${avatar.nombre}">
+        <div class="rareza-vertical" style="color: var(--dorado);">PERFIL</div>
+        <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: var(--dorado); color: #000; font-family: 'Oswald'; font-size: 0.75rem; font-weight: bold; padding: 2px 12px; border-radius: 4px; z-index: 10; white-space: nowrap; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+            ¡ÍTEM ESPECIAL! ⭐
+        </div>
+    `;
+
+    wrapper.appendChild(divAvatar);
+
+    // 🕹️ Si el avatar no es repetido, le inyectamos un botón flotante para equipar rápido abajo
+    if (!avatar.es_repetido_avatar) {
+        const btnAccionRapida = document.createElement("button");
+        btnAccionRapida.className = "btn-estadio";
+        btnAccionRapida.innerText = "Equipar este Avatar ⚡";
+        btnAccionRapida.style.cssText = "margin-top: 20px; background: var(--dorado); color:#000; font-weight:bold; box-shadow: 0 0 15px rgba(255,177,0,0.3);";
+        
+        btnAccionRapida.onclick = async () => {
+            btnAccionRapida.disabled = true;
+            const idLimpio = avatar.id.replace("avatar_", "");
+            if (typeof equiparAvatarDesdeTienda === "function") {
+                await equiparAvatarDesdeTienda(idLimpio);
+            }
+            btnAccionRapida.innerText = "¡Equipado con éxito! 📸";
+        };
+        wrapper.appendChild(btnAccionRapida);
+    } else {
+        const txtRepetido = document.createElement("div");
+        txtRepetido.style.cssText = "color: #ef4444; font-family: 'Oswald'; font-size: 1.1rem; margin-top: 15px; text-transform: uppercase;";
+        txtRepetido.innerText = "🔄 REPETIDO (+100 Oro Reembolsado)";
+        wrapper.appendChild(txtRepetido);
+    }
+
+    await new Promise(r => setTimeout(r, 500));
+    animacionCartaEnCurso = false;
+    if (btnSiguiente) btnSiguiente.disabled = false;
 }
 
 function mostrarSiguienteCartaSecuencia() {
@@ -752,18 +809,24 @@ async function renderizarGrillaFinalSobres() {
           const itemContenedor = document.createElement("div");
           itemContenedor.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 8px;";
 
-          let rarezaClaseFinal = figu.rareza.toLowerCase();
+          let rarezaClaseFinal = figu.rareza ? figu.rareza.toLowerCase() : 'comun';
           if (rarezaClaseFinal === "especial") rarezaClaseFinal = "rara";
 
-          let rarezaTextoFinal = figu.rareza.toUpperCase();
+          let rarezaTextoFinal = figu.es_foto_perfil ? "PERFIL" : (figu.rareza ? figu.rareza.toUpperCase() : "COMUN");
           if (rarezaTextoFinal === "ESPECIAL") rarezaTextoFinal = "RARA";
 
           const divCarta = document.createElement("div");
           divCarta.className = `carta-clash ${rarezaClaseFinal}`;
           divCarta.style.animationDelay = `${indice * 0.1}s`;
           
+          // Si es el cromo especial de avatar, le clavamos el relieve dorado en la grilla final
+          if (figu.es_foto_perfil) {
+              divCarta.style.border = "2px solid var(--dorado)";
+              divCarta.style.boxShadow = "0 0 15px rgba(255,177,0,0.3)";
+          }
+          
           divCarta.innerHTML = `
-              ${figu.obtenido > 1 ? `<div class="badge-repetidas">x${figu.obtenido}</div>` : ''}
+              ${figu.obtenido > 1 && !figu.es_foto_perfil ? `<div class="badge-repetidas">x${figu.obtenido}</div>` : ''}
               <img src="${figu.foto}" class="carta-foto" alt="${figu.nombre}">
               <div class="rareza-vertical">${rarezaTextoFinal}</div>
           `;
@@ -4022,80 +4085,8 @@ async function procesarEleccionInicial(fotoId) {
 }
 
 // ========================================================================
-// 📦 TIENDA: COMPRA Y REVELACIÓN PREMIUM DE AVATARES (OPCIÓN B)
+// 📸 AUXILIAR: EQUIPAR FOTO DE PERFIL DESDE LA INTERFAZ
 // ========================================================================
-
-async function comprarSobreAvatar() {
-    mostrarCarga("Abriendo sobre de avatares...");
-    
-    try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${URL_BASE}/tienda/sobre-perfil`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${token}` }
-        });
-
-        const data = await res.json();
-        ocultarCarga();
-
-        if (!res.ok || !data.ok) {
-            return alert(data.mensaje || "❌ No se pudo procesar la compra del sobre.");
-        }
-
-        // 1. Mapeamos los elementos del nuevo modal flotante exclusivo
-        const cromo = document.getElementById("cromo-avatar-revelado");
-        const titulo = document.getElementById("titulo-revelar-avatar");
-        const subtitulo = document.getElementById("subtitulo-revelar-avatar");
-        const textoInfo = document.getElementById("texto-resultado-avatar");
-        const btnEquipar = document.getElementById("btn-equipar-avatar-al-toque");
-
-        // 2. Inyectamos los datos del cromo devuelto por Neon
-        cromo.style.backgroundImage = `url('${data.foto.ruta_jpg}')`;
-        subtitulo.innerText = data.foto.nombre.toUpperCase();
-
-        // 3. Evaluamos si fue repetida o nueva según las banderas del backend
-        if (data.repetida) {
-            titulo.innerText = "¡REPETIDA! 🔄";
-            titulo.style.color = "#ef4444"; // Rojo peligro
-            cromo.style.borderColor = "#64748b"; // Borde gris apagado
-            textoInfo.innerHTML = `Ya tenías este diseño en tu colección.<br>La banca te reembolsa <span style="color: var(--dorado); font-weight:bold;">🪙200 monedas</span> de consuelo.`;
-            btnEquipar.style.display = "none"; // Si es repetida, no hace falta equipar
-        } else {
-            titulo.innerText = "¡NUEVO AVATAR! 🎉";
-            titulo.style.color = "var(--verde)"; // Verde éxito o dorado
-            cromo.style.borderColor = "var(--dorado)"; // Borde dorado premium
-            textoInfo.innerHTML = `¡Facha desbloqueada con éxito!<br>Se guardó en tu biblioteca de avatares.`;
-            btnEquipar.style.display = "block"; // Activamos botón para equipar al toque
-            
-            // Le asignamos la función de equipar directo usando el ID ganado
-            btnEquipar.onclick = async () => {
-                cerrarModalAvatarRevelado();
-                if (typeof equiparAvatarDesdeTienda === "function") {
-                    await equiparAvatarDesdeTienda(data.foto.id);
-                }
-            };
-        }
-
-        // 4. Refrescamos las monedas en tu barra superior de la UI global
-        if (usuarioActual) usuarioActual.monedas = data.monedasActuales;
-        actualizarInterfazUI();
-
-        // 5. Encendemos el modal flotante
-        document.getElementById("modal-revelar-avatar").style.display = "flex";
-
-    } catch (err) {
-        ocultarCarga();
-        console.error("❌ Fallo en la compra del sobre cosmético:", err);
-        alert("📡 Error de red al conectar con la Tienda.");
-    }
-}
-
-// Cierra el cartel flotante
-function cerrarModalAvatarRevelado() {
-    document.getElementById("modal-revelar-avatar").style.display = "none";
-}
-
-// Función auxiliar para equipar directo desde el botón del modal
 async function equiparAvatarDesdeTienda(fotoId) {
     mostrarCarga("Equipando nuevo avatar...");
     try {
@@ -4114,10 +4105,10 @@ async function equiparAvatarDesdeTienda(fotoId) {
         
         if (data.ok) {
             alert("📸 ¡Facha actualizada al instante!");
-            // Si tenés funciones que redibujen tu perfil o el menú, las llamás acá
             if (typeof cargarDatosMiPerfil === "function") cargarDatosMiPerfil();
+            if (typeof actualizarInterfazUI === "function") actualizarInterfazUI();
         } else {
-            alert(data.mensaje);
+            alert(data.mensaje || "❌ No se pudo equipar el avatar.");
         }
     } catch (err) {
         ocultarCarga();
