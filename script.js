@@ -89,6 +89,10 @@ function cambiarModulo(idModulo, botonPresionado) {
           if (typeof actualizarHistorialTransferenciasUI === "function") {
                actualizarHistorialTransferenciasUI();
           }
+
+          if (idModulo === 'modulo-perfil' && usuarioActual) { // <- Reemplazá 'modulo-perfil' por el ID real de tu contenedor
+                if (typeof actualizarPerfilUI === "function") actualizarPerfilUI();
+            }
      }
      
      // 🦾 GATILLO DE ENTRADA: Al entrar al sector de Contratos SBC, inicializamos el panel del Bot Comerciante
