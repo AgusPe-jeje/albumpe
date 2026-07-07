@@ -1854,30 +1854,51 @@ const SELECCIONES_BOTS = [
     "Arabia Saudita", "Irán", "Suiza", "Dinamarca", "Suecia", "Polonia", "Ucrania", "Austria"
 ];
 
-app.get('/api/mundial/estado/:usuarioId', async (req, res) => {
-    const usuarioId = req.params.usuarioId;
+// ========================================================================
+// 🏆 ENDPOINT SEGURO: ESTADO Y COOLDOWN DEL MINIMUNDIAL (ANTI-CHEAT)
+// ========================================================================
+app.get('/api/mundial/estado', verificarToken, async (req, res) => {
+    // 🛡️ REGLA DE ORO: La identidad se extrae pura del JWT, imposible de alterar por el cliente
+    const usuarioId = req.usuarioLogueado.id; 
+
+    const client = await pool.connect();
     try {
-        const userCheck = await pool.query("SELECT copas_mundiales, ultima_timba_mundial FROM usuarios WHERE id = $1", [usuarioId]);
-        if (userCheck.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado" });
+        // 🔒 Consulta parametrizada clásica para evitar cualquier intento de SQL Injection
+        const queryText = "SELECT copas_mundiales, ultima_timba_mundial FROM usuarios WHERE id = $1";
+        const userCheck = await client.query(queryText, [usuarioId]);
+        
+        if (userCheck.rows.length === 0) {
+            return res.status(404).json({ ok: false, error: "Usuario inexistente en los registros de la Arena." });
+        }
 
         const user = userCheck.rows[0];
         const ahora = new Date();
         let tiempoRestante = 0;
 
+        // Validamos de forma estricta si existe una marca de tiempo previa
         if (user.ultima_timba_mundial) {
             const ultimaVez = new Date(user.ultima_timba_mundial);
             const transcurrido = ahora - ultimaVez;
+            
+            // COOLDOWN_MUNDIAL_MS constante declarada en tu servidor (Ej: 4 * 60 * 60 * 1000)
             if (transcurrido < COOLDOWN_MUNDIAL_MS) {
                 tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
             }
         }
 
+        // 📤 Formato limpio y estructurado mapeado directo para el Front
         return res.json({
-            copas: user.copas_mundiales,
-            siguienteIn: tiempoRestante
+            ok: true,
+            copas: Number(user.copas_mundiales) || 0,
+            milisegundosRestantes: Math.floor(tiempoRestante) // Enviamos entero puro redondeado
         });
+        
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        console.error("❌ Fallo de integridad en /mundial/estado:", err.message);
+        return res.status(500).json({ ok: false, error: "Error interno de sincronización en los servidores." });
+    } finally {
+        // 🔑 LIBERACIÓN DEL POOL: Evita que el servidor se sature de hilos y tire el error 503
+        client.release(); 
     }
 });
 
