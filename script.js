@@ -3631,7 +3631,7 @@ async function inspeccionarPerfilRival(usuarioId) {
      try {
           const token = localStorage.getItem("token");
 
-          // Fetch seguro con cabeceras de tester para el mantenimiento
+          // Fetch blindado para mantenimiento
           const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`, {
                method: "GET",
                headers: {
@@ -3645,54 +3645,77 @@ async function inspeccionarPerfilRival(usuarioId) {
           const data = await res.json();
           if (!data.ok || !data.perfil) return alert(data.mensaje || "Error al leer datos del rival.");
 
-          const rival = data.perfil;
+          const rival = data.perfil; // 🟢 Sincronizado con la propiedad 'perfil' de tu backend
 
-          // 1. Inyectamos el Nombre del Rival
-          const txtUsername = document.getElementById("visitante-txt-username");
+          // 1. Datos Principales (Header del Visitante)
+          const txtUsername = document.getElementById("rival-txt-username");
           if (txtUsername) {
                txtUsername.innerText = rival.nombre ? rival.nombre.toUpperCase() : "COMPETIDOR";
           }
 
-          // 2. Mapeamos los campos exactos de tu HTML limpio
-          const txtCopas = document.getElementById("visitante-stat-copas");
-          if (txtCopas) {
-               txtCopas.innerText = `${rival.puntosRanking || 0} PTS`;
+          const txtProgresoTotal = document.getElementById("rival-txt-progreso-total");
+          if (txtProgresoTotal) {
+               txtProgresoTotal.innerText = `${rival.estadisticasAlbum?.porcentajeCompletado || 0}% COMPLETADO`;
           }
 
-          const txtMundiales = document.getElementById("visitante-stat-mundiales");
+          const txtRango = document.getElementById("rival-txt-rango");
+          if (txtRango && rival.puntosRanking !== undefined) {
+               if (rival.puntosRanking >= 10000) txtRango.innerText = `RANKING: LEYENDA GLOBAL (${rival.puntosRanking} PTS)`;
+               else if (rival.puntosRanking >= 5000) txtRango.innerText = `RANKING: PROFESIONAL (${rival.puntosRanking} PTS)`;
+               else txtRango.innerText = `RANKING: DEBUTANTE (${rival.puntosRanking} PTS)`;
+          }
+
+          // 2. Bloque A: Inventario de Rarezas del Rival
+          if (document.getElementById("rival-stat-comunes")) document.getElementById("rival-stat-comunes").innerText = rival.estadisticasAlbum?.comunes || 0;
+          if (document.getElementById("rival-stat-raras")) document.getElementById("rival-stat-raras").innerText = rival.estadisticasAlbum?.raras || 0;
+          if (document.getElementById("rival-stat-epicas")) document.getElementById("rival-stat-epicas").innerText = rival.estadisticasAlbum?.epicas || 0;
+          if (document.getElementById("rival-stat-legendarias")) document.getElementById("rival-stat-legendarias").innerText = rival.estadisticasAlbum?.legendarias || 0;
+
+          // 3. Bloque B: Rendimiento en Competencia del Rival
+          const txtTimbaEfectividad = document.getElementById("rival-txt-timba-efectividad");
+          if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${rival.estadisticasTimba?.porcentajeEfectividad || 0}%`;
+
+          const txtTimbaJugadas = document.getElementById("rival-txt-timba-jugadas");
+          if (txtTimbaJugadas) {
+               const ganadas = (rival.estadisticasTimba?.ganadasExacto || 0) + (rival.estadisticasTimba?.ganadasSigno || 0);
+               txtTimbaJugadas.innerText = `${ganadas} Ganados / ${rival.estadisticasTimba?.jugadas || 0} Totales`;
+          }
+
+          const txtMundiales = document.getElementById("rival-stat-mundiales-copas");
           if (txtMundiales) {
-               // Buscamos las copas mundiales (guardadas en tu tabla usuarios)
-               // resguardando el dato si el objeto anidado cambia
-               const copasCount = rival.estadisticasTimba?.jugadas !== undefined ? (usuarioActual.copas_mundiales || 0) : 0; 
-               txtMundiales.innerText = `🏆 ${copasCount} Copas`;
+               // Resguardamos por si la propiedad copas viene directo de la fila
+               txtMundiales.innerText = `🏆 ${rival.copasMundiales || 0}`;
           }
 
-          const txtPenales = document.getElementById("visitante-stat-penales");
-          if (txtPenales) {
-               txtPenales.innerText = `${rival.estadisticasTimba?.porcentajeEfectividad || 0}% Efectividad`;
-          }
-
-          // 3. 📸 DISEÑO CROMO RIVAL: Transformamos su contenedor a formato de carta física rectangular
-          const divAvatar = document.getElementById("visitante-avatar");
+          // 4. Render de la foto del Rival agrandada estilo cromo
+          const divAvatar = document.getElementById("rival-avatar-user");
           if (divAvatar && rival.foto) {
-               divAvatar.style.width = "110px";
-               divAvatar.style.height = "145px";
-               divAvatar.style.borderRadius = "8px"; // Chau círculo, hola carta
-               divAvatar.style.border = "2px solid var(--dorado)";
+               divAvatar.style.borderRadius = "12px";
                divAvatar.style.backgroundImage = `url('${rival.foto}')`;
                divAvatar.style.backgroundSize = "cover";
                divAvatar.style.backgroundPosition = "center";
-               divAvatar.innerText = ""; // Limpiamos el escudo genérico 🛡️
+               divAvatar.innerText = ""; // Limpiamos el emoji base
           }
 
-          // 4. Mostramos el modal en pantalla
-          document.getElementById("modal-perfil-visitante").style.display = "flex";
+          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL (Guardado opcional en BD o fallback por ahora)
+          const contenedorDestacado = document.getElementById("rival-contenedor-destacado");
+          if (contenedorDestacado) {
+               // Por el momento, como las insignias son locales, dejamos el cartel o el cromo si decidís subirlo a la DB luego
+               contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">Inspeccionando facha del competidor en tiempo real...</p>`;
+          }
+
+          // Mostramos el modal dándole display block
+          document.getElementById("modal-rival").style.display = "block";
 
      } catch (err) {
-          console.error("❌ Fallo en inspección de rival:", err);
-          alert("❌ No se pudieron sincronizar los datos de este jugador.");
-          document.getElementById("modal-perfil-visitante").style.display = "none";
+          console.error("❌ Error al inspeccionar rival:", err);
+          alert("❌ No se pudieron sincronizar los datos completos de este jugador.");
      }
+}
+
+// Función simple para cerrar el modal
+function cerrarModalRival() {
+    document.getElementById("modal-rival").style.display = "none";
 }
 
 
