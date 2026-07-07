@@ -3637,15 +3637,11 @@ async function inspeccionarPerfilRival(usuarioId) {
 
 
 async function actualizarMiPerfilUI() {
-    if (!usuarioActual || !usuarioActual.id) {
-        console.warn("⚠️ No se puede cargar el perfil: 'usuarioActual' o su ID están vacíos.");
-        return;
-    }
+    if (!usuarioActual || !usuarioActual.id) return;
 
     try {
         const token = localStorage.getItem("token");
 
-        // Hacemos el fetch al endpoint maestro pasando el token de tester
         const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`, {
             method: "GET",
             headers: {
@@ -3654,91 +3650,60 @@ async function actualizarMiPerfilUI() {
             }
         });
         
-        if (!res.ok) {
-            console.error(`❌ El servidor respondió con error HTTP: ${res.status}`);
-            document.getElementById("perfil-txt-username").innerText = "ERROR DE SERVIDOR";
-            return;
-        }
+        if (!res.ok) return;
 
         const data = await res.json();
         console.log("💎 DATA RECIBIDA DEL ENDPOINT /perfil:", data);
 
-        if (!data.ok || !data.perfil) {
-            console.error("No se pudo obtener la info de la Arena o vino vacía:", data.mensaje);
-            document.getElementById("perfil-txt-username").innerText = "ERROR DE DATA";
-            return;
-        }
+        if (!data.ok || !data.perfil) return;
 
         const perfil = data.perfil;
 
-        // 1. Inyectamos el Nombre de Usuario real (Reemplaza "CARGANDO CRACK...")
+        // 1. Inyectamos Nombre de Usuario
         const txtUsername = document.getElementById("perfil-txt-username");
         if (txtUsername) {
             txtUsername.innerText = perfil.nombre ? perfil.nombre.toUpperCase() : "SIN NOMBRE";
         }
 
-        // 2. Dinamizamos el Rango según sus puntos (Opcional, usando tus puntosRanking)
+        // 2. Porcentaje Total Completado del Álbum (junto al Nombre)
+        const txtProgresoTotal = document.getElementById("perfil-txt-progreso-total");
+        if (txtProgresoTotal) {
+            txtProgresoTotal.innerText = `${perfil.estadisticasAlbum?.porcentajeCompletado || 0}% COMPLETADO`;
+        }
+
+        // 3. Rango según sus Puntos reales de Ranking
         const txtRango = document.getElementById("perfil-txt-rango");
         if (txtRango && perfil.puntosRanking !== undefined) {
             if (perfil.puntosRanking >= 10000) txtRango.innerText = "RANKING: LEYENDA GLOBAL";
             else if (perfil.puntosRanking >= 5000) txtRango.innerText = "RANKING: PROFESIONAL";
-            else txtRango.innerText = "RANKING: DEBUTANTE";
+            else txtRango.innerText = `RANKING: DEBUTANTE (${perfil.puntosRanking} PTS)`;
         }
 
-        // 3. Renderizamos el Porcentaje total del Álbum en el HUD si fuera necesario, 
-        // o mapeamos las estadísticas que expone tu consulta Postgres.
-        
-        // 4. Actualizamos el bloque de MUNDIALES GANADOS
-        const txtMundiales = document.getElementById("stat-mundiales-copas");
-        if (txtMundiales) {
-            // Tu tabla usuarios guarda copas_mundiales, que viaja en estadisticasTimba o la raíz del perfil
-            // Si el backend lo mapea directo lo ponemos, sino dejamos el valor real de la consulta
-            txtMundiales.innerText = `🏆 ${usuarioActual.copas_mundiales || 0}`;
-        }
+        // 4. Mapeo atómico de las rarezas reales calculadas por tu Query Postgres
+        const txtComunes = document.getElementById("stat-comunes");
+        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum?.comunes || 0;
 
-        // 5. Estadísticas de la Timba (Efectividad y Cantidades)
-        const txtTimbaPorcentaje = document.getElementById("stat-penales-porcentaje");
-        if (txtTimbaPorcentaje) {
-            txtTimbaPorcentaje.innerText = (perfil.estadisticasTimba?.porcentajeEfectividad || 0) + "%";
-        }
+        const txtRaras = document.getElementById("stat-raras");
+        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum?.raras || 0;
 
-        const txtTimbaCant = document.getElementById("stat-penales-cant");
-        if (txtTimbaCant) {
-            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
-            const jugadas = perfil.estadisticasTimba?.jugadas || 0;
-            txtTimbaCant.innerText = `${ganadas}G / ${jugadas}A`;
-        }
+        const txtEpicas = document.getElementById("stat-epicas");
+        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum?.epicas || 0;
 
-        // 6. Sobres Abiertos (Usa tus monedas actuales de la DB frescas)
-        const txtSobres = document.getElementById("stat-sobres-abiertos");
-        if (txtSobres) {
-            txtSobres.innerText = perfil.monedas !== undefined ? perfil.monedas : 0;
-            // Opcional: Cambiar la etiqueta de abajo a "Saldo Oro" si querés reusar el casillero
-            const labelSobres = txtSobres.nextElementSibling;
-            if (labelSobres) labelSobres.innerText = "Oro en Cuenta";
-        }
+        const txtLegendarias = document.getElementById("stat-legendarias");
+        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 7. Trades con Bot (Muestra tus puntos de ranking actuales)
-        const txtTrades = document.getElementById("stat-SBC-completados");
-        if (txtTrades) {
-            txtTrades.innerText = perfil.puntosRanking !== undefined ? perfil.puntosRanking : 0;
-            const labelTrades = txtTrades.nextElementSibling;
-            if (labelTrades) labelTrades.innerText = "Puntos de Ranking";
-        }
-
-        // 8. 📸 CAMBIO DE AVATAR EN TU DIV CIRCULAR: Inyecta la bandera de Alemania como fondo
+        // 5. Ajuste visual de la foto: Aspecto de cromo rectangular impecable
         const divAvatar = document.getElementById("perfil-avatar-user");
         if (divAvatar && perfil.foto) {
+            divAvatar.style.borderRadius = "8px"; // Cambiado de 50% a cantos redondeados tipo carta física
             divAvatar.style.backgroundImage = `url('${perfil.foto}')`;
             divAvatar.style.backgroundSize = "cover";
             divAvatar.style.backgroundPosition = "center";
-            divAvatar.innerText = ""; // Limpiamos el emoji de la pelota genérica para que se vea la facha
+            divAvatar.innerText = ""; // Limpiamos la pelota de fútbol inicial
         }
 
     } catch (err) {
-        console.error("❌ Fallo crítico al renderizar la tarjeta:", err);
-        const txtUsername = document.getElementById("perfil-txt-username");
-        if (txtUsername) txtUsername.innerText = "DESCONECTADO";
+        console.error("❌ Error al pintar la cartelera de perfil:", err);
     }
 }
 
