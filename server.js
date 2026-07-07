@@ -1260,6 +1260,7 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
         if (todosLosJugadores.length === 0) return res.status(400).json({ error: "No hay jugadores en la DB" });
 
         let sobreAbierto = [];
+        // 1. Mantenemos tus 5 jugadores nativos intactos
         for (let i = 0; i < 5; i++) {
             let rand = Math.random();
             let rarezaElegida = 'comun';
@@ -1282,11 +1283,57 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
             sobreAbierto.push({ ...elegido });
         }
 
-        const nuevoOro = usuario.monedas - costo;
+        // 2. 🎲 GATILLO SORPRESA: 10% de chances de meter un Avatar cosmético como 6ta carta
+        let reembolsoAvatar = 0;
+        const PROBABILIDAD_AVATAR = 0.10; // 0.10 = 10% | Puedes subirlo o bajarlo aquí
+        
+        if (Math.random() < PROBABILIDAD_AVATAR) {
+            const fotoAzarQuery = await pool.query("SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 1");
+            
+            if (fotoAzarQuery.rows.length > 0) {
+                const avatarGanado = fotoAzarQuery.rows[0];
+
+                // Verificamos si ya lo tenía desbloqueado
+                const yaLaTiene = await pool.query(
+                    "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
+                    [usuario_id, avatarGanado.id]
+                );
+
+                let esRepetido = false;
+                if (yaLaTiene.rows.length === 0) {
+                    // Si es nuevo, va derecho a su colección
+                    await pool.query(
+                        "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2)",
+                        [usuario_id, avatarGanado.id]
+                    );
+                } else {
+                    esRepetido = true;
+                    reembolsoAvatar = 100; // 🪙 Monedas de consuelo si sale repetido dentro del sobre común
+                }
+
+                // 🎭 EL DISFRAZ: Lo metemos al final simulando ser un jugador para no romper tu JS
+                sobreAbierto.push({
+                    id: `avatar_${avatarGanado.id}`, 
+                    nombre: avatarGanado.nombre,
+                    foto: avatarGanado.ruta_jpg,
+                    posicion: "AVATAR",        // 👈 La clave para filtrar en tu frontend
+                    rareza: "legendaria",      // 👈 Para que brille con marco dorado en la animación
+                    es_foto_perfil: true,      // Flag útil
+                    es_repetido_avatar: esRepetido,
+                    obtenido: esRepetido ? 1 : 0
+                });
+            }
+        }
+
+        // 3. Cobramos el costo del sobre y sumamos el reembolso si correspondió
+        const nuevoOro = usuario.monedas - costo + reembolsoAvatar;
         await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
 
-        // Guardado usando EXCLUDED para evitar bugs en Postgres
+        // 4. Tu loop original de guardado para los jugadores
         for (let jugador of sobreAbierto) {
+            // Saltamos el guardado de progreso si es el ítem simulado de avatar
+            if (jugador.es_foto_perfil) continue;
+
             const resProg = await pool.query(
                 `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
                  ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad
@@ -1299,6 +1346,7 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
         return res.json({ success: true, sobre: sobreAbierto, monedas: nuevoOro });
 
     } catch (err) {
+        console.error("❌ Error en pack opening mixto:", err.message);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -3424,67 +3472,6 @@ app.put('/api/usuarios/cambiar-foto', verificarToken, async (req, res) => {
     }
 });
 
-app.post('/api/tienda/sobre-perfil', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const COSTO_SOBRE = 500; // Podés cambiar el precio acá
-
-    try {
-        // 1. Chequeamos si el usuario tiene la tarasca suficiente
-        const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-        if (userCheck.rows[0].monedas < COSTO_SOBRE) {
-            return res.status(400).json({ ok: false, mensaje: "🪙 No tenés suficiente Oro para este sobre de avatares." });
-        }
-
-        // 2. Traemos una foto de perfil completamente al azar de la base de datos
-        const fotoAzarQuery = await pool.query("SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 1");
-        const fotoGanada = fotoAzarQuery.rows[0];
-
-        // 3. Verificamos si el usuario ya la tenía desbloqueada
-        const yaLaTiene = await pool.query(
-            "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
-            [usuario_id, fotoGanada.id]
-        );
-
-        let mensajeResultado = "";
-        let reembolso = 0;
-
-        // Descontamos el costo del sobre de entrada
-        await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [COSTO_SOBRE, usuario_id]);
-
-        if (yaLaTiene.rows.length > 0) {
-            // 🔥 CASO REPETIDO: Le reembolsamos algo de monedas de consuelo
-            reembolso = 200; 
-            await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [reembolso, usuario_id]);
-            mensajeResultado = `🔄 ¡REPETIDA! Ya tenías "${fotoGanada.nombre}". La banca te reembolsa 🪙${reembolso} monedas.`;
-        } else {
-            // 🎉 CASO NUEVO: Se guarda en su colección
-            await pool.query(
-                "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2)",
-                [usuario_id, fotoGanada.id]
-            );
-            mensajeResultado = `📸 ¡NUEVO AVATAR! Conseguiste la foto de perfil: **${fotoGanada.nombre}**`;
-        }
-
-        // Traemos el saldo final de monedas actualizado
-        const saldoFinal = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-
-        return res.json({
-            ok: true,
-            mensajeResultado,
-            repetida: yaLaTiene.rows.length > 0,
-            foto: {
-                id: fotoGanada.id,
-                nombre: fotoGanada.nombre,
-                ruta_jpg: fotoGanada.ruta_jpg
-            },
-            monedasActuales: saldoFinal.rows[0].monedas
-        });
-
-    } catch (err) {
-        console.error("❌ Error al abrir sobre de perfil:", err.message);
-        return res.status(500).json({ ok: false, mensaje: "Error en el servidor al abrir el sobre." });
-    }
-});
 
 // ========================================================================
 // 🎁 MECÁNICA: ELECCIÓN DE AVATAR INICIAL PARA USUARIOS NUEVOS
