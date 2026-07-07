@@ -1461,6 +1461,15 @@ function arrancarCronometroMundialVisual(ms) {
      const contenedorOpcionesPaises = document.getElementById("zona-eleccion-pais-mundial");
      if (!lblReloj) return;
 
+     // 🛡️ CONTROL DE RESGUARDO ANTI-NAN: Si los milisegundos no son un número válido o vienen corruptos
+     if (ms === undefined || ms === null || isNaN(ms)) {
+          console.warn("⚠️ Los milisegundos del mundial llegaron corruptos o ausentes.");
+          lblReloj.innerText = "⏳ Sincronizando vestuarios con la Arena...";
+          lblReloj.style.color = "#64748b"; // Un gris sutil para indicar espera
+          if (btnIniciar) btnIniciar.style.display = "none";
+          return;
+     }
+
      if (ms <= 0) {
           lblReloj.innerText = "🔋 ¡Inscripción abierta para el MiniMundial!";
           lblReloj.style.color = "var(--verde-match)";
@@ -2495,41 +2504,54 @@ async function cargarRankingMundialesLocal() {
           }
 
           data.ranking.forEach((user, index) => {
-               const tr = document.createElement("tr");
-               if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
+                const tr = document.createElement("tr");
+                if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
 
-               let posicionText = index + 1;
-               if (index === 0) posicionText = "🥇";
-               if (index === 1) posicionText = "🥈";
-               if (index === 2) posicionText = "🥉";
+                let posicionText = index + 1;
+                if (index === 0) posicionText = "🥇";
+                if (index === 1) posicionText = "🥈";
+                if (index === 2) posicionText = "🥉";
 
-               // 1. Armamos la estructura de la fila sin meter el onclick inline
-               tr.innerHTML = `
+                // 🛡️ ESCANEO COMPLETO DE PROPIEDADES EN POSTGRES
+                console.log("🕵️ Escaneando datos de la fila del ranking:", user);
+                const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
+
+                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
                         class="celda-rival-click"
                         onmouseover="this.style.color='var(--celeste)'" 
                         onmouseout="this.style.color='#fff'">
-                        👤 ${user.username} ${usuarioActual && Number(user.id) === Number(usuarioActual.id) ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
+                        👤 ${user.username} ${usuarioActual && Number(idDetectado) === Number(usuarioActual.id) ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
                     </td>
-                    <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales || 0}</td>
-               `;
+                    <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales || user.copas || 0}</td>
+                `;
 
-               // 2. Capturamos la celda del nombre que acabamos de meter al DOM
-               const celdaClick = tr.querySelector(".celda-rival-click");
-               
-               // 3. Le asignamos el evento de forma nativa y segura asegurando el entero de Postgres
-               if (celdaClick) {
+                const celdaClick = tr.querySelector(".celda-rival-click");
+                
+                if (celdaClick) {
                     celdaClick.addEventListener("click", async () => {
-                         const idLimpio = Number(user.id);
-                         if (typeof inspeccionarPerfilRival === "function") {
-                              await inspeccionarPerfilRival(idLimpio);
-                         }
-                    });
-               }
+                        if (!idDetectado) {
+                                console.error("❌ Mapeo roto. El objeto de la DB no contiene ninguna propiedad de ID conocida:", user);
+                                return alert("❌ Error de datos: No se pudo rastrear el ID único de este competidor.");
+                        }
 
-               tbody.appendChild(tr);
-          });
+                        const idLimpio = Number(idDetectado);
+                        
+                        // Control extra: Si dio NaN el casteo numérico por venir corrupto de la DB, frenamos acá
+                        if (isNaN(idLimpio)) {
+                                console.error("❌ El ID detectado no es un número válido (NaN):", idDetectado);
+                                return alert("❌ Error de casteo: El ID del rival llegó corrupto de la base de datos.");
+                        }
+
+                        if (typeof inspeccionarPerfilRival === "function") {
+                                await inspeccionarPerfilRival(idLimpio);
+                        }
+                    });
+                }
+
+                tbody.appendChild(tr);
+            });
      } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
 }
 
