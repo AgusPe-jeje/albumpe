@@ -9,6 +9,17 @@ const BITACORAS_SALA_CACHE = {};
 
 const app = express();
 
+// 🟢 ¡FALTABA ESTO DE ACÁ ABAJO! Inicialización real del pool de conexión para Neon
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, 
+  ssl: {
+    rejectUnauthorized: false // Clave obligatoria para que Render conecte con Neon de forma segura
+  }
+});
+
+// Opcional: Lo hacemos accesible de forma global por si lo usás en módulos separados
+global.pool = pool;
+
 const jwt = require('jsonwebtoken'); 
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_super_segura_para_la_arena';
 
@@ -55,7 +66,7 @@ const verificarToken = (req, res, next) => {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (FIXED DEFINITIVO)
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
 
 app.use((req, res, next) => {
