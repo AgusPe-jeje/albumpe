@@ -1463,8 +1463,9 @@ app.get('/api/ranking', async (req, res) => {
 });
 
 app.get('/api/ranking-mundiales', async (req, res) => {
+    // 🎯 INYECTAMOS EL ID EN EL SELECT (Aseguráte de que tu columna se llame id o usuario_id)
     const query = `
-        SELECT username, copas_mundiales 
+        SELECT id, username, copas_mundiales 
         FROM usuarios 
         WHERE copas_mundiales > 0
         ORDER BY copas_mundiales DESC, puntos_ranking DESC 
@@ -1472,8 +1473,10 @@ app.get('/api/ranking-mundiales', async (req, res) => {
     `;
     try {
         const result = await pool.query(query);
+        // Devolvemos el array con la estructura completa { id, username, copas_mundiales }
         return res.json({ ranking: result.rows });
     } catch (err) {
+        console.error("❌ Error en la query del ranking:", err.message);
         return res.status(500).json({ error: err.message });
     }
 });
