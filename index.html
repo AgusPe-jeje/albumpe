@@ -81,6 +81,7 @@
             <nav class="nav-modulos-estadio" style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; width: max-content; min-width: 100%; align-items: center;">
                 <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🛍️ TIENDA</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">📖 MI ÁLBUM</button>
+                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-perfil', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box; border-color: var(--celeste); color: var(--celeste);">👤 MI PERFIL</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">⚽ PENALES</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🎰 TIMBA</button>
                 <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">💸 MERCADO</button>
@@ -177,6 +178,52 @@
 
                     <div id="selector-paises" class="custom-scrollbar-paises"></div>
                     <div class="grid-album-match" id="contenedor-grid-album"></div>
+                </div>
+            </div>
+
+            <div id="modulo-perfil" class="modulo-contenido" style="display: none;">
+                <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--celeste); padding: 25px; border-radius: 16px; max-width: 800px; margin: 20px auto;">
+                    
+                    <div style="display: flex; align-items: center; gap: 20px; border-bottom: 1px solid #1e293b; padding-bottom: 20px; flex-wrap: wrap;">
+                        <div style="position: relative; width: 90px; height: 90px; background: #020617; border: 2px solid var(--dorado); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 0 15px rgba(255,177,0,0.2);" id="perfil-avatar-user">
+                            ⚽
+                        </div>
+                        <div style="text-align: left; flex-grow: 1;">
+                            <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 1.8rem; letter-spacing: 1px;">CARGANDO CRACK...</h2>
+                            <p id="perfil-txt-rango" style="color: var(--celeste); margin: 4px 0 0 0; font-weight: bold; font-size: 0.85rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: DEBUTANTE</p>
+                        </div>
+                    </div>
+
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 20px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 RENDIMIENTO EN COMPETENCIA</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                        <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
+                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">EFECTIVIDAD PENALES</span>
+                            <span id="stat-penales-porcentaje" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
+                            <span id="stat-penales-cant" style="color: #94a3b8; font-size: 0.7rem;">0G / 0A</span>
+                        </div>
+                        <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
+                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">MUNDIALES GANADOS</span>
+                            <span id="stat-mundiales-copas" style="color: var(--dorado); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🏆 0</span>
+                            <span style="color: #94a3b8; font-size: 0.7rem;">Torneos FIFA</span>
+                        </div>
+                        <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
+                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">SOBRES ABIERTOS</span>
+                            <span id="stat-sobres-abiertos" style="color: #fff; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #94a3b8; font-size: 0.7rem;">Cofres Desbloqueados</span>
+                        </div>
+                        <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
+                            <span style="color: #64748b; font-size: 0.75rem; font-weight: bold; display: block;">TRADES CON BOT</span>
+                            <span id="stat-SBC-completados" style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
+                            <span style="color: #94a3b8; font-size: 0.7rem;">Contratos Firmados</span>
+                        </div>
+                    </div>
+
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 0 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
+                    <div style="background: rgba(2, 6, 23, 0.4); border: 1px solid #1e293b; padding: 15px; border-radius: 12px; display: flex; justify-content: center; align-items: center; min-height: 150px;">
+                        <div id="perfil-contenedor-destacado">
+                            <p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -575,6 +622,40 @@
                 <p><strong>💸 MERCADO DE PASES P2P:</strong> Publicá tus duplicados al precio de Oro que dicte tu estrategia. Las ofertas duran **24 horas estrictas**. Si no hay venta, el sistema en background retira el cromo de la vitrina y te lo devuelve de forma automática.</p>
             </div>
             <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio btn-next-shot" style="width: 100%; margin-top: 25px; background: var(--rojo); border-color: var(--rojo); cursor: pointer; font-weight: bold;">❌ CERRAR GUÍA</button>
+        </div>
+    </div>
+
+    <div id="modal-perfil-visitante" class="modal-anuncio-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;">
+        <div style="background: #0b111e; border: 2px solid var(--dorado); width: 100%; max-width: 500px; padding: 25px; border-radius: 12px; position: relative;">
+            
+            <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #1a2436; padding-bottom: 15px; margin-bottom: 15px;">
+                <div style="width: 65px; height: 65px; background: #020617; border: 2px solid var(--celeste); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem;" id="visitante-avatar">
+                    🛡️
+                </div>
+                <div style="text-align: left;">
+                    <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; display: block; font-family: 'Oswald';">PERFIL DE ARENA</span>
+                    <h2 id="visitante-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 1.5rem; text-transform: uppercase;">USUARIO_RIVAL</h2>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; text-align: left; background: rgba(2,6,23,0.4); padding: 15px; border-radius: 8px; border: 1px solid #1e293b; font-family: system-ui, sans-serif; font-size: 0.9rem; color: #cbd5e1;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>🎯 Copas de Ranking:</span>
+                    <strong id="visitante-stat-copas" style="color: var(--rojo);">0 PTS</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>🏆 Mundiales Ganados:</span>
+                    <strong id="visitante-stat-mundiales" style="color: var(--dorado);">0 Copas</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>🧤 Rendimiento Penales:</span>
+                    <strong id="visitante-stat-penales" style="color: var(--verde-match);">0% efectividad</strong>
+                </div>
+            </div>
+
+            <button type="button" onclick="document.getElementById('modal-perfil-visitante').style.display = 'none';" class="btn-estadio" style="width: 100%; margin-top: 20px; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: bold; border-color: #334155;">
+                ❌ CERRAR INSPECCIÓN
+            </button>
         </div>
     </div>
 
