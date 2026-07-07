@@ -2214,7 +2214,7 @@ function cancelarMundialMultiLobby() {
 }
 
 /* ========================================================================
-   📢 10. LEADERBOARDS (RANKINGS GENERAL Y MUNDIAL) Y BANNER INFORMATIVO
+   📢 10. LEADERBOARDS (RANKINGS GENERAL Y MUNDIAL) Y BANNER INFORMATIVO (FIXED)
    ======================================================================== */
 
 async function cargarRankingLocal() {
@@ -2223,7 +2223,13 @@ async function cargarRankingLocal() {
      if (!tbody) return;
 
      try {
-          const res = await fetch(`${URL_BASE}/ranking`);
+          const token = localStorage.getItem("token");
+
+          // Fetch con cabecera de tester para pasar el candado de mantenimiento
+          const res = await fetch(`${URL_BASE}/ranking`, {
+               method: "GET",
+               headers: { "Authorization": `Bearer ${token}` }
+          });
           const data = await res.json();
           tbody.innerHTML = "";
 
@@ -2240,11 +2246,11 @@ async function cargarRankingLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               // Se añade interactividad al hacer clic en el nombre del usuario
+               // 🔥 CORREGIDO: Eliminadas las comillas extras de la función onclick para pasar el entero nativo
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
-                        onclick="inspeccionarPerfilRival('${user.id}')"
+                        onclick="inspeccionarPerfilRival(${user.id})"
                         onmouseover="this.style.color='var(--celeste)'" 
                         onmouseout="this.style.color='#fff'">
                         👤 ${user.username} ${usuarioActual && user.username === usuarioActual.username ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
@@ -2261,7 +2267,13 @@ async function cargarRankingMundialesLocal() {
      if (!tbody) return;
 
      try {
-          const res = await fetch(`${URL_BASE}/ranking-mundiales`);
+          const token = localStorage.getItem("token");
+
+          // Fetch con cabecera de tester para pasar el candado de mantenimiento
+          const res = await fetch(`${URL_BASE}/ranking-mundiales`, {
+               method: "GET",
+               headers: { "Authorization": `Bearer ${token}` }
+          });
           const data = await res.json();
           tbody.innerHTML = "";
 
@@ -2278,11 +2290,11 @@ async function cargarRankingMundialesLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               // Se añade interactividad al hacer clic en el nombre del usuario
+               // 🔥 CORREGIDO: Cambiado de '${user.id}' a ${user.id} sin comillas para enviar el entero puro de Postgres
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
-                        onclick="inspeccionarPerfilRival('${user.id}')"
+                        onclick="inspeccionarPerfilRival(${user.id})"
                         onmouseover="this.style.color='var(--celeste)'" 
                         onmouseout="this.style.color='#fff'">
                         👤 ${user.username} ${usuarioActual && user.id === usuarioActual.id ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
@@ -3750,6 +3762,61 @@ async function cambiarFotoPerfil(fotoId) {
     } catch (err) {
         console.error("❌ Error al intentar cambiar la foto de perfil:", err);
         alert("Fallo en la comunicación con la Arena al actualizar tu avatar.");
+    }
+}
+
+async function abrirCatalogoAvataresUI() {
+    try {
+        const token = localStorage.getItem("token");
+
+        // 1. Pedimos tu catálogo de banderas al servidor
+        const res = await fetch(`${URL_BASE}/fotos-perfil/mis-avatares`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+        const data = await res.json();
+
+        if (!data.ok) return alert("No se pudo cargar el catálogo de avatares.");
+
+        // 2. Apuntamos al contenedor donde vas a mostrar las fotos
+        // (Asegurate de crear este ID en tu HTML, por ejemplo, un div vacío dentro de un modal)
+        const contenedor = document.getElementById("perfil-grilla-avatares");
+        if (!contenedor) return;
+
+        contenedor.innerHTML = ""; // Limpiamos la grilla antes de rellenar
+
+        // 3. Recorremos cada avatar que devolvió la base de datos
+        data.catalogo.forEach(avatar => {
+            // Creamos el elemento visual de la carta en el DOM
+            const divCarta = document.createElement("div");
+            divCarta.style.width = "80px";
+            divCarta.style.height = "105px";
+            divCarta.style.borderRadius = "6px";
+            divCarta.style.backgroundImage = `url('${avatar.ruta_jpg}')`;
+            divCarta.style.backgroundSize = "cover";
+            divCarta.style.backgroundPosition = "center";
+            divCarta.style.cursor = "pointer";
+            
+            // 🛡️ Si está bloqueada, le metemos un filtro oscuro (candado visual)
+            if (!avatar.desbloqueada) {
+                divCarta.style.filter = "brightness(0.3) grayscale(1)";
+                divCarta.title = "🔒 Conseguilo en un sobre de la tienda";
+            } else {
+                divCarta.style.border = "2px solid #334155";
+                divCarta.title = `Equipar ${avatar.nombre}`;
+                
+                // 🔥 ¡ACÁ SE METE EL FAMOSO RENGLÓN!
+                // Al hacerle click a una carta desbloqueada, ejecuta la función que creamos antes
+                divCarta.onclick = () => cambiarFotoPerfil(avatar.id);
+            }
+
+            contenedor.appendChild(divCarta);
+        });
+
+    } catch (err) {
+        console.error("❌ Error al cargar vitrina de avatares:", err);
     }
 }
 
