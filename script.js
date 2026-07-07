@@ -3643,21 +3643,20 @@ async function actualizarMiPerfilUI() {
     }
 
     try {
-        // 🔑 Recuperamos el token almacenado en tu juego (localStorage o la variable que uses)
-        const token = localStorage.getItem("token"); // 👈 Asegurate de que sea la clave correcta donde guardás tu JWT
+        const token = localStorage.getItem("token");
 
-        // Hacemos el fetch al endpoint maestro pasándole las cabeceras de seguridad
+        // Hacemos el fetch al endpoint maestro pasando el token de tester
         const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`, {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` // 🔥 CON ESTO EL MIDDLEWARE DE MANTENIMIENTO TE DEJA PASAR DE UNA
+                "Authorization": `Bearer ${token}`
             }
         });
         
         if (!res.ok) {
             console.error(`❌ El servidor respondió con error HTTP: ${res.status}`);
-            document.getElementById("visitante-txt-username").innerText = "ERROR DE SERVIDOR";
+            document.getElementById("perfil-txt-username").innerText = "ERROR DE SERVIDOR";
             return;
         }
 
@@ -3666,60 +3665,79 @@ async function actualizarMiPerfilUI() {
 
         if (!data.ok || !data.perfil) {
             console.error("No se pudo obtener la info de la Arena o vino vacía:", data.mensaje);
-            document.getElementById("visitante-txt-username").innerText = "ERROR DE DATA";
+            document.getElementById("perfil-txt-username").innerText = "ERROR DE DATA";
             return;
         }
 
         const perfil = data.perfil;
 
-        // 1. Inyectamos el Nombre de Usuario
-        const txtUsername = document.getElementById("visitante-txt-username");
+        // 1. Inyectamos el Nombre de Usuario real (Reemplaza "CARGANDO CRACK...")
+        const txtUsername = document.getElementById("perfil-txt-username");
         if (txtUsername) {
             txtUsername.innerText = perfil.nombre ? perfil.nombre.toUpperCase() : "SIN NOMBRE";
         }
 
-        // 2. Cargamos las Estadísticas Generales
-        const txtPuntos = document.getElementById("visitante-txt-puntos");
-        if (txtPuntos) txtPuntos.innerText = perfil.puntosRanking !== undefined ? perfil.puntosRanking : 0;
-
-        const txtMonedas = document.getElementById("visitante-txt-monedas");
-        if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas : 0;
-
-        // 3. Renderizamos el Porcentaje total del Álbum
-        const txtProgreso = document.getElementById("visitante-txt-progreso");
-        if (txtProgreso) {
-            txtProgreso.innerText = (perfil.estadisticasAlbum?.porcentajeCompletado || 0) + "%";
+        // 2. Dinamizamos el Rango según sus puntos (Opcional, usando tus puntosRanking)
+        const txtRango = document.getElementById("perfil-txt-rango");
+        if (txtRango && perfil.puntosRanking !== undefined) {
+            if (perfil.puntosRanking >= 10000) txtRango.innerText = "RANKING: LEYENDA GLOBAL";
+            else if (perfil.puntosRanking >= 5000) txtRango.innerText = "RANKING: PROFESIONAL";
+            else txtRango.innerText = "RANKING: DEBUTANTE";
         }
 
-        // 4. Llenamos los contadores específicos por Rareza
-        const txtComunes = document.getElementById("visitante-txt-comunes");
-        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum?.comunes || 0;
+        // 3. Renderizamos el Porcentaje total del Álbum en el HUD si fuera necesario, 
+        // o mapeamos las estadísticas que expone tu consulta Postgres.
+        
+        // 4. Actualizamos el bloque de MUNDIALES GANADOS
+        const txtMundiales = document.getElementById("stat-mundiales-copas");
+        if (txtMundiales) {
+            // Tu tabla usuarios guarda copas_mundiales, que viaja en estadisticasTimba o la raíz del perfil
+            // Si el backend lo mapea directo lo ponemos, sino dejamos el valor real de la consulta
+            txtMundiales.innerText = `🏆 ${usuarioActual.copas_mundiales || 0}`;
+        }
 
-        const txtRaras = document.getElementById("visitante-txt-raras");
-        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum?.raras || 0;
+        // 5. Estadísticas de la Timba (Efectividad y Cantidades)
+        const txtTimbaPorcentaje = document.getElementById("stat-penales-porcentaje");
+        if (txtTimbaPorcentaje) {
+            txtTimbaPorcentaje.innerText = (perfil.estadisticasTimba?.porcentajeEfectividad || 0) + "%";
+        }
 
-        const txtEpicas = document.getElementById("visitante-txt-epicas");
-        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum?.epicas || 0;
+        const txtTimbaCant = document.getElementById("stat-penales-cant");
+        if (txtTimbaCant) {
+            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
+            const jugadas = perfil.estadisticasTimba?.jugadas || 0;
+            txtTimbaCant.innerText = `${ganadas}G / ${jugadas}A`;
+        }
 
-        const txtLegendarias = document.getElementById("visitante-txt-legendarias");
-        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum?.legendarias || 0;
+        // 6. Sobres Abiertos (Usa tus monedas actuales de la DB frescas)
+        const txtSobres = document.getElementById("stat-sobres-abiertos");
+        if (txtSobres) {
+            txtSobres.innerText = perfil.monedas !== undefined ? perfil.monedas : 0;
+            // Opcional: Cambiar la etiqueta de abajo a "Saldo Oro" si querés reusar el casillero
+            const labelSobres = txtSobres.nextElementSibling;
+            if (labelSobres) labelSobres.innerText = "Oro en Cuenta";
+        }
 
-        // 5. Estadísticas de la Timba
-        const txtTimbaJugadas = document.getElementById("visitante-txt-timba-jugadas");
-        if (txtTimbaJugadas) txtTimbaJugadas.innerText = perfil.estadisticasTimba?.jugadas || 0;
+        // 7. Trades con Bot (Muestra tus puntos de ranking actuales)
+        const txtTrades = document.getElementById("stat-SBC-completados");
+        if (txtTrades) {
+            txtTrades.innerText = perfil.puntosRanking !== undefined ? perfil.puntosRanking : 0;
+            const labelTrades = txtTrades.nextElementSibling;
+            if (labelTrades) labelTrades.innerText = "Puntos de Ranking";
+        }
 
-        const txtTimbaEfectividad = document.getElementById("visitante-txt-timba-efectividad");
-        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = (perfil.estadisticasTimba?.porcentajeEfectividad || 0) + "%";
-
-        // 6. Actualizamos el Avatar o Bandera activa
-        const imgAvatar = document.getElementById("visitante-img-avatar");
-        if (imgAvatar && perfil.foto) {
-            imgAvatar.src = perfil.foto;
+        // 8. 📸 CAMBIO DE AVATAR EN TU DIV CIRCULAR: Inyecta la bandera de Alemania como fondo
+        const divAvatar = document.getElementById("perfil-avatar-user");
+        if (divAvatar && perfil.foto) {
+            divAvatar.style.backgroundImage = `url('${perfil.foto}')`;
+            divAvatar.style.backgroundSize = "cover";
+            divAvatar.style.backgroundPosition = "center";
+            divAvatar.innerText = ""; // Limpiamos el emoji de la pelota genérica para que se vea la facha
         }
 
     } catch (err) {
-        console.error("❌ Fallo crítico en la comunicación con la Arena:", err);
-        const txtUsername = document.getElementById("visitante-txt-username");
+        console.error("❌ Fallo crítico al renderizar la tarjeta:", err);
+        const txtUsername = document.getElementById("perfil-txt-username");
         if (txtUsername) txtUsername.innerText = "DESCONECTADO";
     }
 }
