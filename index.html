@@ -182,10 +182,10 @@
             </div>
 
             <div id="modulo-perfil" class="modulo-contenido" style="display: none;">
-                <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--celeste); padding: 25px; border-radius: 16px; max-width: 800px; margin: 20px auto;">
+                <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--celeste); padding: 25px; border-radius: 16px; max-width: 800px; margin: 20px auto; box-sizing: border-box;">
                     
-                    <div style="display: flex; align-items: center; gap: 25px; border-bottom: 1px solid #1e293b; padding-bottom: 25px; flex-wrap: wrap;">
-                        <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--dorado); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(255,177,0,0.25);" id="perfil-avatar-user">
+                    <div style="display: flex; align-items: center; gap: 25px; border-bottom: 1px solid #1e293b; padding-bottom: 25px; flex-wrap: wrap; position: relative;">
+                        <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--dorado); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(255,177,0,0.25); background-size: cover; background-position: center;" id="perfil-avatar-user">
                             ⚽
                         </div>
                         <div style="text-align: left; flex-grow: 1;">
@@ -194,10 +194,20 @@
                                 <span id="perfil-txt-progreso-total" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.3rem; font-weight: bold;">0% COMPLETADO</span>
                             </div>
                             <p id="perfil-txt-rango" style="color: var(--celeste); margin: 6px 0 0 0; font-weight: bold; font-size: 0.95rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: DEBUTANTE (45 PTS)</p>
+                            
+                            <button type="button" onclick="abrirCatalogoAvataresUI()" class="btn-estadio" style="margin-top: 12px; padding: 6px 14px; font-size: 0.8rem; background: #1e293b; color: var(--celeste); border: 1px solid var(--celeste); border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Oswald'; letter-spacing: 0.5px; transition: all 0.2s;">
+                                📸 CAMBIAR AVATAR
+                            </button>
                         </div>
                     </div>
 
-                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 20px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 COLECCIÓN EN PROGRESO (CROMOS EN PROPIEDAD)</h3>
+                    <div id="perfil-panel-avatares" style="display: none; background: rgba(2,6,23,0.85); border: 2px dashed var(--celeste); padding: 20px; border-radius: 12px; margin: 20px 0; position: relative; z-index: 100;">
+                        <h4 style="color: #fff; margin: 0 0 15px 0; font-size: 0.95rem; font-family: 'Oswald'; text-align: left; letter-spacing: 0.5px; color: var(--dorado);">SELECT YOUR AVATAR (Hacé click en uno desbloqueado)</h4>
+                        <div id="perfil-grilla-avatares" style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; min-height: 50px;">
+                            </div>
+                    </div>
+
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">📊 COLECCIÓN EN PROGRESO (CROMOS EN PROPIEDAD)</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px;">
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
                             <span style="color: #94a3b8; font-size: 0.75rem; font-weight: bold; display: block;">COMUNES</span>
@@ -217,7 +227,7 @@
                         </div>
                     </div>
 
-                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 20px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">⚔️ RENDIMIENTO EN COMPETENCIA</h3>
+                    <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">⚔️ RENDIMIENTO EN COMPETENCIA</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 25px;">
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
                             <span style="color: var(--verde-match); font-size: 0.75rem; font-weight: bold; display: block;">EFECTIVIDAD PENALES</span>
