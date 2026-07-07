@@ -3637,67 +3637,90 @@ async function inspeccionarPerfilRival(usuarioId) {
 
 
 async function actualizarMiPerfilUI() {
-    if (!usuarioActual || !usuarioActual.id) return;
+    if (!usuarioActual || !usuarioActual.id) {
+        console.warn("⚠️ No se puede cargar el perfil: 'usuarioActual' o su ID están vacíos.");
+        return;
+    }
 
     try {
-        // Hacemos el fetch al endpoint maestro que me pasaste
-        const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`);
-        const data = await res.json();
+        // 🔑 Recuperamos el token almacenado en tu juego (localStorage o la variable que uses)
+        const token = localStorage.getItem("token"); // 👈 Asegurate de que sea la clave correcta donde guardás tu JWT
 
-        if (!data.ok) {
-            console.error("No se pudo obtener la info de la Arena:", data.mensaje);
+        // Hacemos el fetch al endpoint maestro pasándole las cabeceras de seguridad
+        const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` // 🔥 CON ESTO EL MIDDLEWARE DE MANTENIMIENTO TE DEJA PASAR DE UNA
+            }
+        });
+        
+        if (!res.ok) {
+            console.error(`❌ El servidor respondió con error HTTP: ${res.status}`);
+            document.getElementById("visitante-txt-username").innerText = "ERROR DE SERVIDOR";
+            return;
+        }
+
+        const data = await res.json();
+        console.log("💎 DATA RECIBIDA DEL ENDPOINT /perfil:", data);
+
+        if (!data.ok || !data.perfil) {
+            console.error("No se pudo obtener la info de la Arena o vino vacía:", data.mensaje);
+            document.getElementById("visitante-txt-username").innerText = "ERROR DE DATA";
             return;
         }
 
         const perfil = data.perfil;
 
-        // 1. Inyectamos el Nombre de Usuario (arriba de todo)
+        // 1. Inyectamos el Nombre de Usuario
         const txtUsername = document.getElementById("visitante-txt-username");
         if (txtUsername) {
-            txtUsername.innerText = perfil.nombre.toUpperCase();
+            txtUsername.innerText = perfil.nombre ? perfil.nombre.toUpperCase() : "SIN NOMBRE";
         }
 
         // 2. Cargamos las Estadísticas Generales
         const txtPuntos = document.getElementById("visitante-txt-puntos");
-        if (txtPuntos) txtPuntos.innerText = perfil.puntosRanking || 0;
+        if (txtPuntos) txtPuntos.innerText = perfil.puntosRanking !== undefined ? perfil.puntosRanking : 0;
 
-        const txtMonedas = document.getElementById("visitante-txt-monedas"); // Si tenés este casillero
-        if (txtMonedas) txtMonedas.innerText = perfil.monedas || 0;
+        const txtMonedas = document.getElementById("visitante-txt-monedas");
+        if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas : 0;
 
         // 3. Renderizamos el Porcentaje total del Álbum
         const txtProgreso = document.getElementById("visitante-txt-progreso");
         if (txtProgreso) {
-            txtProgreso.innerText = perfil.estadisticasAlbum.porcentajeCompletado + "%";
+            txtProgreso.innerText = (perfil.estadisticasAlbum?.porcentajeCompletado || 0) + "%";
         }
 
         // 4. Llenamos los contadores específicos por Rareza
         const txtComunes = document.getElementById("visitante-txt-comunes");
-        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum.comunes || 0;
+        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum?.comunes || 0;
 
         const txtRaras = document.getElementById("visitante-txt-raras");
-        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum.raras || 0;
+        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum?.raras || 0;
 
         const txtEpicas = document.getElementById("visitante-txt-epicas");
-        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum.epicas || 0;
+        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum?.epicas || 0;
 
         const txtLegendarias = document.getElementById("visitante-txt-legendarias");
-        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum.legendarias || 0;
+        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
         // 5. Estadísticas de la Timba
         const txtTimbaJugadas = document.getElementById("visitante-txt-timba-jugadas");
-        if (txtTimbaJugadas) txtTimbaJugadas.innerText = perfil.estadisticasTimba.jugadas || 0;
+        if (txtTimbaJugadas) txtTimbaJugadas.innerText = perfil.estadisticasTimba?.jugadas || 0;
 
         const txtTimbaEfectividad = document.getElementById("visitante-txt-timba-efectividad");
-        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = perfil.estadisticasTimba.porcentajeEfectividad + "%";
+        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = (perfil.estadisticasTimba?.porcentajeEfectividad || 0) + "%";
 
         // 6. Actualizamos el Avatar o Bandera activa
-        const imgAvatar = document.getElementById("visitante-img-avatar"); // O el ID que tenga la etiqueta <img> del perfil
-        if (imgAvatar) {
+        const imgAvatar = document.getElementById("visitante-img-avatar");
+        if (imgAvatar && perfil.foto) {
             imgAvatar.src = perfil.foto;
         }
 
     } catch (err) {
-        console.error("❌ Fallo en la comunicación con la Arena:", err);
+        console.error("❌ Fallo crítico en la comunicación con la Arena:", err);
+        const txtUsername = document.getElementById("visitante-txt-username");
+        if (txtUsername) txtUsername.innerText = "DESCONECTADO";
     }
 }
 
