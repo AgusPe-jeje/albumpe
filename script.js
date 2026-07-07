@@ -4021,6 +4021,110 @@ async function procesarEleccionInicial(fotoId) {
     }
 }
 
+// ========================================================================
+// 📦 TIENDA: COMPRA Y REVELACIÓN PREMIUM DE AVATARES (OPCIÓN B)
+// ========================================================================
+
+async function comprarSobreAvatar() {
+    mostrarCarga("Abriendo sobre de avatares...");
+    
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${URL_BASE}/tienda/sobre-perfil`, {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        const data = await res.json();
+        ocultarCarga();
+
+        if (!res.ok || !data.ok) {
+            return alert(data.mensaje || "❌ No se pudo procesar la compra del sobre.");
+        }
+
+        // 1. Mapeamos los elementos del nuevo modal flotante exclusivo
+        const cromo = document.getElementById("cromo-avatar-revelado");
+        const titulo = document.getElementById("titulo-revelar-avatar");
+        const subtitulo = document.getElementById("subtitulo-revelar-avatar");
+        const textoInfo = document.getElementById("texto-resultado-avatar");
+        const btnEquipar = document.getElementById("btn-equipar-avatar-al-toque");
+
+        // 2. Inyectamos los datos del cromo devuelto por Neon
+        cromo.style.backgroundImage = `url('${data.foto.ruta_jpg}')`;
+        subtitulo.innerText = data.foto.nombre.toUpperCase();
+
+        // 3. Evaluamos si fue repetida o nueva según las banderas del backend
+        if (data.repetida) {
+            titulo.innerText = "¡REPETIDA! 🔄";
+            titulo.style.color = "#ef4444"; // Rojo peligro
+            cromo.style.borderColor = "#64748b"; // Borde gris apagado
+            textoInfo.innerHTML = `Ya tenías este diseño en tu colección.<br>La banca te reembolsa <span style="color: var(--dorado); font-weight:bold;">🪙200 monedas</span> de consuelo.`;
+            btnEquipar.style.display = "none"; // Si es repetida, no hace falta equipar
+        } else {
+            titulo.innerText = "¡NUEVO AVATAR! 🎉";
+            titulo.style.color = "var(--verde)"; // Verde éxito o dorado
+            cromo.style.borderColor = "var(--dorado)"; // Borde dorado premium
+            textoInfo.innerHTML = `¡Facha desbloqueada con éxito!<br>Se guardó en tu biblioteca de avatares.`;
+            btnEquipar.style.display = "block"; // Activamos botón para equipar al toque
+            
+            // Le asignamos la función de equipar directo usando el ID ganado
+            btnEquipar.onclick = async () => {
+                cerrarModalAvatarRevelado();
+                if (typeof equiparAvatarDesdeTienda === "function") {
+                    await equiparAvatarDesdeTienda(data.foto.id);
+                }
+            };
+        }
+
+        // 4. Refrescamos las monedas en tu barra superior de la UI global
+        if (usuarioActual) usuarioActual.monedas = data.monedasActuales;
+        actualizarInterfazUI();
+
+        // 5. Encendemos el modal flotante
+        document.getElementById("modal-revelar-avatar").style.display = "flex";
+
+    } catch (err) {
+        ocultarCarga();
+        console.error("❌ Fallo en la compra del sobre cosmético:", err);
+        alert("📡 Error de red al conectar con la Tienda.");
+    }
+}
+
+// Cierra el cartel flotante
+function cerrarModalAvatarRevelado() {
+    document.getElementById("modal-revelar-avatar").style.display = "none";
+}
+
+// Función auxiliar para equipar directo desde el botón del modal
+async function equiparAvatarDesdeTienda(fotoId) {
+    mostrarCarga("Equipando nuevo avatar...");
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${URL_BASE}/usuarios/cambiar-foto`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ fotoId: parseInt(fotoId) })
+        });
+        
+        const data = await res.json();
+        ocultarCarga();
+        
+        if (data.ok) {
+            alert("📸 ¡Facha actualizada al instante!");
+            // Si tenés funciones que redibujen tu perfil o el menú, las llamás acá
+            if (typeof cargarDatosMiPerfil === "function") cargarDatosMiPerfil();
+        } else {
+            alert(data.mensaje);
+        }
+    } catch (err) {
+        ocultarCarga();
+        console.error("❌ Error al auto-equipar:", err);
+    }
+}
+
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
 document.addEventListener("DOMContentLoaded", () => {
     const contenedorScroll = document.querySelector(".menu-scroll-padre");
