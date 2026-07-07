@@ -107,7 +107,7 @@ function cambiarModulo(idModulo, botonPresionado) {
           actualizarTimbasRestantesUI();
      }
      if (idModulo === 'modulo-minimundial' && usuarioActual) {
-          actualizarEstadoMundialUI();
+          chequearEstadoMundialServer();
           cargarRankingMundialesLocal(); 
           document.getElementById("fase-inscripcion-mundial").style.display = "block";
           document.getElementById("fase-draft-mundial").style.display = "none";
@@ -1441,19 +1441,35 @@ let mundialRivalClasif = "";
 let jugadoresSeleccionadosDraft = [];
 let intervaloCronometroMundial = null;
 
-async function actualizarEstadoMundialUI() {
-     if (!usuarioActual) return;
-     try {
-          const res = await fetch(`${URL_BASE}/mundial/estado/${usuarioActual.id}`);
-          const data = await res.json();
-          
-          const lblCopas = document.getElementById("lbl-copas-mundiales");
-          if (lblCopas) lblCopas.innerText = data.copas || 0;
+// 🔥 UNIFICADO Y BLINDADO: Trae el estado seguro y actualiza copas + reloj
+async function chequearEstadoMundialServer() {
+    try {
+        const res = await fetch(`${URL_BASE}/mundial/estado`, {
+            method: "GET",
+            headers: obtenerHeadersSeguros() // ⚡ Pasa el mantenimiento usando tu token cifrado
+        });
+        const data = await res.json();
+        
+        if (data.ok) {
+            // 1. Sincronizamos las copas en la UI de forma dinámica
+            const lblCopas = document.getElementById("lbl-copas-mundiales");
+            if (lblCopas && data.copas !== undefined) {
+                lblCopas.innerText = data.copas;
+            }
 
-          arrancarCronometroMundialVisual(data.siguienteIn);
-     } catch (err) { console.error("Error al pedir estado del Mundial:", err); }
+            // 2. Mandamos los milisegundos seguros al motor visual del reloj
+            if (data.milisegundosRestantes !== undefined) {
+                arrancarCronometroMundialVisual(Number(data.milisegundosRestantes));
+            }
+        } else {
+            console.warn("⚠️ El servidor respondió con error al chequear el mundial:", data.error);
+        }
+    } catch (err) {
+        console.error("❌ Error de red al solicitar cronómetro:", err);
+    }
 }
 
+// ⏱️ MOTOR VISUAL DEL RELOJ DE LA ARENA
 function arrancarCronometroMundialVisual(ms) {
      clearInterval(intervaloCronometroMundial);
      const lblReloj = document.getElementById("cronometro-mundial");
@@ -1461,11 +1477,11 @@ function arrancarCronometroMundialVisual(ms) {
      const contenedorOpcionesPaises = document.getElementById("zona-eleccion-pais-mundial");
      if (!lblReloj) return;
 
-     // 🛡️ CONTROL DE RESGUARDO ANTI-NAN: Si los milisegundos no son un número válido o vienen corruptos
+     // 🛡️ CONTROL DE RESGUARDO ANTI-NAN: Si los milisegundos vienen corruptos o ausentes
      if (ms === undefined || ms === null || isNaN(ms)) {
           console.warn("⚠️ Los milisegundos del mundial llegaron corruptos o ausentes.");
           lblReloj.innerText = "⏳ Sincronizando vestuarios con la Arena...";
-          lblReloj.style.color = "#64748b"; // Un gris sutil para indicar espera
+          lblReloj.style.color = "#64748b"; 
           if (btnIniciar) btnIniciar.style.display = "none";
           return;
      }
@@ -1637,7 +1653,7 @@ async function ejecutarTorneoMundial() {
         if (!data.progreso.ganoClasificacion) {
              contenedorLista.innerHTML = `<div class="item-historial-partido" style="color:var(--rojo); border-color:var(--rojo); text-align:center;"><span>❌ Quedaste afuera por falta de puntos en eliminatorias.</span></div>`;
              usuarioActual.monedas = data.datosActualizados?.monedas || usuarioActual.monedas;
-             actualizarInterfazUI(); actualizarEstadoMundialUI(); liberarNavegacionArenaUI(); return;
+             actualizarInterfazUI(); chequearEstadoMundialServer(); liberarNavegacionArenaUI(); return;
         }
 
         const wrapperTabla = document.createElement("div");
@@ -1718,7 +1734,7 @@ async function ejecutarTorneoMundial() {
              cartelEliminado.innerText = `❌ Quedaste fuera en Grupos (Puesto #${data.progreso.posicionFinalGrupo}).`;
              contenedorLista.appendChild(cartelEliminado);
              usuarioActual.monedas = data.datosActualizados?.monedas || usuarioActual.monedas;
-             actualizarInterfazUI(); actualizarEstadoMundialUI(); liberarNavegacionArenaUI(); return;
+             actualizarInterfazUI(); chequearEstadoMundialServer(); liberarNavegacionArenaUI(); return;
         }
 
         // REPRODUCCIÓN CRONOLÓGICA DE PLAYOFFS ELIMINATORIOS
@@ -1743,7 +1759,7 @@ async function ejecutarTorneoMundial() {
              usuarioActual.copas_mundiales = data.datosActualizados.copas_mundiales;
              actualizarInterfazUI(); cargarRankingMundialesLocal();
         }
-        actualizarEstadoMundialUI(); liberarNavegacionArenaUI();
+        chequearEstadoMundialServer(); liberarNavegacionArenaUI();
     } catch (err) { console.error(err); ocultarCarga(); liberarNavegacionArenaUI(); }
 }
 
