@@ -3580,10 +3580,9 @@ async function inspeccionarPerfilRival(usuarioId) {
      }
 
      try {
-          // 🔑 Recuperamos tu token de tester
           const token = localStorage.getItem("token");
 
-          // 🔥 CORREGIDO: Le inyectamos las cabeceras de autorización para romper el mantenimiento
+          // Fetch seguro con cabeceras de tester para el mantenimiento
           const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`, {
                method: "GET",
                headers: {
@@ -3595,52 +3594,53 @@ async function inspeccionarPerfilRival(usuarioId) {
           if (!res.ok) throw new Error("No se pudo obtener el perfil del rival");
           
           const data = await res.json();
-          if (!data.ok) return alert(data.mensaje);
+          if (!data.ok || !data.perfil) return alert(data.mensaje || "Error al leer datos del rival.");
 
           const rival = data.perfil;
 
-          // 1. Cargamos datos generales y Foto de Perfil Dinámica de tu BD
-          document.getElementById("visitante-txt-username").innerText = rival.nombre;
-          document.getElementById("visitante-stat-copas").innerText = `${rival.puntosRanking || 0} PTS`;
-          
-          // Render de la foto o fallback por si viene por defecto
-          const imgAvatar = document.getElementById("visitante-avatar");
-          if (imgAvatar) {
-               imgAvatar.innerHTML = `<img src="${rival.foto}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" onerror="this.src='fotos/_defecto.jpg'">`;
+          // 1. Inyectamos el Nombre del Rival
+          const txtUsername = document.getElementById("visitante-txt-username");
+          if (txtUsername) {
+               txtUsername.innerText = rival.nombre ? rival.nombre.toUpperCase() : "COMPETIDOR";
           }
 
-          // 2. Armamos un desglose dinámico en el cuerpo del modal para lucir tus nuevas estadísticas de Álbum y Timba
-          const contenedorStats = document.querySelector("#modal-perfil-visitante rgba") || document.getElementById("visitante-stat-copas").parentNode.parentNode;
-          
-          contenedorStats.innerHTML = `
-               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span>🎯 Copas de Ranking:</span>
-                    <strong style="color: var(--rojo);">${rival.puntosRanking} PTS</strong>
-               </div>
-               <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span>📖 Progreso Álbum:</span>
-                    <strong style="color: var(--celeste);">${rival.estadisticasAlbum.porcentajeCompletado}%</strong>
-               </div>
-               <div style="border-top: 1px solid #1a2436; margin: 8px 0; padding-top: 8px; display: flex; justify-content: space-around; font-size: 0.8rem; text-align: center;">
-                    <div><span style="color: #64748b;">COM</span><br><b style="color: #fff;">${rival.estadisticasAlbum.comunes}</b></div>
-                    <div><span style="color: #64748b;">RAR</span><br><b style="color: var(--celeste);">${rival.estadisticasAlbum.raras}</b></div>
-                    <div><span style="color: #64748b;">ÉPI</span><br><b style="color: #a855f7;">${rival.estadisticasAlbum.epicas}</b></div>
-                    <div><span style="color: #64748b;">LEG</span><br><b style="color: var(--dorado);">${rival.estadisticasAlbum.legendarias}</b></div>
-               </div>
-               <div style="border-top: 1px solid #1a2436; padding-top: 8px; display: flex; justify-content: space-between;">
-                    <span>🎰 Efectividad Timba:</span>
-                    <strong style="color: var(--verde-match);">${rival.estadisticasTimba.porcentajeEfectividad}%</strong>
-               </div>
-               <div style="font-size: 0.75rem; color: #64748b; text-align: right; font-style: italic;">
-                    Jugadas: ${rival.estadisticasTimba.jugadas} | Exactos: ${rival.estadisticasTimba.ganadasExacto}
-               </div>
-          `;
+          // 2. Mapeamos los campos exactos de tu HTML limpio
+          const txtCopas = document.getElementById("visitante-stat-copas");
+          if (txtCopas) {
+               txtCopas.innerText = `${rival.puntosRanking || 0} PTS`;
+          }
 
-          // Mostramos el modal
+          const txtMundiales = document.getElementById("visitante-stat-mundiales");
+          if (txtMundiales) {
+               // Buscamos las copas mundiales (guardadas en tu tabla usuarios)
+               // resguardando el dato si el objeto anidado cambia
+               const copasCount = rival.estadisticasTimba?.jugadas !== undefined ? (usuarioActual.copas_mundiales || 0) : 0; 
+               txtMundiales.innerText = `🏆 ${copasCount} Copas`;
+          }
+
+          const txtPenales = document.getElementById("visitante-stat-penales");
+          if (txtPenales) {
+               txtPenales.innerText = `${rival.estadisticasTimba?.porcentajeEfectividad || 0}% Efectividad`;
+          }
+
+          // 3. 📸 DISEÑO CROMO RIVAL: Transformamos su contenedor a formato de carta física rectangular
+          const divAvatar = document.getElementById("visitante-avatar");
+          if (divAvatar && rival.foto) {
+               divAvatar.style.width = "110px";
+               divAvatar.style.height = "145px";
+               divAvatar.style.borderRadius = "8px"; // Chau círculo, hola carta
+               divAvatar.style.border = "2px solid var(--dorado)";
+               divAvatar.style.backgroundImage = `url('${rival.foto}')`;
+               divAvatar.style.backgroundSize = "cover";
+               divAvatar.style.backgroundPosition = "center";
+               divAvatar.innerText = ""; // Limpiamos el escudo genérico 🛡️
+          }
+
+          // 4. Mostramos el modal en pantalla
           document.getElementById("modal-perfil-visitante").style.display = "flex";
 
      } catch (err) {
-          console.error(err);
+          console.error("❌ Fallo en inspección de rival:", err);
           alert("❌ No se pudieron sincronizar los datos de este jugador.");
           document.getElementById("modal-perfil-visitante").style.display = "none";
      }
@@ -3716,6 +3716,40 @@ async function actualizarMiPerfilUI() {
 
     } catch (err) {
         console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
+    }
+}
+
+async function cambiarFotoPerfil(fotoId) {
+    try {
+        const token = localStorage.getItem("token");
+
+        // Hacemos la petición PUT a tu endpoint del servidor
+        const res = await fetch(`${URL_BASE}/usuarios/cambiar-foto`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}` // Rompe el mantenimiento
+            },
+            body: JSON.stringify({ fotoId: parseInt(fotoId) })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+            // Si el servidor responde que no la tenés desbloqueada, salta el aviso
+            alert(data.mensaje || "❌ No podés equiparte este avatar.");
+            return;
+        }
+
+        // 🎉 Si todo salió bien, avisamos y refrescamos la interfaz del perfil
+        alert(data.mensaje); // Muestra tu "📸 ¡Facha actualizada! Tu nuevo avatar está activo."
+        
+        // Volvemos a llamar a la función master para que dibuje el nuevo cromo al toque
+        actualizarMiPerfilUI();
+
+    } catch (err) {
+        console.error("❌ Error al intentar cambiar la foto de perfil:", err);
+        alert("Fallo en la comunicación con la Arena al actualizar tu avatar.");
     }
 }
 
