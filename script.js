@@ -3207,7 +3207,6 @@ document.addEventListener("DOMContentLoaded", () => {
 /* ========================================================================
    🏅 SISTEMA DE RETENCIÓN: MISIONES DIARIAS SINCRONIZADAS AL SERVIDOR
    ======================================================================== */
-
 // Variable global en memoria que se refrescará con lo que devuelva el servidor
 window.misionesDiariasUsuario = [];
 let intervaloResetMisiones = null; // Control atómico del bucle del reloj
