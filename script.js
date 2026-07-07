@@ -4213,6 +4213,139 @@ async function equiparAvatarDesdeTienda(fotoId) {
     }
 }
 
+// ========================================================================
+// ✍️ LÓGICA DE INTERFAZ: LIBRO DE FIRMAS DE PERFILES DE LA ARENA
+// ========================================================================
+
+async function cargarFirmasDelPerfil(perfilId) {
+    const contenedor = document.getElementById("contenedor-lista-firmas");
+    if (!contenedor) return;
+    contenedor.innerHTML = "<p style='color: #64748b;'>Cargando dedicatorias...</p>";
+
+    try {
+        const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
+            method: 'GET',
+            headers: obtenerHeadersSeguros()
+        });
+        const data = await res.json();
+
+        if (!data.ok || data.firmas.length === 0) {
+            contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem;'>Nadie firmó este muro todavía. ¡Sé el primero! 🚀</p>";
+            return;
+        }
+
+        contenedor.innerHTML = "";
+        data.firmas.forEach(f => {
+            const divFirma = document.createElement("div");
+            divFirma.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left;";
+            
+            // Evaluamos las fechas para ver si fue editado
+            const fechaOriginal = new Date(f.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+            let flagFecha = `<span style="color: #475569; font-size: 0.75rem;">${fechaOriginal}</span>`;
+            
+            if (f.editado_en) {
+                const fechaEdit = new Date(f.editado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                flagFecha = `<span style="color: var(--dorado); font-size: 0.75rem;" title="Original: ${fechaOriginal}">✏️ Editado el ${fechaEdit}</span>`;
+            }
+
+            // Si el usuario logueado es el autor de esta firma, le damos controles rápidos
+            const esMio = usuarioActual && usuarioActual.id === f.autor_id;
+            const botonera = esMio ? `
+                <div style="display: flex; gap: 8px; margin-top: 5px; justify-content: flex-end;">
+                    <button onclick="dispararEditarFirma(${f.id}, '${f.mensaje}', ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #334155;">Editar</button>
+                    <button onclick="ejecutarBorrarFirma(${f.id}, ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #ef4444; color: #fff;">Borrar</button>
+                </div>
+            ` : '';
+
+            divFirma.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--celeste); font-size: 0.9rem;">@${f.username}</strong>
+                    ${flagFecha}
+                </div>
+                <p id="texto-firma-${f.id}" style="margin: 4px 0; color: #cbd5e1; font-size: 0.9rem; word-break: break-word;">${f.mensaje}</p>
+                ${botonera}
+            `;
+            contenedor.appendChild(divFirma);
+        });
+
+    } catch (err) {
+        console.error("❌ Fallo de red en firmas:", err);
+    }
+}
+
+// MANDAR NUEVA FIRMA
+async function enviarNuevaFirma(perfilId) {
+    const input = document.getElementById("input-mensaje-firma");
+    if (!input) return;
+    const mensaje = input.value.trim();
+
+    if (!mensaje) return alert("❌ Escribí algo antes de firmar.");
+
+    try {
+        const res = await fetch(`${URL_BASE}/firmas/crear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...obtenerHeadersSeguros() },
+            body: JSON.stringify({ perfilId, mensaje })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            input.value = "";
+            cargarFirmasDelPerfil(perfilId); // Recargamos el feed en vivo
+        } else {
+            alert(data.error);
+        }
+    } catch (err) {
+        console.error("❌ Fallo al guardar firma:", err);
+    }
+}
+
+// MANDAR EDICIÓN (PROMPT SIMPLE RÁPIDO)
+async function dispararEditarFirma(firmaId, mensajeViejo, perfilId) {
+    const nuevoTexto = prompt("Modificá tu dedicatoria (máx 140 caracteres):", mensajeViejo);
+    if (nuevoTexto === null) return; // Canceló el prompt
+    
+    if (!nuevoTexto.trim()) return alert("❌ El mensaje no puede estar vacío.");
+
+    try {
+        const res = await fetch(`${URL_BASE}/firmas/editar`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...obtenerHeadersSeguros() },
+            body: JSON.stringify({ firmaId, nuevoMensaje: nuevoTexto.trim() })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            cargarFirmasDelPerfil(perfilId);
+        } else {
+            alert(data.error);
+        }
+    } catch (err) {
+        console.error("❌ Fallo al editar firma:", err);
+    }
+}
+
+// BORRAR FIRMA
+async function ejecutarBorrarFirma(firmaId, perfilId) {
+    if (!confirm("🚨 ¿Seguro de que querés borrar tu firma de este perfil?")) return;
+
+    try {
+        const res = await fetch(`${URL_BASE}/firmas/borrar/${firmaId}`, {
+            method: 'DELETE',
+            headers: obtenerHeadersSeguros()
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            cargarFirmasDelPerfil(perfilId);
+        } else {
+            alert(data.error);
+        }
+    } catch (err) {
+        console.error("❌ Fallo al borrar firma:", err);
+    }
+}
+
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
 document.addEventListener("DOMContentLoaded", () => {
     const contenedorScroll = document.querySelector(".menu-scroll-padre");
