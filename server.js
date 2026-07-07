@@ -9,14 +9,6 @@ const BITACORAS_SALA_CACHE = {};
 
 const app = express();
 
-// 🟢 ¡FALTABA ESTO DE ACÁ ABAJO! Inicialización real del pool de conexión para Neon
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, 
-  ssl: {
-    rejectUnauthorized: false // Clave obligatoria para que Render conecte con Neon de forma segura
-  }
-});
-
 const jwt = require('jsonwebtoken'); 
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_super_segura_para_la_arena';
 
@@ -61,7 +53,7 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (FIXED DEFINITIVO)
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -85,6 +77,7 @@ app.use((req, res, next) => {
         }
         
         return res.status(503).json({ 
+            ok: false,
             error: "🚧 La Arena está en mantenimiento por reformas de infraestructura. ¡Volvé más tarde, pa! 🏗️" 
         });
     }
@@ -92,37 +85,30 @@ app.use((req, res, next) => {
     // Bloqueamos el registro por completo en mantenimiento
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
+            ok: false,
             error: "🚧 La Arena está en mantenimiento. El registro de nuevas cuentas está cerrado por el momento." 
         });
     }
 
-    // C. 🛡️ FILTRO DE CONTROL: Excepciones para endpoints sin token y validación de testers
-    
-    // 1️⃣ Dejamos pasar las peticiones de base o logout que no siempre mandan cabecera Bearer
+    // C. 🛡️ FILTRO DE CONTROL PARA LOGUEADOS (TESTERS)
+    // Si viene con un token válido en la cabecera, le damos paso libre a cualquier endpoint interno
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.split(' ')[1]) {
+        return next(); // Es un tester con sesión iniciada (puede ver perfil, sobres, trading, mundial, etc.)
+    }
+
+    // D. 📢 EXCEPCIONES PÚBLICAS (Solo rutas que DE VERDAD se pueden ver sin estar logueado)
     if (
         req.path.startsWith('/api/anuncio-actual') || 
-        req.path.startsWith('/api/timbas-restantes') || 
-        req.path.startsWith('/api/tiros-restantes') || 
         req.path.startsWith('/api/logout') ||
-        req.path.startsWith('/api/misiones') ||
-        req.path.startsWith('/api/ranking') ||       // 🌟 Para el Top 10 de la Arena / Penales
-        req.path.startsWith('/api/mundial') ||       // 🌟 Para los Reyes del Mundo y el contador de tiempo
-        req.path.startsWith('/api/mercado') || 
-        req.path.startsWith('/api/usuarios/reclamar-diario') ||
-        req.path.startsWith('/api/contratos') ||
-        req.path.startsWith('/api/usuarios/perfil')
+        req.path.startsWith('/api/ranking') // Para que se vea la tabla de posiciones general
     ) {
         return next();
     }
 
-    // 2️⃣ Para cualquier otra ruta privada del juego, exigimos el token del tester autorizado
-    const authHeader = req.headers['authorization'];
-    if (authHeader && authHeader.split(' ')[1]) {
-        return next(); // Es un tester con sesión iniciada (sobres, trading, mundial, etc.)
-    }
-
-    // D. Si no es un archivo estático, ni un login de tester, ni tiene sesión iniciada, rebota acá:
+    // E. Si no cumplió ninguna condición anterior, rebota por mantenimiento
     return res.status(503).json({ 
+        ok: false,
         error: "🚧 La Arena está en mantenimiento por reformas de infraestructura." 
     });
 });
