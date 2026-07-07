@@ -3641,7 +3641,7 @@ async function actualizarMiPerfilUI() {
 
     try {
         // Hacemos el fetch al endpoint maestro que me pasaste
-        const res = await fetch(`${URL_BASE}/api/usuarios/perfil/${usuarioActual.id}`);
+        const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`);
         const data = await res.json();
 
         if (!data.ok) {
