@@ -818,7 +818,11 @@ async function iniciarDueloLocal() {
      cargarRankingLocal();
 
      try {
-          const res = await fetch(`${URL_BASE}/tiros-restantes/${usuarioActual.id}`);
+          // 🟢 CORREGIDO: Ahora viaja con los headers JWT seguros para saltear el mantenimiento
+          const res = await fetch(`${URL_BASE}/tiros-restantes/${usuarioActual.id}`, {
+               method: "GET",
+               headers: obtenerHeadersSeguros() 
+          });
           const data = await res.json();
           
           if (data.tiros <= 0) {
@@ -914,13 +918,17 @@ async function ejecutarPenalLocal(direccionElegida) {
      direccionGanadora = "";
 
      try {
+          // 🟢 CORREGIDO: Combinamos el JWT con el Content-Type para peticiones con BODY
           const res = await fetch(`${URL_BASE}/jugar-penal`, {
                method: 'POST',
-               headers: obtenerHeadersSeguros(), // 🔥 Cambiado por Headers Seguros (Ya no viaja Content-Type manual)
-               body: JSON.stringify({ gano: esGol }) // ❌ usuario_id ELIMINADO COMPLETAMENTE
+               headers: {
+                    ...obtenerHeadersSeguros(),
+                    'Content-Type': 'application/json'
+               },
+               body: JSON.stringify({ gano: esGol })
           });
           const data = await res.json();
-          ocultarCarga();
+          if (typeof ocultarCarga === "function") ocultarCarga();
           
           if (data.error_limite) {
                alert(data.mensaje);
