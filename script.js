@@ -3653,57 +3653,58 @@ async function actualizarMiPerfilUI() {
         if (!res.ok) return;
 
         const data = await res.json();
-        console.log("💎 DATA RECIBIDA DEL ENDPOINT /perfil:", data);
-
         if (!data.ok || !data.perfil) return;
 
         const perfil = data.perfil;
 
-        // 1. Inyectamos Nombre de Usuario
+        // 1. Datos Principales (Header)
         const txtUsername = document.getElementById("perfil-txt-username");
-        if (txtUsername) {
-            txtUsername.innerText = perfil.nombre ? perfil.nombre.toUpperCase() : "SIN NOMBRE";
-        }
+        if (txtUsername) txtUsername.innerText = perfil.nombre ? perfil.nombre.toUpperCase() : "SIN NOMBRE";
 
-        // 2. Porcentaje Total Completado del Álbum (junto al Nombre)
         const txtProgresoTotal = document.getElementById("perfil-txt-progreso-total");
-        if (txtProgresoTotal) {
-            txtProgresoTotal.innerText = `${perfil.estadisticasAlbum?.porcentajeCompletado || 0}% COMPLETADO`;
-        }
+        if (txtProgresoTotal) txtProgresoTotal.innerText = `${perfil.estadisticasAlbum?.porcentajeCompletado || 0}% COMPLETADO`;
 
-        // 3. Rango según sus Puntos reales de Ranking
         const txtRango = document.getElementById("perfil-txt-rango");
         if (txtRango && perfil.puntosRanking !== undefined) {
-            if (perfil.puntosRanking >= 10000) txtRango.innerText = "RANKING: LEYENDA GLOBAL";
-            else if (perfil.puntosRanking >= 5000) txtRango.innerText = "RANKING: PROFESIONAL";
+            if (perfil.puntosRanking >= 10000) txtRango.innerText = `RANKING: LEYENDA GLOBAL (${perfil.puntosRanking} PTS)`;
+            else if (perfil.puntosRanking >= 5000) txtRango.innerText = `RANKING: PROFESIONAL (${perfil.puntosRanking} PTS)`;
             else txtRango.innerText = `RANKING: DEBUTANTE (${perfil.puntosRanking} PTS)`;
         }
 
-        // 4. Mapeo atómico de las rarezas reales calculadas por tu Query Postgres
-        const txtComunes = document.getElementById("stat-comunes");
-        if (txtComunes) txtComunes.innerText = perfil.estadisticasAlbum?.comunes || 0;
+        // 2. Bloque A: Inventario de Rarezas
+        if (document.getElementById("stat-comunes")) document.getElementById("stat-comunes").innerText = perfil.estadisticasAlbum?.comunes || 0;
+        if (document.getElementById("stat-raras")) document.getElementById("stat-raras").innerText = perfil.estadisticasAlbum?.raras || 0;
+        if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
+        if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        const txtRaras = document.getElementById("stat-raras");
-        if (txtRaras) txtRaras.innerText = perfil.estadisticasAlbum?.raras || 0;
+        // 3. Bloque B: Estadísticas de Juego Remapeadas
+        const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
+        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba?.porcentajeEfectividad || 0}%`;
 
-        const txtEpicas = document.getElementById("stat-epicas");
-        if (txtEpicas) txtEpicas.innerText = perfil.estadisticasAlbum?.epicas || 0;
+        const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
+        if (txtTimbaJugadas) {
+            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
+            txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba?.jugadas || 0} Totales`;
+        }
 
-        const txtLegendarias = document.getElementById("stat-legendarias");
-        if (txtLegendarias) txtLegendarias.innerText = perfil.estadisticasAlbum?.legendarias || 0;
+        const txtMundiales = document.getElementById("stat-mundiales-copas");
+        if (txtMundiales) txtMundiales.innerText = `🏆 ${usuarioActual.copas_mundiales || 0}`;
 
-        // 5. Ajuste visual de la foto: Aspecto de cromo rectangular impecable
+        const txtMonedas = document.getElementById("stat-monedas");
+        if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas.toLocaleString() : 0;
+
+        // 4. Render de la Carta Físicamente Agrandada
         const divAvatar = document.getElementById("perfil-avatar-user");
         if (divAvatar && perfil.foto) {
-            divAvatar.style.borderRadius = "8px"; // Cambiado de 50% a cantos redondeados tipo carta física
+            divAvatar.style.borderRadius = "12px";
             divAvatar.style.backgroundImage = `url('${perfil.foto}')`;
             divAvatar.style.backgroundSize = "cover";
             divAvatar.style.backgroundPosition = "center";
-            divAvatar.innerText = ""; // Limpiamos la pelota de fútbol inicial
+            divAvatar.innerText = "";
         }
 
     } catch (err) {
-        console.error("❌ Error al pintar la cartelera de perfil:", err);
+        console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
     }
 }
 
