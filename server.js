@@ -3565,6 +3565,29 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
 // ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL
 // ========================================================================
 
+// 🛡️ FUNCIÓN DE SEGURIDAD ANTI-LINKS Y ANTI-XSS
+function validarTextoFirmaSeguro(texto) {
+    const textoLimpio = (texto || '').trim();
+
+    if (!textoLimpio) return { valido: false, error: "El mensaje no puede estar vacío." };
+    if (textoLimpio.length > 140) return { valido: false, error: "El mensaje supera los 140 caracteres." };
+
+    // 1. 🚫 DETECTOR DE SCRIPTS/HTML: Si tiene etiquetas tipo <script>, <div>, etc.
+    const detectorHTML = /<[^>]*>/g;
+    if (detectorHTML.test(textoLimpio)) {
+        return { valido: false, error: "❌ Código detectado: No se permite inyectar HTML ni Scripts." };
+    }
+
+    // 2. 🚫 DETECTOR DE LINKS: Filtra http, https, ftp, .com, .net, .org, www.
+    // Captura formatos como 'http://...', 'https://...', 'www.sitio.com' o incluso 'sitio.com' suelto
+    const detectorLinks = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|net|org|io|edu|gov|co|ar)\b)/i;
+    if (detectorLinks.test(textoLimpio)) {
+        return { valido: false, error: "❌ Enlace detectado: No se permiten links en las firmas." };
+    }
+
+    return { valido: true, texto: textoLimpio };
+}
+
 // 1. OBTENER TODAS LAS FIRMAS DE UN PERFIL ESPECÍFICO
 app.get('/api/firmas/:perfilId', verificarToken, async (req, res) => {
     const { perfilId } = req.params;
@@ -3590,10 +3613,12 @@ app.post('/api/firmas/crear', verificarToken, async (req, res) => {
     const autor_id = req.usuarioLogueado.id;
     const { perfilId, mensaje } = req.body;
 
-    const textoLimpio = (mensaje || '').trim();
-    if (!textoLimpio || textoLimpio.length > 140) {
-        return res.status(400).json({ error: "El mensaje debe tener entre 1 y 140 caracteres." });
+    // 🛡️ Pasamos el filtro de seguridad
+    const validacion = validarTextoFirmaSeguro(mensaje);
+    if (!validacion.valido) {
+        return res.status(400).json({ error: validacion.error });
     }
+
     if (parseInt(perfilId) === autor_id) {
         return res.status(400).json({ error: "No podés firmar tu propio perfil, che." });
     }
@@ -3604,13 +3629,13 @@ app.post('/api/firmas/crear', verificarToken, async (req, res) => {
             VALUES ($1, $2, $3, NOW())
             RETURNING id;
         `;
-        await pool.query(query, [perfilId, autor_id, textoLimpio]);
+        // Guardamos el texto validado libre de porquerías
+        await pool.query(query, [perfilId, autor_id, validacion.texto]);
         return res.json({ ok: true, mensaje: "¡Perfil firmado correctamente!" });
     } catch (err) {
-        if (err.code === '23505') { // Código de Postgres para violación de restricción UNIQUE
-            return res.status(400).json({ error: "Ya firmaste este perfil. Podés editar tu firma actual si querés cambiarla." });
+        if (err.code === '23505') { 
+            return res.status(400).json({ error: "Ya firmaste este perfil." });
         }
-        console.error("❌ Error al crear firma:", err.message);
         return res.status(500).json({ error: "Error interno al procesar la firma." });
     }
 });
@@ -3620,28 +3645,22 @@ app.put('/api/firmas/editar', verificarToken, async (req, res) => {
     const autor_id = req.usuarioLogueado.id;
     const { firmaId, nuevoMensaje } = req.body;
 
-    const textoLimpio = (nuevoMensaje || '').trim();
-    if (!textoLimpio || textoLimpio.length > 140) {
-        return res.status(400).json({ error: "El mensaje debe tener entre 1 y 140 caracteres." });
+    // 🛡️ Pasamos el filtro de seguridad también al editar
+    const validacion = validarTextoFirmaSeguro(nuevoMensaje);
+    if (!validacion.valido) {
+        return res.status(400).json({ error: validacion.error });
     }
 
     try {
-        // Validamos la autoría de forma atómica en el WHERE
         const query = `
             UPDATE usuario_firmas 
             SET mensaje = $1, editado_en = NOW()
             WHERE id = $2 AND autor_id = $3
             RETURNING id;
         `;
-        const result = await pool.query(query, [textoLimpio, firmaId, autor_id]);
-
-        if (result.rows.length === 0) {
-            return res.status(403).json({ error: "No tenés permisos para editar esta firma o no existe." });
-        }
-
+        await pool.query(query, [validacion.texto, firmaId, autor_id]);
         return res.json({ ok: true, mensaje: "Firma modificada con éxito." });
     } catch (err) {
-        console.error("❌ Error al editar firma:", err.message);
         return res.status(500).json({ error: "Error en el servidor al editar." });
     }
 });
