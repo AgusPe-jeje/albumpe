@@ -2239,7 +2239,7 @@ async function cargarRankingLocal() {
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
-                        onclick="inspeccionarPerfilRival('${user.username}')"
+                        onclick="inspeccionarPerfilRival('${user.id}')"
                         onmouseover="this.style.color='var(--celeste)'" 
                         onmouseout="this.style.color='#fff'">
                         👤 ${user.username} ${usuarioActual && user.username === usuarioActual.username ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
@@ -3623,8 +3623,10 @@ async function inspeccionarPerfilRival(usuarioId) {
           document.getElementById("modal-perfil-visitante").style.display = "flex";
 
      } catch (err) {
-          console.error("❌ Error al inspeccionar al rival:", err);
-          alert("Hubo un problema al conectar con los vestuarios de ese jugador.");
+          console.error(err);
+          alert("❌ No se pudieron sincronizar los datos de este jugador.");
+          // Opcional: cerrar el modal automáticamente si falla
+          document.getElementById("modal-perfil-visitante").style.display = "none";
      }
 }
 
