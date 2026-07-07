@@ -410,10 +410,17 @@ function mostrarJugadoresPorPais() {
           card.className = `carta-clash ${figu.rareza.toLowerCase()} ${esObtenida ? '' : 'bloqueada'}`;
           card.style.animationDelay = `${(index % 12) * 30}ms`;
           
+          // 🔥 AGREGADO: Si el usuario tiene la figurita, se le renderiza el botón de insignia abajo
           card.innerHTML = `
               ${figu.obtenido > 1 ? `<div class="badge-repetidas">x${figu.obtenido}</div>` : ''}
               <img src="${figu.foto}" class="carta-foto" alt="${figu.nombre}">
               <div class="rareza-vertical">${figu.rareza.toUpperCase()}</div>
+              
+              ${esObtenida ? `
+                  <button type="button" onclick="marcarCromoComoDestacado(${figu.id}, '${figu.nombre.replace(/'/g, "\\'")}', '${figu.foto}', '${figu.rareza}')" class="btn-estadio" style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); padding: 4px 6px; font-size: 0.65rem; background: var(--dorado); color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 10;">
+                      🌟 DESTACAR
+                  </button>
+              ` : ''}
           `;
           contenedorGrid.appendChild(card);
      });
@@ -2821,6 +2828,7 @@ async function comprarCartaMercado(ofertaId) {
             // Refrescamos el historial dinámico si ya metiste el feed global abajo
             if (typeof actualizarHistorialTransferenciasUI === "function") {
                 actualizarHistorialTransferenciasUI();
+                renderizarCromoDestacadoUI();
             }
 
         } else {
@@ -3731,65 +3739,29 @@ async function actualizarMiPerfilUI() {
     }
 }
 
-async function cambiarFotoPerfil(fotoId) {
-    try {
-        const token = localStorage.getItem("token");
-
-        // Hacemos la petición PUT a tu endpoint del servidor
-        const res = await fetch(`${URL_BASE}/usuarios/cambiar-foto`, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}` // Rompe el mantenimiento
-            },
-            body: JSON.stringify({ fotoId: parseInt(fotoId) })
-        });
-
-        const data = await res.json();
-
-        if (!res.ok || !data.ok) {
-            // Si el servidor responde que no la tenés desbloqueada, salta el aviso
-            alert(data.mensaje || "❌ No podés equiparte este avatar.");
-            return;
-        }
-
-        // 🎉 Si todo salió bien, avisamos y refrescamos la interfaz del perfil
-        alert(data.mensaje); // Muestra tu "📸 ¡Facha actualizada! Tu nuevo avatar está activo."
-        
-        // Volvemos a llamar a la función master para que dibuje el nuevo cromo al toque
-        actualizarMiPerfilUI();
-
-    } catch (err) {
-        console.error("❌ Error al intentar cambiar la foto de perfil:", err);
-        alert("Fallo en la comunicación con la Arena al actualizar tu avatar.");
-    }
-}
-
+// A. Abre el panel dinámico y renderiza tus banderas/avatares desde Neon
 async function abrirCatalogoAvataresUI() {
+    const panel = document.getElementById("perfil-panel-avatares");
+    if (panel) {
+        // Efecto toggle: si está abierto lo cierra, si está cerrado lo abre
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+        if (panel.style.display === "none") return;
+    }
+
     try {
         const token = localStorage.getItem("token");
-
-        // 1. Pedimos tu catálogo de banderas al servidor
         const res = await fetch(`${URL_BASE}/fotos-perfil/mis-avatares`, {
             method: "GET",
-            headers: {
-                "Authorization": `Bearer ${token}`
-            }
+            headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
+        if (!data.ok) return;
 
-        if (!data.ok) return alert("No se pudo cargar el catálogo de avatares.");
-
-        // 2. Apuntamos al contenedor donde vas a mostrar las fotos
-        // (Asegurate de crear este ID en tu HTML, por ejemplo, un div vacío dentro de un modal)
         const contenedor = document.getElementById("perfil-grilla-avatares");
         if (!contenedor) return;
+        contenedor.innerHTML = "";
 
-        contenedor.innerHTML = ""; // Limpiamos la grilla antes de rellenar
-
-        // 3. Recorremos cada avatar que devolvió la base de datos
         data.catalogo.forEach(avatar => {
-            // Creamos el elemento visual de la carta en el DOM
             const divCarta = document.createElement("div");
             divCarta.style.width = "80px";
             divCarta.style.height = "105px";
@@ -3798,26 +3770,85 @@ async function abrirCatalogoAvataresUI() {
             divCarta.style.backgroundSize = "cover";
             divCarta.style.backgroundPosition = "center";
             divCarta.style.cursor = "pointer";
+            divCarta.style.transition = "transform 0.2s";
             
-            // 🛡️ Si está bloqueada, le metemos un filtro oscuro (candado visual)
             if (!avatar.desbloqueada) {
-                divCarta.style.filter = "brightness(0.3) grayscale(1)";
+                divCarta.style.filter = "brightness(0.25) grayscale(1)";
                 divCarta.title = "🔒 Conseguilo en un sobre de la tienda";
             } else {
-                divCarta.style.border = "2px solid #334155";
+                divCarta.style.border = "2px solid var(--celeste)";
                 divCarta.title = `Equipar ${avatar.nombre}`;
+                divCarta.onmouseover = () => divCarta.style.transform = "scale(1.05)";
+                divCarta.onmouseout = () => divCarta.style.transform = "scale(1)";
                 
-                // 🔥 ¡ACÁ SE METE EL FAMOSO RENGLÓN!
-                // Al hacerle click a una carta desbloqueada, ejecuta la función que creamos antes
-                divCarta.onclick = () => cambiarFotoPerfil(avatar.id);
+                // Al hacer click, llama al endpoint de actualización
+                divCarta.onclick = () => procesarCambioFotoPerfil(avatar.id);
             }
-
             contenedor.appendChild(divCarta);
         });
-
     } catch (err) {
         console.error("❌ Error al cargar vitrina de avatares:", err);
     }
+}
+
+// B. Envía el PUT al servidor para impactar la DB y refresca tu cromo
+async function procesarCambioFotoPerfil(fotoId) {
+    try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${URL_BASE}/usuarios/cambiar-foto`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ fotoId: parseInt(fotoId) })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.ok) return alert(data.mensaje || "❌ Error al cambiar avatar.");
+
+        // Cerramos el panel y actualizamos la facha del perfil de una
+        document.getElementById("perfil-panel-avatares").style.display = "none";
+        actualizarMiPerfilUI();
+    } catch (err) {
+        console.error("❌ Error al cambiar la foto de perfil:", err);
+    }
+}
+
+// Guarda tu carta favorita en el almacenamiento local del juego
+function marcarCromoComoDestacado(id, nombre, foto, rareza) {
+    const cromo = { id, nombre, foto, rareza };
+    localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromo));
+    alert(`🌟 ¡${nombre.toUpperCase()} fue asignado como tu cromo insignia del vestuario!`);
+}
+
+// Inyecta el cromo seleccionado dentro de la caja de tu perfil
+function renderizarCromoDestacadoUI() {
+    const contenedor = document.getElementById("perfil-contenedor-destacado");
+    if (!contenedor) return;
+
+    const cromoGuardado = localStorage.getItem("cromo_destacado_perfil");
+
+    if (!cromoGuardado) {
+        contenedor.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia... Elegilo desde tu pestaña 'MI ÁLBUM'</p>`;
+        return;
+    }
+
+    const cromo = JSON.parse(cromoGuardado);
+    
+    // Determinamos el color de borde según la rareza para mantener la estética limpia
+    let colorBorde = "var(--celeste)";
+    if (cromo.rareza.toLowerCase() === "epica") colorBorde = "#a855f7";
+    if (cromo.rareza.toLowerCase() === "legendaria") colorBorde = "var(--dorado)";
+    if (cromo.rareza.toLowerCase() === "comun") colorBorde = "#475569";
+
+    contenedor.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <div style="width: 110px; height: 145px; background: #020617; border: 3px solid ${colorBorde}; border-radius: 8px; background-image: url('${cromo.foto}'); background-size: cover; background-position: center; box-shadow: 0 0 15px rgba(0,0,0,0.5);"></div>
+            <span style="color: #fff; font-family: 'Oswald'; font-size: 1rem; letter-spacing: 0.5px;">${cromo.nombre.toUpperCase()}</span>
+            <span style="color: ${colorBorde}; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">[${cromo.rareza}]</span>
+        </div>
+    `;
 }
 
 // ⚡ MOTOR DE SCROLL HORIZONTAL CON LA RUEDA DEL MOUSE
