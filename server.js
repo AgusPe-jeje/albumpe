@@ -9,17 +9,6 @@ const BITACORAS_SALA_CACHE = {};
 
 const app = express();
 
-// 🟢 ¡FALTABA ESTO DE ACÁ ABAJO! Inicialización real del pool de conexión para Neon
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, 
-  ssl: {
-    rejectUnauthorized: false // Clave obligatoria para que Render conecte con Neon de forma segura
-  }
-});
-
-// Opcional: Lo hacemos accesible de forma global por si lo usás en módulos separados
-global.pool = pool;
-
 const jwt = require('jsonwebtoken'); 
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_super_segura_para_la_arena';
 
@@ -3312,30 +3301,36 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
 
     try {
-        // 🧠 Consulta Maestra: Trae datos de usuario, su foto de perfil exclusiva y cuenta las rarezas del álbum
+        // 🧠 Consulta Maestra Corregida para Postgres (username y GROUP BY completo)
         const perfilQuery = `
             SELECT 
                 u.id, 
-                u.nombre_usuario, 
+                u.username AS nombre_usuario, -- 👈 CORREGIDO: Usamos la columna real 'username'
                 u.monedas, 
                 u.puntos_ranking,
                 u.timbas_jugadas,
                 u.timbas_ganadas_exacto,
                 u.timbas_ganadas_signo,
                 fp.ruta_jpg AS foto_perfil,
-                -- Contamos las cartas por rareza en base a lo que tiene stock (> 0)
                 COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END) AS comunes,
                 COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END) AS raras,
                 COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END) AS epicas,
                 COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END) AS legendarias,
-                -- Calculamos el porcentaje completado respecto al total de cartas existentes en el juego
-                ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / (SELECT COUNT(*) FROM jugadores)::NUMERIC) * 100, 2) AS porcentaje_album
+                ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2) AS porcentaje_album
             FROM usuarios u
             LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id
             LEFT JOIN usuario_progreso up ON u.id = up.usuario_id
             LEFT JOIN jugadores j ON up.jugador_id = j.id
             WHERE u.id = $1
-            GROUP BY u.id, fp.ruta_jpg;
+            GROUP BY 
+                u.id, 
+                u.username, 
+                u.monedas, 
+                u.puntos_ranking, 
+                u.timbas_jugadas, 
+                u.timbas_ganadas_exacto, 
+                u.timbas_ganadas_signo, 
+                fp.ruta_jpg; -- 👈 CORREGIDO: Todas las columnas agregadas al GROUP BY
         `;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
@@ -3347,7 +3342,7 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
         const datos = result.rows[0];
 
         // 📊 Matemática de la Timba en caliente para el Front
-        const victoriasTotales = parseInt(datos.timbas_ganadas_exacto) + parseInt(datos.timbas_ganadas_signo);
+        const victoriasTotales = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
         const porcentajeVictorias = datos.timbas_jugadas > 0 
             ? Math.round((victoriasTotales / datos.timbas_jugadas) * 100) 
             : 0;
@@ -3361,16 +3356,16 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 puntosRanking: datos.puntos_ranking,
                 foto: datos.foto_perfil || 'fotos/_defecto.jpg',
                 estadisticasAlbum: {
-                    comunes: parseInt(datos.comunes),
-                    raras: parseInt(datos.raras),
-                    epicas: parseInt(datos.epicas),
-                    legendarias: parseInt(datos.legendarias),
+                    comunes: parseInt(datos.comunes || 0),
+                    raras: parseInt(datos.raras || 0),
+                    epicas: parseInt(datos.epicas || 0),
+                    legendarias: parseInt(datos.legendarias || 0),
                     porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0
                 },
                 estadisticasTimba: {
-                    jugadas: parseInt(datos.timbas_jugadas),
-                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto),
-                    ganadasSigno: parseInt(datos.timbas_ganadas_signo),
+                    jugadas: parseInt(datos.timbas_jugadas || 0),
+                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0),
+                    ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0),
                     porcentajeEfectividad: porcentajeVictorias
                 }
             }
