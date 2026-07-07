@@ -2503,17 +2503,31 @@ async function cargarRankingMundialesLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               // 🔥 CORREGIDO: Cambiado de '${user.id}' a ${user.id} sin comillas para enviar el entero puro de Postgres
+               // 1. Armamos la estructura de la fila sin meter el onclick inline
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
-                        onclick="inspeccionarPerfilRival(${user.id})"
+                        class="celda-rival-click"
                         onmouseover="this.style.color='var(--celeste)'" 
                         onmouseout="this.style.color='#fff'">
-                        👤 ${user.username} ${usuarioActual && user.id === usuarioActual.id ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
+                        👤 ${user.username} ${usuarioActual && Number(user.id) === Number(usuarioActual.id) ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
                     </td>
-                    <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales}</td>
+                    <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales || 0}</td>
                `;
+
+               // 2. Capturamos la celda del nombre que acabamos de meter al DOM
+               const celdaClick = tr.querySelector(".celda-rival-click");
+               
+               // 3. Le asignamos el evento de forma nativa y segura asegurando el entero de Postgres
+               if (celdaClick) {
+                    celdaClick.addEventListener("click", async () => {
+                         const idLimpio = Number(user.id);
+                         if (typeof inspeccionarPerfilRival === "function") {
+                              await inspeccionarPerfilRival(idLimpio);
+                         }
+                    });
+               }
+
                tbody.appendChild(tr);
           });
      } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
