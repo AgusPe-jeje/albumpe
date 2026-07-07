@@ -109,7 +109,8 @@ app.use((req, res, next) => {
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
-        req.path.startsWith('/api/ranking') // Para que se vea la tabla de posiciones general
+        req.path.startsWith('/api/ranking') ||
+        req.path.startsWith('/api/usuarios/opciones-avatar-inicial') // Para que se vea la tabla de posiciones general
     ) {
         return next();
     }
