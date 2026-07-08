@@ -6,6 +6,9 @@
     <title>🏆 Virtual Album Mundial 🏆</title>
     <link href="https://fonts.googleapis.com/css2?family=Khand:wght@500;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    
+    <script src="/socket.io/socket.io.js" defer></script>
+    <script src="script.js" defer></script>
 </head>
 <body class="ambiente-mundial">
     
@@ -69,29 +72,21 @@
             </div>
             
             <div id="wrapper-desplegable-misiones" class="desplegable-misiones-anim">
-                <div style="display: flex; flex-direction: column; gap: 12px;" id="contenedor-lista-misiones">
-                    </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;" id="contenedor-lista-misiones"></div>
             </div>
         </div>
         
-<!-- 🟢 Contenedor Padre: Bloquea el desborde vertical y activa el scroll horizontal nativo -->
         <div class="menu-scroll-padre" style="width: 100%; max-width: 900px; margin: 25px auto; overflow-x: auto; overflow-y: hidden; padding: 10px 5px 18px 5px; box-sizing: border-box;">
-            
-            <!-- Contenedor Flexible: Fuerza un ancho amplio para garantizar que el scroll se mueva libremente -->
             <nav class="nav-modulos-estadio" style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; width: max-content; min-width: 100%; align-items: center;">
                 <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🛍️ TIENDA</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">📖 MI ÁLBUM</button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-perfil', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-family: 'Oswald'; font-weight: bold; font-size: 1rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase;">
-                    👤 MI PERFIL
-                </button>
+                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-perfil', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-family: 'Oswald'; font-weight: bold; font-size: 1rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase;">👤 MI PERFIL</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">⚽ PENALES</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🎰 TIMBA</button>
                 <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">💸 MERCADO</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🏆 MUNDIAL</button>
                 <button class="btn-modulo-match" style="border-color: var(--dorado); color: var(--dorado); flex: 0 0 165px; width: 165px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;" onclick="cambiarModulo('modulo-mundial-multi', this)">👥 MULTIJUGADOR</button>
-                <button type="button" id="btn-nav-contratos" class="btn-modulo-match" onclick="cambiarModulo('modulo-contratos-sbc', this)" style="flex: 0 0 180px; width: 180px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">
-                    🦾 CONTRATOS BOT
-                </button>
+                <button type="button" id="btn-nav-contratos" class="btn-modulo-match" onclick="cambiarModulo('modulo-contratos-sbc', this)" style="flex: 0 0 180px; width: 180px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🦾 CONTRATOS BOT</button>
             </nav>
         </div>
 
@@ -124,12 +119,10 @@
                             <button class="btn-comprar-pack" onclick="comprarSobreEspecifico('legendario')">ABRIR (🪙500)</button>
                         </div>
                     </div>
-                    <!-- 🔄 FILTRO PREMIUM: SALTEAR REPETIDOS -->
+                    
                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; font-family: 'Oswald'; color: #fff; letter-spacing: 1px;">
                         <input type="checkbox" id="check-saltear-repetidos" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--dorado);">
-                        <label for="check-saltear-repetidos" style="cursor: pointer; font-size: 1rem; text-transform: uppercase;">
-                            ⚡ Saltear cartas repetidas en la animación
-                        </label>
+                        <label for="check-saltear-repetidos" style="cursor: pointer; font-size: 1rem; text-transform: uppercase;">⚡ Saltear cartas repetidas en la animación</label>
                     </div>
 
                     <div class="seccion-sobre-abierto-arena">
@@ -141,9 +134,7 @@
                                 <div class="pista-bloque" id="pista-rareza">?</div>
                             </div>
                             <div id="pantalla-carta-presentada" class="carta-presentada-wrapper"></div>
-                            <button type="button" id="btn-siguiente-carta-pack" class="btn-estadio btn-next-pack-card" onclick="mostrarSiguienteCartaSecuencia()">
-                                SIGUIENTE CARTA ▶
-                            </button>
+                            <button type="button" id="btn-siguiente-carta-pack" class="btn-estadio btn-next-pack-card" onclick="mostrarSiguienteCartaSecuencia()">SIGUIENTE CARTA ▶</button>
                         </div>
                         <div id="grid-sobre-abierto"></div>
                     </div>
@@ -163,9 +154,7 @@
                     </div>
 
                     <div style="text-align: center; margin-bottom: 20px;">
-                        <button type="button" class="btn-estadio" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--dorado); color: var(--dorado); max-width: 350px; width: 100%; font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;" onclick="cambiarModulo('modulo-comerciante-bot', this); abrirMercadoBot(window.albumCompleto || []);">
-                            🤖 HABLAR CON EL BOT COMERCIANTE
-                        </button>
+                        <button type="button" class="btn-estadio" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-color: var(--dorado); color: var(--dorado); max-width: 350px; width: 100%; font-weight: bold; font-size: 1.1rem; letter-spacing: 1px;" onclick="cambiarModulo('modulo-comerciante-bot', this); abrirMercadoBot(window.albumCompleto || []);">🤖 HABLAR CON EL BOT COMERCIANTE</button>
                     </div>
 
                     <div class="contenedor-filtros-album">
@@ -192,21 +181,15 @@
 
             <div id="modulo-perfil" class="modulo-contenido" style="display: none;">
                 <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--celeste); padding: 25px; border-radius: 16px; max-width: 800px; margin: 20px auto; box-sizing: border-box;">
-                    
                     <div style="display: flex; align-items: center; gap: 25px; border-bottom: 1px solid #1e293b; padding-bottom: 25px; flex-wrap: wrap; position: relative;">
-                        <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--dorado); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(255,177,0,0.25); background-size: cover; background-position: center;" id="perfil-avatar-user">
-                            ⚽
-                        </div>
+                        <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--dorado); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(255,177,0,0.25); background-size: cover; background-position: center;" id="perfil-avatar-user">⚽</div>
                         <div style="text-align: left; flex-grow: 1;">
                             <div style="display: flex; align-items: baseline; gap: 15px; flex-wrap: wrap;">
                                 <h2 id="perfil-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 2.2rem; letter-spacing: 1px;">-</h2>
                                 <span id="perfil-txt-progreso-total" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.3rem; font-weight: bold;">0% COMPLETADO</span>
                             </div>
                             <p id="perfil-txt-rango" style="color: var(--celeste); margin: 6px 0 0 0; font-weight: bold; font-size: 0.95rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: -</p>
-                            
-                            <button type="button" onclick="abrirCatalogoAvataresUI()" class="btn-estadio" style="margin-top: 12px; padding: 6px 14px; font-size: 0.8rem; background: #1e293b; color: var(--celeste); border: 1px solid var(--celeste); border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Oswald'; letter-spacing: 0.5px; transition: all 0.2s;">
-                                📸 CAMBIAR AVATAR
-                            </button>
+                            <button type="button" onclick="abrirCatalogoAvataresUI()" class="btn-estadio" style="margin-top: 12px; padding: 6px 14px; font-size: 0.8rem; background: #1e293b; color: var(--celeste); border: 1px solid var(--celeste); border-radius: 6px; cursor: pointer; font-weight: bold; font-family: 'Oswald'; letter-spacing: 0.5px; transition: all 0.2s;">📸 CAMBIAR AVATAR</button>
                         </div>
                     </div>
 
@@ -263,11 +246,8 @@
 
                     <div style="border-top: 1px solid #1e293b; padding-top: 25px; text-align: left;">
                         <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin: 0 0 15px 0; letter-spacing: 0.5px;">📜 TU TABLÓN DE FIRMAS RECIBCIDAS</h3>
-                        
-                        <div id="mi-contenedor-lista-firmas" style="max-height: 300px; overflow-y: auto; padding-right: 5px;">
-                            </div>
+                        <div id="mi-contenedor-lista-firmas" style="max-height: 300px; overflow-y: auto; padding-right: 5px;"></div>
                     </div>
-
                 </div>
             </div>
 
@@ -361,9 +341,7 @@
 
                     <div class="contenedor-partido-timba-tv" style="border: 2px solid rgba(251, 191, 36, 0.3);">
                         <h3 style="color: var(--dorado); font-size: 1.4rem; margin-top: 0; font-family: 'Oswald'; letter-spacing: 1px; text-transform: uppercase; text-align: center;">🎯 LA QUINIELA COMBINADA (X10)</h3>
-                        <p style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 20px; font-style: italic; text-align: center; line-height: 1.4;">
-                            Acertá el resultado de los 3 partidos de la fecha en una sola boleta. ¡Premio x10 si no pifiás ninguno!
-                        </p>
+                        <p style="color: #94a3b8; font-size: 0.8rem; margin-bottom: 20px; font-style: italic; text-align: center; line-height: 1.4;">Acertá el resultado de los 3 partidos de la fecha en una sola boleta. ¡Premio x10 si no pifiás ninguno!</p>
 
                         <div id="contenedor-lista-quiniela" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
                             <p style="color: #64748b; text-align: center; font-size: 0.85rem;">⏳ Sincronizando cartelera rotativa de la Arena...</p>
@@ -452,9 +430,7 @@
                     <div id="fase-inscripcion-mundial" class="inputs-apuesta-timba-stadium" style="text-align: center; padding: 20px;">
                         <div id="cronometro-mundial" class="banca-reloj-status" style="margin-bottom: 15px;">⏱ McKay Verificando estado del vestuario...</div>
                         <div id="zona-eleccion-pais-mundial" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
-                        <button type="button" id="btn-preparar-mundial" onclick="prepararInscripcionMundial()" class="btn-estadio btn-bet-action" style="max-width: 320px; margin: 0 auto;">
-                            🏆 INSCRIBIRSE AL TORNEO (🪙1.500 Oro)
-                        </button>
+                        <button type="button" id="btn-preparar-mundial" onclick="prepararInscripcionMundial()" class="btn-estadio btn-bet-action" style="max-width: 320px; margin: 0 auto;">🏆 INSCRIBIRSE AL TORNEO (🪙1.500 Oro)</button>
                     </div>
 
                     <div id="fase-draft-mundial" style="display: none; padding: 15px;">
@@ -470,71 +446,14 @@
                             </div>
                         </div>
 
-                        <div class="banca-reloj-status" id="lbl-estrellas-equipo-mundial" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">
-                            ⭐ (0/5 Estrellas)
-                        </div>
+                        <div class="banca-reloj-status" id="lbl-estrellas-equipo-mundial" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">⭐ (0/5 Estrellas)</div>
 
                         <div class="grid-cartas-draft-mundial" id="grid-cartas-draft-mundial" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
 
-                        <button type="button" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">
-                            ⚔️ JUGAR PARTIDO DE SELECCIONES
-                        </button>
+                        <button type="button" onclick="ejecutarTorneoMundial()" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem;">⚔️ JUGAR PARTIDO DE SELECCIONES</button>
                     </div>
 
                     <div id="fase-fixture-mundial" style="display: none; padding: 15px;">
-                        <h2 class="subtitulo-modulo-tv" style="text-align: center; color: var(--dorado);">📊 BITÁCORA DE CRUCES Y RESULTADOS</h2>
-                        <div id="lista-cruces-mundial-simulacion" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 25px;"></div>
-                        <button type="button" onclick="cambiarModulo('modulo-minimundial')" class="btn-estadio btn-next-shot" style="width: 100%;">
-                            🔄 VOLVER AL VESTUARIO
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="modulo-mundial-multi" class="modulo-contenido" style="display: none;">
-                <div class="caja-modulo-estadio">
-                    <h2 class="titulo-modulo" style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">🏆 MINI-MUNDIAL MULTIJUGADOR</h2>
-                    
-                    <div id="multi-menu-inicial" style="text-align: center; margin-top: 20px;">
-                        <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto 20px; border: 1px solid #1a2436;">
-                            <h3>🆕 CREAR NUEVA SALA</h3>
-                            
-                            <label>Modalidad del torneo:</label>
-                            <select id="multi-select-tipo-apuesta" onchange="conmutarInputsMultiUI()" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b; text-align: center;">
-                                <option value="amistoso">🤝 AMISTOSO (Gratis)</option>
-                                <option value="oro">🪙 TIMBA POR ORO</option>
-                                <option value="carta">🃏 APOSTAR FIGURITA REPETIDA</option>
-                            </select>
-
-                            <div id="multi-wrapper-oro" style="display: none;">
-                                <label>Apuesta de Oro:</label>
-                                <input type="number" id="multi-input-apuesta" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            </div>
-
-                            <div id="multi-wrapper-carta" style="display: none;">
-                                <label>Elegí el Cromo a arriesgar:</label>
-                                <select id="multi-select-carta-apuesta" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b;"></select>
-                            </div>
-
-                            <button class="btn-estadio" style="margin-top: 10px;" onclick="abrirDraftMulti(true)">Crear Sala</button>
-                        </div>
-
-                        <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; border: 1px solid #1a2436;">
-                            <h3>🚪 UNIRSE A UNA SALA</h3>
-                            <input type="text" id="multi-input-codigo" placeholder="CÓDIGO DE SALA" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; text-transform: uppercase; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            <button class="btn-estadio" onclick="abrirDraftMulti(false)">Ingresar Código</button>
-                        </div>
-                    </div>
-
-                    <div id="multi-fase-inscripcion" style="display: none; text-align: center; padding: 20px;">
-                        <h3 style="color: var(--celeste);">ELEGÍ TU PAÍS PARA EL TORNEO ONLINE</h3>
-                        <div id="multi-zona-eleccion-pais" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
-                        <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); max-width: 250px; margin: 15px auto 0;">
-                            ❌ ABANDONAR INSCRIPCIÓN
-                        </button>
-                    </div>
-
-                    <div id="multi-fase-draft" style="display: none; padding: 15px;">
                         <div class="arena-versus-scoreboard" style="margin-bottom: 20px;">
                             <div class="bando-equipo-stadium local">
                                 <span class="bandera-flag">🛡️</span>
@@ -546,9 +465,7 @@
                                 <span class="nombre-seleccion">RIVALES</span>
                             </div>
                         </div>
-                        <div class="banca-reloj-status" id="multi-lbl-estrellas-equipo" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">
-                            ⭐ (0/5 Estrellas)
-                        </div>
+                        <div class="banca-reloj-status" id="multi-lbl-estrellas-equipo" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">⭐ (0/5 Estrellas)</div>
 
                         <div class="grid-cartas-draft-mundial" id="multi-grid-cartas-draft" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
                         
@@ -558,12 +475,8 @@
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button type="button" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">
-                                ⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO
-                            </button>
-                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">
-                                ↩️ CAMBIAR SELECCIÓN / SALIR
-                            </button>
+                            <button type="button" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO</button>
+                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">↩️ CAMBIAR SELECCIÓN / SALIR</button>
                         </div>
                     </div>
 
@@ -597,10 +510,7 @@
                     <div style="text-align: center; border-bottom: 1px solid #1e293b; padding-bottom: 15px;">
                         <h2 id="sbc-titulo-desafio" style="color: var(--dorado); font-family: 'Oswald'; margin: 0; font-size: 2rem; letter-spacing: 1px;">⚙️ CARGANDO CONTRATO...</h2>
                         <p id="sbc-descripcion-desafio" style="color: #94a3b8; font-size: 0.95rem; margin: 5px 0 0 0; font-style: italic;">Conectando con las oficinas del Bot Comerciante...</p>
-                        
-                        <div id="sbc-timer-rotacion" style="font-family: 'Oswald'; font-size: 0.85rem; color: var(--dorado); letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px;">
-                            ⏳ ACTUALIZACIÓN DE CARTELERA EN: CARGANDO...
-                        </div>
+                        <div id="sbc-timer-rotacion" style="font-family: 'Oswald'; font-size: 0.85rem; color: var(--dorado); letter-spacing: 0.5px; text-transform: uppercase; margin-top: 8px;">⏳ ACTUALIZACIÓN DE CARTELERA EN: CARGANDO...</div>
                     </div>
 
                     <div class="layout-sbc-columnas" style="display: flex; flex-direction: column; gap: 25px; width: 100%;">
@@ -621,51 +531,32 @@
 
                         <div style="background: rgba(0,0,0,0.4); padding: 20px; border-radius: 12px; border: 1px solid #1a2436; display: flex; flex-direction: column; gap: 15px;">
                             <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">📋 REQUISITOS DEL CONTRATO</h3>
-                            
-                            <div id="sbc-lista-requisitos" style="font-size: 0.9rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 8px; background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b;">
-                            </div>
-
+                            <div id="sbc-lista-requisitos" style="font-size: 0.9rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 8px; background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b;"></div>
                             <div style="text-align: center; margin-top: 10px;">
                                 <span style="font-size: 0.85rem; color: #64748b; display: block; margin-bottom: 5px;">JUGADORES SELECCIONADOS:</span>
                                 <div id="sbc-contador-slots" style="font-family: 'Oswald'; font-size: 1.5rem; color: var(--celeste);">0 / 3</div>
                             </div>
-
-                            <button type="button" id="btn-entregar-sbc" class="btn-estadio" style="background: var(--dorado); color:#000; font-weight: bold; padding: 12px 0; border-radius: 8px; width: 100%; font-family: 'Oswald'; text-transform: uppercase; font-size: 1rem; letter-spacing: 0.5px;" onclick="enviarContratoAlBot()">
-                                🤝 FIRMAR TRATO CON EL BOT
-                            </button>
+                            <button type="button" id="btn-entregar-sbc" class="btn-estadio" style="background: var(--dorado); color:#000; font-weight: bold; padding: 12px 0; border-radius: 8px; width: 100%; font-family: 'Oswald'; text-transform: uppercase; font-size: 1rem; letter-spacing: 0.5px;" onclick="enviarContratoAlBot()">🤝 FIRMAR TRATO CON EL BOT</button>
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 15px;">
                             <h3 style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.3rem; margin: 0; text-transform: uppercase; letter-spacing: 0.5px; text-align: center;">🎒 TU STOCK DE REPETIDAS APTO</h3>
                             <div id="grid-sbc-elegibles" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; max-height: 480px; overflow-y: auto; padding: 8px; background: rgba(2, 6, 23, 0.4); border-radius: 12px; border: 1px solid #1e293b; min-height: 250px; box-sizing: border-box;"></div>
                         </div>
-
                     </div>
                 </div>
             </div>
 
             <div id="modal-avatar-inicial" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.98); z-index: 10000; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
                 <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--dorado); padding: 35px; border-radius: 16px; max-width: 550px; text-align: center; box-shadow: 0 0 40px rgba(255,177,0,0.25); box-sizing: border-box;">
-                    
-                    <h2 style="color: #fff; font-family: 'Oswald'; margin: 0 0 10px 0; font-size: 2.2rem; letter-spacing: 1px; text-transform: uppercase;">
-                        ¡Bienvenido a la Arena! ⚽
-                    </h2>
-                    <p style="color: #94a3b8; font-size: 1rem; margin-bottom: 30px; line-height: 1.4;">
-                        Antes de salir a la cancha, elegí una de estas 3 cartas aleatorias. <br>
-                        Será tu **Foto de Perfil inicial** en los Rankings.
-                    </p>
-                    
-                    <div id="contenedor-opciones-iniciales" style="display: flex; gap: 20px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; min-height: 150px;">
-                        </div>
-                    
-                    <p style="color: var(--celeste); font-size: 0.85rem; font-style: italic; margin: 0; font-family: system-ui, sans-serif;">
-                        🔒 Los demás diseños país y grupales los desbloqueás en los sobres de la Tienda.
-                    </p>
+                    <h2 style="color: #fff; font-family: 'Oswald'; margin: 0 0 10px 0; font-size: 2.2rem; letter-spacing: 1px; text-transform: uppercase;">¡Bienvenido a la Arena! ⚽</h2>
+                    <p style="color: #94a3b8; font-size: 1rem; margin-bottom: 30px; line-height: 1.4;">Antes de salir a la cancha, elegí una de estas 3 cartas aleatorias. <br> Será tu **Foto de Perfil inicial** en los Rankings.</p>
+                    <div id="contenedor-opciones-iniciales" style="display: flex; gap: 20px; justify-content: center; margin-bottom: 30px; flex-wrap: wrap; min-height: 150px;"></div>
+                    <p style="color: var(--celeste); font-size: 0.85rem; font-style: italic; margin: 0; font-family: system-ui, sans-serif;">🔒 Los demás diseños país y grupales los desbloqueás en los sobres de la Tienda.</p>
                 </div>
             </div>
 
-            <div id="modulo-comerciante-bot" class="modulo-contenido" style="display: none;">
-                </div>
+            <div id="modulo-comerciante-bot" class="modulo-contenido" style="display: none;"></div>
 
         </section>
     </main>
@@ -676,13 +567,9 @@
             
             <div style="color: #fff; font-size: 0.95rem; line-height: 1.6; display: flex; flex-direction: column; gap: 15px; margin-top: 15px; font-family: system-ui, sans-serif;">
                 <p><strong>🛍️ SOBRES & TIENDA:</strong> Conseguí cromos en las cuatro rarezas oficiales del juego: <b>Común, Rara, Épica y Legendaria</b> para llenar las páginas de tu álbum.</p>
-                
                 <p><strong>🤝 CARTELERA DE CONTRATOS:</strong> Sacrificá tus cartas **repetidas** para cumplir las exigencias semanales del Bot Comerciante. El sistema está blindado: tu cromo original nunca se toca y cobrás Oro directo a tu balance.</p>
-
                 <p><strong>🏆 TORNEOS (MINIMUNDIAL & MULTI):</strong> Armá tu terna estratégica de 3 jugadores del mismo país en base a su poder. En Single Player competís contra bots cuidando el cooldown, y en Multiplayer jugás salas personalizadas por Oro, Cartas o Amistoso con cronogramas precalculados por el servidor.</p>
-                
                 <p><strong>🎯 OBJETIVOS DIARIOS:</strong> Cumplí misiones de apertura, trades o torneos para rascar bonus de Oro. La cartelera se reinicia a cero de forma atómica a la **medianoche (GMT-3)**. Podés colapsar o expandir este panel cuando quieras.</p>
-
                 <p><strong>💸 MERCADO DE PASES P2P:</strong> Publicá tus duplicados al precio de Oro que dicte tu estrategia. Las ofertas duran **24 horas estrictas**. Si no hay venta, el sistema en background retira el cromo de la vitrina y te lo devuelve de forma automática.</p>
             </div>
             <button type="button" onclick="cerrarModalAyuda()" class="btn-estadio btn-next-shot" style="width: 100%; margin-top: 25px; background: var(--rojo); border-color: var(--rojo); cursor: pointer; font-weight: bold;">❌ CERRAR GUÍA</button>
@@ -693,9 +580,7 @@
         <div style="background: #0b111e; border: 2px solid var(--dorado); width: 100%; max-width: 500px; padding: 25px; border-radius: 12px; position: relative;">
             
             <div style="display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #1a2436; padding-bottom: 15px; margin-bottom: 15px;">
-                <div style="width: 65px; height: 65px; background: #020617; border: 2px solid var(--celeste); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem;" id="visitante-avatar">
-                    🛡️
-                </div>
+                <div style="width: 65px; height: 65px; background: #020617; border: 2px solid var(--celeste); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem;" id="visitante-avatar">🛡️</div>
                 <div style="text-align: left;">
                     <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; letter-spacing: 1px; display: block; font-family: 'Oswald';">PERFIL DE ARENA</span>
                     <h2 id="visitante-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 1.5rem; text-transform: uppercase;">USUARIO_RIVAL</h2>
@@ -717,9 +602,7 @@
                 </div>
             </div>
 
-            <button type="button" onclick="document.getElementById('modal-perfil-visitante').style.display = 'none';" class="btn-estadio" style="width: 100%; margin-top: 20px; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: bold; border-color: #334155;">
-                ❌ CERRAR INSPECCIÓN
-            </button>
+            <button type="button" onclick="document.getElementById('modal-perfil-visitante').style.display = 'none';" class="btn-estadio" style="width: 100%; margin-top: 20px; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: bold; border-color: #334155;">❌ CERRAR INSPECCIÓN</button>
         </div>
     </div>
 
@@ -738,29 +621,19 @@
                     <h2 style="color: var(--celeste); font-family: 'Oswald'; margin: 0; font-size: 1.6rem; text-transform: uppercase;">📋 Informe de Cambios</h2>
                     <span id="informe-txt-version" style="background: var(--celeste); color: #000; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.75rem; font-family: monospace;">v0.0</span>
                 </div>
-                
-                <p style="color: #64748b; font-size: 0.8rem; margin-top: 8px; font-family: system-ui, sans-serif; font-style: italic; text-align: left;">
-                    Publicado: <span id="informe-txt-fecha">--</span>
-                </p>
-                
+                <p style="color: #64748b; font-size: 0.8rem; margin-top: 8px; font-family: system-ui, sans-serif; font-style: italic; text-align: left;">Publicado: <span id="informe-txt-fecha">--</span></p>
                 <div id="informe-lista-cambios" style="color: #fff; font-size: 0.9rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; margin-top: 15px; font-family: system-ui, sans-serif; text-align: left;"></div>
             </div>
-            
-            <button type="button" onclick="cerrarInformeParche()" class="btn-estadio" style="width: 100%; margin-top: 25px; background: var(--celeste); color: #000; font-weight: bold; border-color: var(--celeste); cursor: pointer; padding: 10px 0; border-radius: 6px; font-family: 'Oswald'; text-transform: uppercase;">
-                ¡Entendido, Crack!
-            </button>
+            <button type="button" onclick="cerrarInformeParche()" class="btn-estadio" style="width: 100%; margin-top: 25px; background: var(--celeste); color: #000; font-weight: bold; border-color: var(--celeste); cursor: pointer; padding: 10px 0; border-radius: 6px; font-family: 'Oswald'; text-transform: uppercase;">¡Entendido, Crack!</button>
         </div>
     </div>
 
     <div id="modal-rival" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(2, 6, 23, 0.85); z-index: 2000; overflow-y: auto; padding: 20px 10px; box-sizing: border-box;">
         <div class="caja-modulo-estadio" style="background: #0f172a; border: 2px solid var(--dorado); padding: 25px; border-radius: 16px; max-width: 800px; margin: 30px auto; position: relative; box-sizing: border-box;">
-            
             <button type="button" onclick="cerrarModalRival()" style="position: absolute; top: 15px; right: 15px; background: #1e293b; color: #fff; border: 1px solid #334155; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-family: 'Oswald'; font-size: 0.8rem;">❌ CERRAR</button>
 
             <div style="display: flex; align-items: center; gap: 25px; border-bottom: 1px solid #1e293b; padding-bottom: 25px; flex-wrap: wrap;">
-                <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--celeste); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(0,180,255,0.2); background-size: cover; background-position: center;" id="rival-avatar-user">
-                    👤
-                </div>
+                <div style="position: relative; width: 130px; height: 175px; background: #020617; border: 3px solid var(--celeste); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; box-shadow: 0 0 20px rgba(0,180,255,0.2); background-size: cover; background-position: center;" id="rival-avatar-user">👤</div>
                 <div style="text-align: left; flex-grow: 1;">
                     <h2 id="rival-txt-username" style="color: #fff; font-family: 'Oswald'; margin: 0; font-size: 2.2rem; letter-spacing: 1px;">-</h2>
                     <p id="rival-txt-rango" style="color: var(--celeste); margin: 6px 0 0 0; font-weight: bold; font-size: 0.95rem; font-family: 'Oswald'; letter-spacing: 0.5px;">RANKING: -</p>
@@ -809,16 +682,12 @@
 
             <div style="border-top: 1px solid #1e293b; padding-top: 25px; text-align: left;">
                 <h3 style="color: #fff; font-family: 'Oswald'; font-size: 1.2rem; margin: 0 0 15px 0; letter-spacing: 0.5px;">✍️ MURO DE FIRMAS DE VISITANTES</h3>
-                
                 <div id="caja-formulario-firma" style="display: flex; gap: 10px; margin-bottom: 20px;">
                     <input type="text" id="input-mensaje-firma" maxlength="140" placeholder="Dejá tu firma en este vestuario (máx 140 letras)..." style="flex-grow: 1; padding: 10px 15px; border-radius: 8px; border: 1px solid #1e293b; background: #020617; color: #fff; font-size: 0.9rem;">
                     <button onclick="enviarNuevaFirma(window.usuarioVisitaId)" class="btn-estadio" style="background: var(--celeste); color: #fff; font-weight: bold; font-size: 0.85rem; padding: 0 15px;">Firmar</button>
                 </div>
-
-                <div id="contenedor-lista-firmas" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                    </div>
+                <div id="contenedor-lista-firmas" style="max-height: 250px; overflow-y: auto; padding-right: 5px;"></div>
             </div>
-
         </div>
     </div>
 
@@ -828,6 +697,5 @@
         twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
     });
     </script>
-    <script src="script.js"></script>
 </body>
 </html>
