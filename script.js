@@ -3864,14 +3864,29 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. Bloque B: Estadísticas de Juego Remapeadas
-        const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
-        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba?.porcentajeEfectividad || 0}%`;
+        // 3. Bloque B: Estadísticas de Juego Remapeadas (Timba por un lado si tenés IDs, y Penales por el otro)
+        if (perfil.estadisticasTimba) {
+            const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
+            if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba.porcentajeEfectividad || 0}%`;
 
-        const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
-        if (txtTimbaJugadas) {
-            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
-            txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba?.jugadas || 0} Totales`;
+            const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
+            if (txtTimbaJugadas) {
+                const ganadas = (perfil.estadisticasTimba.ganadasExacto || 0) + (perfil.estadisticasTimba.ganadasSigno || 0);
+                txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba.jugadas || 0} Totales`;
+            }
+        }
+
+        // ⚽ INYECCIÓN REMAPEADA DE PENALES (Usa los nuevos IDs del HTML)
+        if (perfil.estadisticasPenales) {
+            const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
+            if (txtPenalesEfectividad) {
+                txtPenalesEfectividad.innerText = `${perfil.estadisticasPenales.porcentajeEfectividad || 0}%`;
+            }
+
+            const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
+            if (txtPenalesJugadas) {
+                txtPenalesJugadas.innerText = `${perfil.estadisticasPenales.ganados || 0} Ganados / ${perfil.estadisticasPenales.jugados || 0} Totales`;
+            }
         }
 
         const txtMundiales = document.getElementById("stat-mundiales-copas");
@@ -3894,11 +3909,9 @@ async function actualizarMiPerfilUI() {
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
             if (perfil.cromo_destacado) {
-                // Sincronizamos el LocalStorage si venía de la base de datos
                 const cromoMapeado = { id: 0, nombre: "Cromo Insignia", foto: perfil.cromo_destacado, rareza: "legendaria" };
                 localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromoMapeado));
             }
-            // Llamamos a la función encargada de pintar la UI
             renderizarCromoDestacadoUI();
         }
 
