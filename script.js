@@ -222,11 +222,14 @@ async function autenticarUsuario(accion) {
                     verificarAvatarInicial();
                }
 
-               if (accion === 'login') {
-                    alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
-               } else {
-                    alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
-               }
+               // ⏱️ CONTROL ASÍNCRO: Postergamos los alerts para permitir el repintado del DOM
+               setTimeout(() => {
+                    if (accion === 'login') {
+                         alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
+                    } else {
+                         alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
+                    }
+               }, 0);
           }
      } catch (err) {
           console.error("❌ Fallo crítico de red o código en autenticación:", err);
