@@ -1453,7 +1453,7 @@ let intervaloCronometroMundial = null;
 async function chequearEstadoMundialServer() {
     try {
         // 🛠️ FIX: Agregamos "/api" que faltaba para coincidir exactamente con el backend
-        const res = await fetch(`${URL_BASE}/api/mundial/estado`, {
+        const res = await fetch(`${URL_BASE}/mundial/estado`, {
             method: "GET",
             headers: obtenerHeadersSeguros() // ⚡ Pasa el mantenimiento usando tu token cifrado
         });
