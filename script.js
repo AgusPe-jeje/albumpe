@@ -158,8 +158,8 @@ async function autenticarUsuario(accion) {
      
      if (!username || !password) return alert("❌ Completá los datos.");
 
-     // 🛡️ SECURITY FIX: Deshabilitamos el botón correspondiente para mitigar ataques de fuerza bruta / spam
-     const btnAuth = document.getElementById(accion === 'login' ? 'btn-login' : 'btn-registro');
+     // 🛡️ SECURITY FIX: Buscamos el botón usando su clase real del HTML para evitar el crash por null
+     const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
      if (btnAuth) btnAuth.disabled = true;
 
      const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
@@ -192,15 +192,17 @@ async function autenticarUsuario(accion) {
 
           if (data.error) {
                alert(data.error);
-               if (btnAuth) btnAuth.disabled = false; // Rehabilitamos si el backend rebotó las credenciales
+               if (btnAuth) btnAuth.disabled = false;
           } else {
-               // 🔥 CORREGIDO: Clave unificada a "token" para que sea compatible con todo el ecosistema seguro del juego
+               // 1️⃣ PRIMERO: Guardamos el token con la clave unificada "token"
                if (data.token) {
                     localStorage.setItem("token", data.token);
                }
 
+               // 2️⃣ SEGUNDO: Inicializamos el estado del usuario en memoria global
                usuarioActual = data.usuario;
                
+               // 3️⃣ TERCERO: Transición limpia de la interfaz visual
                document.getElementById("seccion-login").style.display = "none";
                
                const interfazJuego = document.getElementById("interfaz-juego");
@@ -209,17 +211,14 @@ async function autenticarUsuario(accion) {
                     interfazJuego.classList.add("mostrar");
                }
                
-               // 🟢 SECTOR MISIONES API
-               if (typeof cargarMisionesDelServidor === 'function') {
-                    cargarMisionesDelServidor();
-               }
+               // 4️⃣ CUARTO: Ahora que el token y el user existen, llamamos secuencialmente a las APIs
+               await cargarMisionesDelServidor();
                
-               // ⏱️ SECTOR CRONÓMETRO
                if (typeof iniciarCronometroResetMisiones === 'function') {
                     iniciarCronometroResetMisiones();
                }
                
-               // 📢 FLUJO DE ANUNCIOS Y EVENTOS
+               // Flujo de anuncios o racha diaria
                if (typeof iniciarControladorAnunciosSeguro === 'function') {
                     setTimeout(iniciarControladorAnunciosSeguro, 1000); 
                } else if (typeof verificarRecompensaDiaria === 'function') {
@@ -233,7 +232,6 @@ async function autenticarUsuario(accion) {
                cargarAlbumLocal();
                if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
                
-               // 🎁 NUEVO FLUG COMPLEMENTARIO: Si es un usuario nuevo, el validador seguro se gatilla acá mismo
                if (typeof verificarAvatarInicial === 'function') {
                     verificarAvatarInicial();
                }
@@ -247,13 +245,14 @@ async function autenticarUsuario(accion) {
      } catch (err) {
           console.error("❌ Fallo crítico de red o código en autenticación:", err);
           ocultarCarga();
-          if (btnAuth) btnAuth.disabled = false; // Rehabilitamos en caso de crash total
+          if (btnAuth) btnAuth.disabled = false;
           alert("📡 Error de conexión. No se pudo establecer contacto con los servidores centrales de la Arena.");
      }
 }
 
 function obtenerHeadersSeguros() {
-    const token = localStorage.getItem("arena_token");
+    // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
+    const token = localStorage.getItem("token");
     return {
         'Content-Type': 'application/json',
         'Authorization': token ? `Bearer ${token}` : ''
