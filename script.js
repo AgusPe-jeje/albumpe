@@ -1091,7 +1091,6 @@ async function ejecutarPenalLocal(direccionElegida) {
      direccionGanadora = "";
 
      try {
-          // 🟢 CORREGIDO: Combinamos el JWT con el Content-Type para peticiones con BODY
           const res = await fetch(`${URL_BASE}/jugar-penal`, {
                method: 'POST',
                headers: {
@@ -1124,6 +1123,18 @@ async function ejecutarPenalLocal(direccionElegida) {
                document.querySelectorAll('.zona-disparo-target').forEach(z => z.style.pointerEvents = "auto");
           }
           arrancarCronometroVisual(data.siguienteIn);
+
+          // 🟢 SECTOR MISIONES API: Trackeo en plural sincronizado con el backend
+          if (typeof trackearProgresoMision === 'function') {
+               // 1. Sumamos el tiro a la tanda de penales jugada
+               await trackearProgresoMision("penales", 1);
+               
+               // 2. Si terminó en gol, impactamos también el contador de goles anotados
+               if (esGol) {
+                    await trackearProgresoMision("goles_penales", 1);
+               }
+          }
+
      } catch (err) {
           console.error(err);
           document.querySelectorAll('.zona-disparo-target').forEach(z => z.style.pointerEvents = "auto");
@@ -3461,7 +3472,7 @@ function abrirMercadoBot(listaTusRepetidas) {
             if (data.ok) {
                 // 🟢 SECTOR MISIONES API: Impactamos el progreso en el backend de forma segura antes de renderizar
                 if (typeof trackearProgresoMision === 'function') {
-                    await trackearProgresoMision("trade", 1);
+                    await trackearProgresoMision("trades", 1);
                 }
 
                 // Actualizar el álbum local en memoria inmediatamente tras el tradeo exitoso
