@@ -3847,64 +3847,6 @@ app.get('/api/anuncio-actual', (req, res) => {
     res.json(CONFIG_ANUNCIO_SERVIDOR);
 });
 
-function iniciarCronometroResetRanking() {
-    if (intervaloResetRanking) clearInterval(intervaloResetRanking);
-
-    intervaloResetRanking = setInterval(() => {
-        const ahora = new Date();
-        
-        // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
-        let diasFaltantes = (1 - ahora.getDay() + 7) % 7;
-        
-        // Si ya es lunes, pero pasó la medianoche, el próximo reset es el lunes que viene
-        if (diasFaltantes === 0 && (ahora.getHours() > 0 || ahora.getMinutes() > 0 || ahora.getSeconds() > 0)) {
-            diasFaltantes = 7;
-        }
-
-        const proximoLunesReset = new Date();
-        proximoLunesReset.setDate(ahora.getDate() + diasFaltantes);
-        proximoLunesReset.setHours(0, 0, 0, 0);
-
-        const tiempoRestanteMs = proximoLunesReset - ahora;
-
-        // 🎯 CAPTURAMOS LAS TRES ETIQUETAS DE LA ARENA
-        const timerPenales = document.getElementById("timer-ranking-semanal");
-        const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
-        const timerSBC = document.getElementById("sbc-timer-rotacion");
-
-        if (tiempoRestanteMs <= 0) {
-            clearInterval(intervaloResetRanking);
-            const msgReset = "🔄 ROTANDO CARTELERA Y DISTRIBUYENDO PREMIOS...";
-            
-            if (timerPenales) timerPenales.innerText = msgReset;
-            if (timerMundial) timerMundial.innerText = msgReset;
-            if (timerSBC) timerSBC.innerText = msgReset;
-            
-            setTimeout(() => {
-                if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
-                if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
-                // 🤖 Acá podés meter la función que refresca los contratos del bot si tenés una, ej: cargarContratosSbcAlIniciar();
-                iniciarCronometroResetRanking();
-            }, 10000);
-            return;
-        }
-
-        const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
-        const dias = Math.floor(totalSegundos / 86400);
-        const horas = Math.floor((totalSegundos % 86400) / 3600);
-        const minutos = Math.floor((totalSegundos % 3600) / 60);
-        const segundos = totalSegundos % 60;
-
-        const stringDias = dias > 0 ? `${dias}d ` : "";
-        const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
-        
-        // 🚀 INYECCIÓN SIMULTÁNEA SIN DESFASAJES
-        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
-        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
-        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
-    }, 1000);
-}
-
 // El servidor va a chequear la fecha de forma pasiva cada 1 hora
 setInterval(procesarResetSemanalRankings, 1000 * 60 * 60);
 
