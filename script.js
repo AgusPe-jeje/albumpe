@@ -67,10 +67,13 @@ function cambiarModulo(idModulo, botonPresionado) {
      
      // 🔥 NUEVA LÓGICA: Al entrar al Mercado, cargamos tus repetidas y las ofertas globales
      if (idModulo === 'modulo-mercado-pases' && usuarioActual) {
+          // Si tu función cargarAlbumLocal() hace un fetch a la base de datos, 
+          // nos aseguramos de que window.albumCompleto tenga información real antes de renderizar el select
           if (typeof cargarAlbumLocal === "function") {
                cargarAlbumLocal().then(() => {
                     cargarMisRepetidasParaVenta();
                }).catch(() => {
+                    // Resguardo por si tu cargarAlbumLocal no es una Promesa async
                     cargarMisRepetidasParaVenta(); 
                });
           } else {
@@ -78,9 +81,11 @@ function cambiarModulo(idModulo, botonPresionado) {
           }
           obtenerOfertasMercado();
 
+          // 🟢 INYECCIÓN FEED RECIENTE: Refrescamos el historial dinámico al entrar a la sección
           if (typeof actualizarHistorialTransferenciasUI === "function") {
                actualizarHistorialTransferenciasUI();
           }
+          
      }
      
      // 🦾 GATILLO DE ENTRADA: Al entrar al sector de Contratos SBC, inicializamos el panel del Bot Comerciante
@@ -104,15 +109,17 @@ function cambiarModulo(idModulo, botonPresionado) {
           document.getElementById("fase-fixture-mundial").style.display = "none";
      }
      if (idModulo === 'modulo-timba') {
+        // Ejecuta la carga automática de la cartelera rotativa
         if (typeof cargarPartidosQuinielaUI === "function") {
              cargarPartidosQuinielaUI();
             }
      }   
      // 👤 GATILLO DE ENTRADA: Al entrar a Mi Perfil, traemos los datos de la base de datos en tiempo real
-     if (idModulo === 'modulo-perfil' && usuarioActual) {
+     if (idModulo === 'modulo-perfil' && usuarioActual) { // 👈 Cambiá 'modulo-perfil' por el ID de tu sección
           actualizarMiPerfilUI();
           renderizarCromoDestacadoUI();
      }
+
 }
 
 function mostrarCarga(mensaje = "Conectando con la Arena...") {
@@ -145,13 +152,13 @@ async function autenticarUsuario(accion) {
         return alert("❌ Completá los datos.");
     }
 
-    // 🧹 REINICIO TOTAL DE SESIÓN PREVIA: Limpieza absoluta
+    // 🧹 REINICIO TOTAL DE SESIÓN PREVIA: Borramos datos flotantes antes de iniciar la nueva
     usuarioActual = null;
     localStorage.removeItem("cromo_destacado_perfil");
     albumCompleto = [];
     window.albumCompleto = [];
 
-    // Limpiamos el Scoreboard inmediatamente antes de la transición
+    // Limpiamos los textos del Scoreboard de la pantalla vieja inmediatamente
     if (typeof actualizarInterfazUI === "function") {
         actualizarInterfazUI();
     }
@@ -166,25 +173,35 @@ async function autenticarUsuario(accion) {
         const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta...";
         mostrarCarga(textoSpinner);
 
-        const response = await fetch(`${URL_BASE}/usuarios/${accion === 'login' ? 'login' : 'registro'}`, {
+        // 🏟️ RUTA CORREGIDA: Apunta exactamente a tu backend (/api/login o /api/registro)
+        const endpoint = `${URL_BASE}/${accion === 'login' ? 'login' : 'registro'}`;
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username, password })
         });
 
+        // 🛡️ PARCHE DE SEGURIDAD: Validamos si el servidor devolvió HTML (como el error 404 anterior)
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error(`El servidor respondió con un formato incorrecto (HTTP ${response.status}). Ruta inválida o caída.`);
+        }
+
         const data = await response.json();
 
-        if (!response.ok || !data.ok) {
+        // ⚡ VALIDACIÓN FLEXIBLE: Verificamos si la petición falló en el backend
+        if (!response.ok) {
             throw new Error(data.error || "Error en las credenciales.");
         }
 
-        // 🔓 Guardamos el token de la sesión entrante
+        // 🔓 Guardamos el token nuevo de la cuenta entrante
         localStorage.setItem('token', data.token);
         
-        // Sincronizamos los datos del nuevo jugador
+        // Sincronizamos la variable global con el nuevo usuario genuino de Neon
         usuarioActual = data.usuario; 
 
-        // 🔄 Pintamos las monedas, copas y nombre genuinos al instante
+        // 🔄 Pintamos las monedas, copas y nombre del nuevo jugador al instante
         if (typeof actualizarInterfazUI === "function") {
             actualizarInterfazUI();
         }
@@ -201,7 +218,7 @@ async function autenticarUsuario(accion) {
             if (modSobres) modSobres.classList.add("activo");
         }
 
-        // 🎯 TRANSICIÓN DE PANTALLAS INTEGRADA DIRECTAMENTE ACÁ:
+        // 🎯 TRANSICIÓN NATIVA DE PANTALLAS:
         document.getElementById("seccion-login").style.display = "none";
         const interfazJuego = document.getElementById("interfaz-juego");
         if (interfazJuego) {
@@ -209,7 +226,7 @@ async function autenticarUsuario(accion) {
              interfazJuego.classList.add("mostrar");
         }
 
-        // Precarga silenciosa del progreso del álbum en background
+        // Cargamos el progreso de este álbum en segundo plano
         if (typeof cargarAlbumLocal === "function") {
             cargarAlbumLocal();
         }
@@ -228,7 +245,7 @@ async function autenticarUsuario(accion) {
 }
 
 function actualizarInterfazUI() {
-     // 🧹 Si no hay usuario activo, limpiamos los contadores a 0
+     // 🧹 Si no hay usuario activo (por ejemplo, recién cerraste sesión), limpiamos los contadores a 0
      if (!usuarioActual) {
           const lblUsuario = document.getElementById("lbl-usuario");
           if (lblUsuario) lblUsuario.innerText = "INVITADO";
@@ -239,7 +256,7 @@ function actualizarInterfazUI() {
           return;
      }
 
-     // 🦾 Si hay un usuario logueado, inyectamos sus datos reales de Neon
+     // 🦾 Si hay un usuario genuino logueado, inyectamos sus datos reales de Neon
      document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
      document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
      document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking;
@@ -251,26 +268,29 @@ function actualizarInterfazUI() {
 }
 
 function obtenerHeadersSeguros() {
-    const token = localStorage.getItem("token");
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
-    };
+     // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
+     const token = localStorage.getItem("token");
+     return {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+     };
 }
 
+// 🔥 CAPTURA DE ENTER PARA INICIAR SESIÓN EN LA ARENA
 document.addEventListener("DOMContentLoaded", () => {
-    const inputUser = document.getElementById("input-usuario");
-    const inputPass = document.getElementById("input-pass");
+     const inputUser = document.getElementById("input-usuario");
+     const inputPass = document.getElementById("input-pass");
 
-    const manejarEnterLogin = (event) => {
-        if (event.key === "Enter") {
-            event.preventDefault(); 
-            autenticarUsuario('login');
-        }
-    };
+     const manejarEnterLogin = (event) => {
+          if (event.key === "Enter") {
+               event.preventDefault(); // Evita cualquier recarga de página molesta
+               autenticarUsuario('login');
+          }
+     };
 
-    if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
-    if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
+     // Asignamos el evento a ambos campos para máxima comodidad
+     if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
+     if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
 });
 
 async function cerrarSesionLocal() {
@@ -297,6 +317,8 @@ async function cerrarSesionLocal() {
      document.getElementById("input-usuario").value = "";
      document.getElementById("input-pass").value = "";
 
+     // 🛠️ REHABILITACIÓN MANUAL DE BOTONES DE ACCESO
+     // Forzamos a que recuperen su facha original y queden 100% cliqueables al volver al Login
      const btnLogin = document.querySelector('.btn-login-match');
      const btnRegistro = document.querySelector('.btn-registro-match');
 
