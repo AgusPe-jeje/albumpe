@@ -3874,6 +3874,9 @@ let intervaloResetMisiones = null; // Control atómico del bucle del reloj
 
 // Esta función se ejecuta al iniciar sesión (adentro de autenticarUsuario)
 async function cargarMisionesDelServidor() {
+    // 🛡️ ESCUDO: Si no hay usuario en memoria, frenamos la llamada antes del 401
+    if (!usuarioActual) return;
+
     try {
         const res = await fetch(`${URL_BASE}/misiones/obtener`, {
             method: 'GET',
@@ -3884,7 +3887,6 @@ async function cargarMisionesDelServidor() {
         if (data.ok) {
             window.misionesDiariasUsuario = data.misiones;
             renderizarMisionesDiarias();
-            // ⏱️ Encendemos el reloj dinámico apuntando al ID correcto del HTML
             iniciarCronometroResetMisiones();
         }
     } catch (err) {
@@ -4036,6 +4038,9 @@ function iniciarCronometroResetMisiones() {
    🎁 PASO 3: SISTEMA PREMIUM: RECOMPENSA POR CONEXIÓN DIARIA CONTINUA (DAILY CLAIM)
    ======================================================================== */
 async function verificarRecompensaDiaria() {
+    // 🛡️ ESCUDO: Evita que un invitado intente reclamar bonos sin registrarse
+    if (!usuarioActual) return;
+
     try {
         const res = await fetch(`${URL_BASE}/usuarios/reclamar-diario`, {
             method: 'POST',
@@ -4899,7 +4904,9 @@ async function equiparAvatarDesdeTienda(fotoId) {
 // ========================================================================
 
 async function cargarFirmasDelPerfil(perfilId) {
-    // 🔍 Seleccionamos dinámicamente el contenedor correcto según el ID del muro
+    // 🛡️ ESCUDO: Si no hay id válido o no hay sesión, abortamos para no renderizar cajas rotas
+    if (!usuarioActual || !perfilId) return;
+
     const esMiMuro = usuarioActual && usuarioActual.id === parseInt(perfilId);
     const idContenedor = esMiMuro ? "mi-contenedor-lista-firmas" : "contenedor-lista-firmas";
 
@@ -4915,7 +4922,6 @@ async function cargarFirmasDelPerfil(perfilId) {
         const data = await res.json();
 
         if (!data.ok || data.firmas.length === 0) {
-            // Cartel inteligente si el muro está en 0 firmas
             if (esMiMuro) {
                 contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó tu vestuario todavía. ¡Hacete notar en las tablas para que vengan! 📋</p>";
             } else {
@@ -4929,7 +4935,6 @@ async function cargarFirmasDelPerfil(perfilId) {
             const divFirma = document.createElement("div");
             divFirma.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left;";
             
-            // Evaluamos las fechas para ver si fue editado
             const fechaOriginal = new Date(f.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
             let flagFecha = `<span style="color: #475569; font-size: 0.75rem;">${fechaOriginal}</span>`;
             
@@ -4938,7 +4943,6 @@ async function cargarFirmasDelPerfil(perfilId) {
                 flagFecha = `<span style="color: var(--dorado); font-size: 0.75rem;" title="Original: ${fechaOriginal}">✏️ Editado el ${fechaEdit}</span>`;
             }
 
-            // Si el usuario logueado es el autor de esta firma, le damos controles rápidos
             const esMio = usuarioActual && usuarioActual.id === f.autor_id;
             const botonera = esMio ? `
                 <div style="display: flex; gap: 8px; margin-top: 5px; justify-content: flex-end;">
