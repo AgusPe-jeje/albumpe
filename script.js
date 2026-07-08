@@ -4612,10 +4612,19 @@ async function inspeccionarPerfilRival(usuarioId) {
                divAvatar.innerText = ""; // Limpiamos el emoji base
           }
 
-          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL
+          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL (CORREGIDO)
+          // 🔥 Muestra la carta físicamente destacada en la vitrina del rival en vez de un texto fijo
           const contenedorDestacado = document.getElementById("rival-contenedor-destacado");
           if (contenedorDestacado) {
-               contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">Inspeccionando facha del competidor en tiempo real...</p>`;
+               if (rival.foto) {
+                    contenedorDestacado.innerHTML = `
+                        <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
+                            <img src="${rival.foto}" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                    `;
+               } else {
+                    contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No seleccionó cromo insignia...</p>`;
+               }
           }
 
           // ✍️ CARGA DE FIRMAS: Traemos el muro de la DB exclusivo para el rival inspeccionado
@@ -4716,6 +4725,51 @@ async function actualizarMiPerfilUI() {
 
     } catch (err) {
         console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
+    }
+}
+
+async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
+    if (!usuarioActual || !usuarioActual.id) return alert("⚠️ No se detectó una sesión activa.");
+
+    try {
+        mostrarCarga("Actualizando tu jugador destacado...");
+
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ fotoUrl: fotoUrl })
+        });
+
+        const data = await res.json();
+        ocultarCarga();
+
+        if (data.ok) {
+            alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
+            
+            // 🔄 Sincronizamos la memoria local para que no falle antes del refresh
+            usuarioActual.foto = fotoUrl;
+
+            // Actualizamos visualmente el avatar del perfil de inmediato
+            const divAvatar = document.getElementById("perfil-avatar-user");
+            if (divAvatar) {
+                divAvatar.style.backgroundImage = `url('${fotoUrl}')`;
+            }
+            
+            // Recargamos el módulo del perfil para asegurar consistencia
+            if (typeof actualizarMiPerfilUI === "function") {
+                await actualizarMiPerfilUI();
+            }
+        } else {
+            alert(data.mensaje || "❌ No se pudo destacar el cromo.");
+        }
+    } catch (err) {
+        ocultarCarga();
+        console.error("Error al enviar el cromo destacado:", err);
+        alert("❌ Error de red al intentar conectar con el vestuario.");
     }
 }
 
