@@ -47,10 +47,6 @@ var historialPartidosSimulados = [];
    🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
    ======================================================================== */
 
-/* ========================================================================
-   🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
-   ======================================================================== */
-
 function cambiarModulo(idModulo, botonPresionado) {
      // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
      document.querySelectorAll('.modulo-contenido, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
@@ -3625,30 +3621,38 @@ function iniciarCronometroResetRanking() {
 
     const calcularYRenderizar = async () => {
         const ahora = new Date();
-        // Ajustamos al huso de Argentina (GMT-3)
-        const ahoraArg = new Date(ahora.toLocaleString("en-US", {timeZone: "America/Argentina/Buenos_Aires"}));
         
+        // 🇦🇷 Convertimos la hora actual de forma segura a la hora de Buenos Aires
+        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+        const ahoraArg = new Date(ahoraArgStr);
+        
+        // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
         let diasFaltantes = (1 - ahoraArg.getDay() + 7) % 7;
-        if (diasFaltantes === 0 && (ahoraArg.getHours() > 0 || ahoraArg.getMinutes() > 0)) {
+        
+        // Si ya es lunes pero pasó la medianoche, el reset es el próximo lunes
+        if (diasFaltantes === 0 && (ahoraArg.getHours() > 0 || ahoraArg.getMinutes() > 0 || ahoraArg.getSeconds() > 0)) {
             diasFaltantes = 7;
         }
 
-        const proximoLunesReset = new Date(ahoraArg);
-        proximoLunesReset.setDate(ahoraArg.getDate() + diasFaltantes);
-        proximoLunesReset.setHours(0, 0, 0, 0);
+        // 🎯 Creamos el objetivo del lunes a la medianoche de forma nativa e independiente
+        const proximoLunesReset = new Date(ahoraArg.getFullYear(), ahoraArg.getMonth(), ahoraArg.getDate() + diasFaltantes, 0, 0, 0, 0);
 
-        const tiempoRestanteMs = proximoLunesReset - ahoraArg;
+        // Operación matemática limpia entre Timestamps numéricos (evita NaN)
+        const tiempoRestanteMs = proximoLunesReset.getTime() - ahoraArg.getTime();
 
         const timerPenales = document.getElementById("timer-ranking-semanal");
         const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
         const timerSBC = document.getElementById("sbc-timer-rotacion");
 
-        if (tiempoRestanteMs <= 0) {
+        // Si hay error de cálculo o ya llegó a cero, disparamos el reset
+        if (isNaN(tiempoRestanteMs) || tiempoRestanteMs <= 0) {
             const msgReset = "🔄 CALCULANDO LIGA...";
-            [timerPenales, timerMundial, timerSBC].forEach(el => { if(el) el.innerText = msgReset; });
+            [timerPenales, timerMundial, timerSBC].forEach(el => { if (el) el.innerText = msgReset; });
             
-            // 🚀 ESPERA ASÍNCRONA INTELIGENTE
-            await new Promise(r => setTimeout(r, 15000)); // Esperamos 15s para que el server termine el COMMIT
+            clearInterval(intervaloResetRanking);
+            
+            // Espera asíncrona de 10s para que Render procese la base de datos de Neon
+            await new Promise(r => setTimeout(r, 10000)); 
             
             if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
             if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
@@ -3658,6 +3662,7 @@ function iniciarCronometroResetRanking() {
             return;
         }
 
+        // Convertimos los milisegundos restantes a strings legibles
         const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
         const dias = Math.floor(totalSegundos / 86400);
         const horas = Math.floor((totalSegundos % 86400) / 3600);
@@ -3674,6 +3679,8 @@ function iniciarCronometroResetRanking() {
     calcularYRenderizar();
     intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
 }
+
+
 function toggleVisibilidadMisiones() {
     const wrapper = document.getElementById("wrapper-desplegable-misiones");
     const boton = document.getElementById("btn-toggle-misiones");
