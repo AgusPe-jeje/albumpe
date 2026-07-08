@@ -4757,16 +4757,20 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // 🔄 Sincronizamos la memoria local para que no falle antes del refresh
-            usuarioActual.foto = fotoUrl;
+            // 🔄 Sincronizamos la memoria local con la nueva columna separada
+            usuarioActual.cromo_destacado = fotoUrl;
 
-            // Actualizamos visualmente el avatar del perfil de inmediato
-            const divAvatar = document.getElementById("perfil-avatar-user");
-            if (divAvatar) {
-                divAvatar.style.backgroundImage = `url('${fotoUrl}')`;
+            // 🎯 FORZAMOS EL REDIBUJADO VISUAL INMEDIATO DEL CROMO DESTACADO (Mi Perfil)
+            const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
+            if (contenedorDestacado) {
+                contenedorDestacado.innerHTML = `
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
+                        <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                `;
             }
             
-            // Recargamos el módulo del perfil para asegurar consistencia
+            // 🔄 Recargamos el perfil de fondo para actualizar estadísticas de ser necesario
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
@@ -4774,7 +4778,7 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
             alert(data.mensaje || "❌ No se pudo destacar el cromo.");
         }
     } catch (err) {
-        ocultarCarga();
+        if (typeof ocultarCarga === "function") ocultarCarga();
         console.error("Error al enviar el cromo destacado:", err);
         alert("❌ Error de red al intentar conectar con el vestuario.");
     }
