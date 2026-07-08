@@ -57,6 +57,12 @@ var historialPartidosSimulados = [];
    ======================================================================== */
 
 function cambiarModulo(idModulo, botonPresionado) {
+
+    // 🛑 CAPADO DE SEGURIDAD: Bloquea el acceso al multijugador si intentan forzarlo
+     if (idModulo === 'modulo-mundial-multi') {
+          alert("🏆 El Modo Multijugador se encuentra en mantenimiento técnico.");
+          return; 
+     }
      // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
      document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
      document.querySelectorAll('.tile-modulo-fifa, .btn-modulo-match').forEach(btn => btn.classList.remove('activo'));
