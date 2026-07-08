@@ -2218,7 +2218,7 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`, {
+            const res = await fetch(`${URL_BASE}/api/multijugador/consultar-sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
             });
@@ -2251,7 +2251,7 @@ async function abrirDraftMulti(esCreador) {
                 return;
             }
 
-            const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`, {
+            const resSala = await fetch(`${URL_BASE}/api/multijugador/sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
             });
@@ -2281,7 +2281,7 @@ async function prepararInscripcionMundialMulti() {
      mostrarCarga("Conectando con la central de la Arena Online...");
 
      try {
-          const res = await fetch(`${URL_BASE}/multijugador/preparar-draft`, {
+          const res = await fetch(`${URL_BASE}/api/multijugador/preparar-draft`, {
                 method: 'POST',
                 headers: obtenerHeadersSeguros(),
                 body: JSON.stringify({})
@@ -2386,7 +2386,7 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
 
     mostrarCarga("Enviando planilla de vestuarios a la Arena Online...");
     
-    let url = `${URL_BASE}/multijugador/crear`;
+    let url = `${URL_BASE}/api/multijugador/crear`;
     let cuerpo = {
         seleccion: paisElegido, 
         jugador_ids: arrayIdsJugadores,
@@ -2395,7 +2395,7 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
     };
 
     if (!multiEsCreador) {
-        url = `${URL_BASE}/multijugador/unirse`;
+        url = `${URL_BASE}/api/multijugador/unirse`;
         cuerpo = {
             seleccion: paisElegido, 
             jugador_ids: arrayIdsJugadores,
@@ -2431,7 +2431,7 @@ async function actualizarLobbyEnVivo() {
     if (!multiCodigoSala) return;
 
     try {
-        const res = await fetch(`${URL_BASE}/multijugador/sala/${multiCodigoSala}`, {
+        const res = await fetch(`${URL_BASE}/api/multijugador/sala/${multiCodigoSala}`, {
             method: 'GET',
             headers: obtenerHeadersSeguros()
         });
@@ -2492,7 +2492,7 @@ async function lanzarSimulacionMulti() {
     const miUsuarioId = usuarioActual ? (usuarioActual.id || usuarioActual._id) : null;
 
     try {
-        const res = await fetch(`${URL_BASE}/multijugador/jugar`, { 
+        const res = await fetch(`${URL_BASE}/api/multijugador/jugar`, { 
           method: 'POST', 
           headers: obtenerHeadersSeguros(),
           body: JSON.stringify({ 
@@ -2523,7 +2523,7 @@ async function lanzarSimulacionMulti() {
 async function consultarResultadoInvitado(intento = 1) {
      if (intento === 1) mostrarCarga("¡El Torneo comenzó! Recibiendo transmisión oficial...");
      try {
-          const res = await fetch(`${URL_BASE}/multijugador/resultado-invitado/${multiSalaId}`, {
+          const res = await fetch(`${URL_BASE}/api/multijugador/resultado-invitado/${multiSalaId}`, {
               method: 'GET',
               headers: obtenerHeadersSeguros()
           });
@@ -2620,86 +2620,160 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  let golesTuActuales = 0; 
                  let golesRivalActuales = 0;
                  let segundoVirtual = 0;
-                 let partidoPausado = false;
+                 let ultimoMinutoSincronizado = -1;
 
-                 // ⏱️ ESQUEMA SOBERANO DE VELOCIDAD: Bot vs Bot = 30s (220ms). El resto = 1 min (660ms).
-                 const velocidadTickReal = esPartidoDeBotsPuro ? 220 : 660;
+                 // ⏱️ LOOP DE POLLING DINÁMICO CRONOMETRADO EN ESPEJO PERFECTO
+                 const timerMulti = setInterval(async () => {
+                     try {
+                         // Solicitamos el estado real del match en el servidor
+                         const resSala = await fetch(`${URL_BASE}/api/multijugador/sala/${multiCodigoSala}`, {
+                             method: 'GET',
+                             headers: obtenerHeadersSeguros()
+                         });
+                         const dataSala = await resSala.json();
 
-                 const timerMulti = setInterval(() => {
-                      if (partidoPausado) return;
+                         if (!dataSala.ok) return;
 
-                      segundoVirtual += 1;
-                      if (segundoVirtual > 90) segundoVirtual = 90;
+                         // 📋 REGLA 1: SINCRONÍA DE RELOJES (El Host manda, el Invitado copia)
+                         if (multiEsCreador) {
+                             if (dataSala.estado_jugada !== 'esperando_eleccion' && dataSala.estado_jugada !== 'mostrar_contador') {
+                                 segundoVirtual += 1;
+                                 if (segundoVirtual > 90) segundoVirtual = 90;
 
-                      document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
+                                 // Registramos el avance del Host en el servidor
+                                 if (segundoVirtual !== ultimoMinutoSincronizado) {
+                                     ultimoMinutoSincronizado = segundoVirtual;
+                                     await fetch(`${URL_BASE}/api/multijugador/actualizar-reloj`, {
+                                         method: 'POST',
+                                         headers: obtenerHeadersSeguros(),
+                                         body: JSON.stringify({ sala_id: multiSalaId, minuto: segundoVirtual })
+                                     }).catch(() => {});
+                                 }
+                             }
+                         } else {
+                             // El Invitado amarra sus engranajes al minuto exacto que devolvió la Base de Datos
+                             segundoVirtual = dataSala.minuto_actual || 0;
+                         }
 
-                      // 🟢 DETECTOR DE EVENTO LOCAL
-                      if (cronogramaGolesTu.includes(segundoVirtual)) {
-                          const idxEv = partido.minutosL.indexOf(segundoVirtual);
-                          const llaveEventoFijo = partido.eventosL[idxEv] || "contrataque_favor";
+                         document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-                          if (esPvpReal || esHumanoVsBot) {
-                              partidoPausado = true; // CERROJO TOTAL EN AMBOS NAVEGADORES
-                              if (yoJuegoEstePartido) {
-                                  if (esPvpReal) ejecutarDueloPVPInteractivos(true, llaveEventoFijo);
-                                  else ejecutarPausaContraBot(llaveEventoFijo, true);
-                              } else {
-                                  ejecutarEsperaEspectadorPasivo(true, `El rival está disputando un ataque crítico...`);
-                              }
-                          } else {
-                              golesTuActuales++;
-                              dispararImpactoVisualMulti(`⚽ Gol de ${loc.toUpperCase()}`);
-                          }
-                          cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
-                      }
-                      
-                      // 🟢 DETECTOR DE EVENTO VISITANTE
-                      else if (cronogramaGolesRival.includes(segundoVirtual)) {
-                          const idxEv = partido.minutosV.indexOf(segundoVirtual);
-                          const llaveEventoFijo = partido.eventosV[idxEv] || "defensa_urgente";
+                         // 📋 REGLA 2: DETECTOR DE INICIO DE EVENTOS
+                         const tieneGolLocal = cronogramaGolesTu.includes(segundoVirtual);
+                         const tieneGolRival = cronogramaGolesRival.includes(segundoVirtual);
 
-                          if (esPvpReal || esHumanoVsBot) {
-                              partidoPausado = true; // CERROJO TOTAL EN AMBOS NAVEGADORES
-                              if (yoJuegoEstePartido) {
-                                  if (esPvpReal) ejecutarDueloPVPInteractivos(false, llaveEventoFijo);
-                                  else ejecutarPausaContraBot(llaveEventoFijo, false);
-                              } else {
-                                  ejecutarEsperaEspectadorPasivo(false, `El rival está conteniendo un avance peligroso...`);
-                              }
-                          } else {
-                              golesRivalActuales++;
-                              dispararImpactoVisualMulti(`💥 Gol de ${vis.toUpperCase()}`);
-                          }
-                          cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
-                      }
+                         if ((tieneGolLocal || tieneGolRival) && dataSala.estado_jugada !== 'esperando_eleccion' && dataSala.estado_jugada !== 'mostrar_contador') {
+                             if (multiEsCreador) {
+                                 // El host es el encargado de clavar el semáforo global para congelar ambas pantallas
+                                 await fetch(`${URL_BASE}/api/multijugador/pausar-por-evento`, {
+                                     method: 'POST',
+                                     headers: obtenerHeadersSeguros(),
+                                     body: JSON.stringify({ sala_id: multiSalaId })
+                                 });
+                             }
+                             return;
+                         }
 
-                      if (segundoVirtual >= 90) {
-                           clearInterval(timerMulti);
-                           
-                           golesTuActuales = partido.golesLocal;
-                           golesRivalActuales = partido.golesVisitante;
-                           document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                         // 📋 REGLA 3: MANEJO DEL ESTADO DE ESPERA INDEFINIDA (SEMÁFORO)
+                         if (dataSala.estado_jugada === 'esperando_eleccion') {
+                             const idxTu = partido.minutosL.indexOf(segundoVirtual);
+                             const idxRiv = partido.minutosV.indexOf(segundoVirtual);
+                             const esLocalAtacando = idxTu !== -1;
+                             const llaveEventoFijo = esLocalAtacando ? (partido.eventosL[idxTu] || "contrataque_favor") : (partido.eventosV[idxRiv] || "defensa_urgente");
 
-                           if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+                             if (yoJuegoEstePartido) {
+                                 const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
+                                 if (mod.style.display !== "block") {
+                                     if (esPvpReal) {
+                                         const soyAtacante = (esLocalAtacando && soyElLocalDeEsteMatch) || (!esLocalAtacando && soyElInvitadoDeEsteMatch);
+                                         lanzarBotoneraPVPUI(soyAtacante ? "ataque" : "defensa", soyAtacante);
+                                     } else if (esHumanoVsBot) {
+                                         ejecutarPausaContraBot(llaveEventoFijo, esLocalAtacando);
+                                     }
+                                 }
+                             } else {
+                                 document.getElementById(`consola-incidencias-${idUnico}`).innerText = `⏳ El rival está decidiendo su jugada interactiva... El reloj de la Arena está detenido.`;
+                             }
+                             return;
+                         }
 
-                           if (partido.definicionPenales) {
-                                const pBox = document.getElementById(`multi-penales-box-${idUnico}`);
-                                if (pBox) {
-                                     pBox.style.display = "block";
-                                     pBox.innerText = `💥 TANDA DE PENALES DE INFARTO: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
-                                }
-                           }
-                           
-                           bloquePartido.style.borderColor = "var(--verde-match)";
-                           const finTexto = document.createElement("div"); 
-                           finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:8px; font-family:'Oswald';";
-                           finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
-                           bloquePartido.appendChild(finTexto);
-                           
-                           document.getElementById(`consola-incidencias-${idUnico}`).innerText = "🏁 Fin del partido. Planillas firmadas.";
-                           resolveCruce(); 
-                      }
-                 }, velocidadTickReal);
+                         // 📋 REGLA 4: DISPARO SINCRONIZADO DEL CONTADOR DE GOL
+                         if (dataSala.estado_jugada === 'mostrar_contador') {
+                             clearInterval(timerMulti); // Rompemos el bucle para que el contador de 3 no se pise con llamadas
+
+                             let cuentaRegresiva = 3;
+                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                             consola.innerText = `⏳ Táctica registrada en el vestuario. Computando jugada en... ${cuentaRegresiva}`;
+
+                             const intervaloContadorVisual = setInterval(async () => {
+                                 cuentaRegresiva--;
+                                 if (cuentaRegresiva > 0) {
+                                     consola.innerText = `⏳ Táctica registrada en el vestuario. Computando jugada en... ${cuentaRegresiva}`;
+                                 } else {
+                                     clearInterval(intervaloContadorVisual);
+                                     consola.style.color = "#cbd5e1";
+
+                                     // Leemos el resultado computado que guardó el servidor al hacer clic
+                                     const resFinal = dataSala.resultado; 
+                                     if (resFinal && resFinal.exito) {
+                                         if (resFinal.esLocalGanador) golesTuActuales++; else golesRivalActuales++;
+                                         dispararImpactoVisualMulti(`🎉 ¡GOOOL! Resolución táctica impecable.`);
+                                     } else {
+                                         consola.innerText = "❌ Movimiento contenido de forma excelente por la zaga defensiva.";
+                                     }
+
+                                     // Limpiamos los cronogramas locales para evitar duplicados
+                                     cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
+                                     cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
+
+                                     setTimeout(async () => {
+                                         if (multiEsCreador) {
+                                             // El host libera el semáforo del servidor para reanudar la simulación
+                                             await fetch(`${URL_BASE}/api/multijugador/reanudar-partido`, {
+                                                 method: 'POST',
+                                                 headers: obtenerHeadersSeguros(),
+                                                 body: JSON.stringify({ sala_id: multiSalaId })
+                                             });
+                                         }
+                                         // Relanzamos el fixture de forma limpia
+                                         window.renderizarFixturePasoAPaso(bitacora, premio, apuestasTexto);
+                                     }, 2000);
+                                 }
+                             }, 1000);
+                             return;
+                         }
+
+                         // FINALIZACIÓN DE LOS 90 MINUTOS
+                         if (segundoVirtual >= 90) {
+                             clearInterval(timerMulti);
+                               
+                             golesTuActuales = partido.golesLocal;
+                             golesRivalActuales = partido.golesVisitante;
+                             document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+
+                             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
+                             if (partido.definicionPenales) {
+                                  const pBox = document.getElementById(`multi-penales-box-${idUnico}`);
+                                  if (pBox) {
+                                       pBox.style.display = "block";
+                                       pBox.innerText = `💥 TANDA DE PENALES DE INFARTO: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
+                                  }
+                             }
+                             
+                             bloquePartido.style.borderColor = "var(--verde-match)";
+                             const finTexto = document.createElement("div"); 
+                             finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:8px; font-family:'Oswald';";
+                             finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
+                             bloquePartido.appendChild(finTexto);
+                             
+                             document.getElementById(`consola-incidencias-${idUnico}`).innerText = "🏁 Fin del partido. Planillas firmadas.";
+                             resolveCruce(); 
+                         }
+
+                     } catch (err) {
+                         console.error("Falla crítica en el sistema multijugador online:", err);
+                     }
+                 }, esPartidoDeBotsPuro ? 220 : 800); // Polling equilibrado
 
                  function dispararImpactoVisualMulti(textoRelato) {
                      bloquePartido.classList.add("efecto-shake");
@@ -2710,79 +2784,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
                  }
 
-                 // 👀 SISTEMA DE SINCRONIZACIÓN AUTOMÁTICA PARA EL ESPECTADOR
-                 function ejecutarEsperaEspectadorPasivo(esGolLocal, mensajeInicial) {
-                     const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                     consola.style.color = "var(--dorado)";
-                     consola.innerText = `⏳ ${mensajeInicial}`;
-
-                     // El espectador simula de forma idéntica el proceso de resolución de 3 segundos
-                     setTimeout(() => {
-                         let cuentaRegresivaEspectador = 3;
-                         consola.innerText = `⏳ Sincronizando jugada con el servidor en... ${cuentaRegresivaEspectador}`;
-
-                         const intervaloEspectador = setInterval(() => {
-                             cuentaRegresivaEspectador--;
-                             if (cuentaRegresivaEspectador > 0) {
-                                 consola.innerText = `⏳ Sincronizando jugada con el servidor en... ${cuentaRegresivaEspectador}`;
-                             } else {
-                                 clearInterval(intervaloEspectador);
-                                 consola.style.color = "#cbd5e1";
-
-                                 if (esGolLocal) { golesTuActuales++; dispararImpactoVisualMulti(`⚽ ¡GOOOL! Avance estratégico exitoso.`); } 
-                                 else { golesRivalActuales++; dispararImpactoVisualMulti(`💥 ¡GOL! Desatención en el fondo.`); }
-
-                                 if (Math.random() <= 0.30) {
-                                     ejecutarMomentoVAR(esGolLocal, `🚨 Gol bajo lupa analítica...`);
-                                 } else {
-                                     setTimeout(() => { partidoPausado = false; }, 1200);
-                                 }
-                             }
-                         }, 1000);
-                     }, 2000); 
-                 }
-
-                 // MOMENTOS VAR
-                 function ejecutarMomentoVAR(esLocal, relatoGol) {
-                     partidoPausado = true;
-                     const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                     const lbl = document.getElementById(`score-vivo-${idUnico}`);
-                     
-                     consola.style.background = "#451a03";
-                     consola.innerHTML = `🚨 El referí detiene el juego de golpe... ¡Llaman del VAR! <span class="badge-var-live">🖥️ ANALIZANDO</span>`;
-
-                     setTimeout(() => {
-                         const seAnula = Math.random() <= 0.40; 
-                         if (seAnula) {
-                             if (esLocal) golesTuActuales--; else golesRivalActuales--;
-                             consola.style.background = "rgba(239, 68, 68, 0.15)";
-                             consola.style.color = "var(--rojo)";
-                             consola.innerText = `❌ ¡ANULADO! El VAR detectó una infracción digital previa.`;
-                             if (lbl) lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                         } else {
-                             consola.style.background = "rgba(34, 197, 94, 0.15)";
-                             consola.style.color = "var(--verde-match)";
-                             consola.innerText = `🏁 ¡CONFIRMADO! Gol 100% reglamentario.`;
-                         }
-                         setTimeout(() => {
-                             consola.style.background = "#020617";
-                             consola.style.color = "#cbd5e1";
-                             partidoPausado = false;
-                         }, 1500);
-                     }, 3000);
-                 }
-
-                 // ⚔️ CONTROL PVP HOST VS INVITADO (CON REGLA: ADIVINA = NO GOL / NO ADIVINA = GOL)
-                 function ejecutarDueloPVPInteractivos(esLocalAtacando, llaveEvento) {
-                     if (multiEsCreador) {
-                         if (esLocalAtacando) lanzarBotoneraPVPUI("ataque", true);
-                         else lanzarBotoneraPVPUI("defensa", false);
-                     } else {
-                         if (esLocalAtacando) lanzarBotoneraPVPUI("defensa", false);
-                         else lanzarBotoneraPVPUI("ataque", true);
-                     }
-                 }
-
+                 // ⚔️ CONTROL PVP BOTONERA ONLINE
                  function lanzarBotoneraPVPUI(tipoCatalogo, esAtacante) {
                      const ev = CATALOGO_PVP_INTERACTIVO[tipoCatalogo] || CATALOGO_PVP_INTERACTIVO["ataque"];
                      const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
@@ -2796,56 +2798,30 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      ev.opciones.slice(0, 3).forEach(opc => {
                          const btn = document.createElement("button");
                          btn.className = "btn-estadio";
-                         btn.style.cssText = "padding:8px; font-size:0.8rem; background:#1e293b; color:#fff; width:100%; text-align:left; margin-bottom: 4px; border-radius: 4px;";
+                         btn.style.cssText = "padding:8px; font-size:0.8rem; background:#1e293b; color:#fff; width:100%; text-align:left; margin-bottom: 4px; border-radius: 4px; cursor:pointer;";
                          btn.innerText = opc.texto;
                          
-                         btn.onclick = () => {
+                         btn.onclick = async () => {
                              mod.style.display = "none";
-                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                             consola.style.color = "var(--dorado)";
-                             
-                             let cuentaRegresiva = 3;
-                             consola.innerText = `⏳ Opción enviada. Sincronizando con tu rival en la máquina en... ${cuentaRegresiva}`;
+                             contO.innerHTML = "";
+                             document.getElementById(`consola-incidencias-${idUnico}`).innerText = "⏳ Registrando tactics en los servidores...";
 
-                             const intervaloContador = setInterval(() => {
-                                 cuentaRegresiva--;
-                                 if (cuentaRegresiva > 0) {
-                                     consola.innerText = `⏳ Opción enviada. Sincronizando con tu rival en la máquina en... ${cuentaRegresiva}`;
-                                 } else {
-                                     clearInterval(intervaloContador);
-                                     consola.style.color = "#cbd5e1";
-                                     
-                                     const rivalAdivinoOpcion = Math.random() <= 0.33; 
-
-                                     if (esAtacante) {
-                                         if (!rivalAdivinoOpcion) { 
-                                             golesTuActuales++; 
-                                             dispararImpactoVisualMulti(`🎉 ${opc.okTexto}`);
-                                             if (Math.random() <= 0.25) { ejecutarMomentoVAR(true, `🎉 ¡VAR analizando!`); return; }
-                                         } else { 
-                                             consola.style.color = "var(--rojo)";
-                                             consola.innerText = `❌ ¡El rival adivinó tu jugada! ${opc.badTexto}`; 
-                                         }
-                                     } else {
-                                         if (rivalAdivinoOpcion) { 
-                                             consola.style.color = "var(--verde-match)";
-                                             consola.innerText = `🎉 ¡Cruce defensivo épico! Lograste adivinar el ataque.`; 
-                                         } else { 
-                                             golesRivalActuales++; 
-                                             dispararImpactoVisualMulti(`💥 No lograste adivinar. ${opc.badTexto}`); 
-                                             if (Math.random() <= 0.25) { ejecutarMomentoVAR(false, `💥 ¡VAR analizando!`); return; }
-                                         }
-                                     }
-                                     
-                                     setTimeout(() => { partidoPausado = false; }, 1200);
-                                 }
-                             }, 1000);
+                             // Enviamos la resolución al endpoint unificado del backend
+                             await fetch(`${URL_BASE}/api/multijugador/enviar-eleccion`, {
+                                 method: 'POST',
+                                 headers: obtenerHeadersSeguros(),
+                                 body: JSON.stringify({
+                                     sala_id: multiSalaId,
+                                     opcion_id: opc.id,
+                                     esLocal: soyElLocalDeEsteMatch
+                                 })
+                             });
                          };
                          contO.appendChild(btn);
                      });
                  }
 
-                 // MÓDULO INTERACTIVO CONTRA EL BOT
+                 // 🤖 MÓDULO INTERACTIVO CONTRA EL BOT SINCRO
                  function ejecutarPausaContraBot(llave, esAtaque) {
                      const ev = CATALOGO_EVENTOS_MUNDIAL[llave] || CATALOGO_PVP_INTERACTIVO["ataque"];
                      const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
@@ -2858,35 +2834,22 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      ev.opciones.forEach(opc => {
                          const btn = document.createElement("button");
                          btn.className = "btn-estadio";
+                         btn.style.cursor = "pointer";
                          btn.innerText = opc.texto;
-                         btn.onclick = () => {
+                         btn.onclick = async () => {
                              mod.style.display = "none";
-                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                             consola.style.color = "var(--dorado)";
+                             contO.innerHTML = "";
+                             document.getElementById(`consola-incidencias-${idUnico}`).innerText = "⏳ Procesando resultado estratégico...";
 
-                             let cuentaRegresiva = 3;
-                             consola.innerText = `⏳ Táctica enviada. Procesando jugada en la máquina en... ${cuentaRegresiva}`;
-
-                             const intervaloContadorBot = setInterval(() => {
-                                 cuentaRegresiva--;
-                                 if (cuentaRegresiva > 0) {
-                                     consola.innerText = `⏳ Táctica enviada. Procesando jugada en la máquina en... ${cuentaRegresiva}`;
-                                 } else {
-                                     clearInterval(intervaloContadorBot);
-                                     consola.style.color = "#cbd5e1";
-
-                                     if (Math.random() <= opc.exito) {
-                                         if (esAtaque) golesTuActuales++;
-                                         dispararImpactoVisualMulti(`🎉 ${opc.okTexto}`);
-                                         if (Math.random() <= 0.30) { ejecutarMomentoVAR(esAtaque, `🎉 ¡VAR analizando gol!`); return; }
-                                     } else {
-                                         if (!esAtaque) golesRivalActuales++;
-                                         dispararImpactoVisualMulti(`❌ ${opc.badTexto}`);
-                                     }
-                                     
-                                     setTimeout(() => { partidoPausado = false; }, 1200);
-                                 }
-                             }, 1000);
+                             await fetch(`${URL_BASE}/api/multijugador/enviar-eleccion-bot`, {
+                                 method: 'POST',
+                                 headers: obtenerHeadersSeguros(),
+                                 body: JSON.stringify({
+                                     sala_id: multiSalaId,
+                                     exito: Math.random() <= opc.exito,
+                                     esLocal: soyElLocalDeEsteMatch
+                                 })
+                             });
                          };
                          contO.appendChild(btn);
                      });
@@ -2982,7 +2945,6 @@ function conmutarInputsMultiUI() {
     }
 }
 
-// 🎬 CINEMÁTICA DE ENFRENTAMIENTO VERSUS ONLINE MUNDIAL
 function ejecutarAnimaciónIntroVersus(contenedor, local, rival, ronda) {
     return new Promise((resolve) => {
         const divIntro = document.createElement("div");
@@ -3002,7 +2964,6 @@ function ejecutarAnimaciónIntroVersus(contenedor, local, rival, ronda) {
         contenedor.appendChild(divIntro);
         divIntro.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Activación de las transiciones CSS
         setTimeout(() => {
             const l = divIntro.querySelector(".intro-loc-txt");
             const v = divIntro.querySelector(".intro-vs-txt");
@@ -3015,7 +2976,6 @@ function ejecutarAnimaciónIntroVersus(contenedor, local, rival, ronda) {
             if (s) { s.innerText = "🏁 ¡CONEXIÓN ESTABLECIDA! PITAZO INICIAL"; s.style.color = "var(--verde-match)"; }
         }, 100);
 
-        // Remoción tras 3.5 segundos netos
         setTimeout(() => {
             divIntro.style.opacity = "0";
             divIntro.style.transition = "opacity 0.4s ease-out";
