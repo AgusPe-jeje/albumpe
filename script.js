@@ -2662,27 +2662,41 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                          }
 
                          // Manejo del semáforo: Esperando elección
-                         if (dataSala.estadoJugada === 'esperando_eleccion') {
-                             const idxTu = partido.minutosL.indexOf(segundoVirtual);
-                             const idxRiv = partido.minutosV.indexOf(segundoVirtual);
-                             const esLocalAtacando = idxTu !== -1;
-                             const llaveEventoFijo = esLocalAtacando ? (partido.eventosL[idxTu] || "contrataque_favor") : (partido.eventosV[idxRiv] || "defensa_urgente");
+                        // 🔄 REEMPLAZÁ ÚNICAMENTE EL BLOQUE DE 'esperando_eleccion' POR ESTE:
 
-                             if (yoJuegoEstePartido) {
-                                 const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
-                                 if (mod.style.display !== "block") {
-                                     if (esPvpReal) {
-                                         const soyAtacante = (esLocalAtacando && soyElLocalDeEsteMatch) || (!esLocalAtacando && soyElInvitadoDeEsteMatch);
-                                         lanzarBotoneraPVPUI(soyAtacante ? "ataque" : "defensa", soyAtacante);
-                                     } else if (esHumanoVsBot) {
-                                         ejecutarPausaContraBot(llaveEventoFijo, esLocalAtacando);
-                                     }
-                                 }
-                             } else {
-                                 document.getElementById(`consola-incidencias-${idUnico}`).innerText = `⏳ Jugadores decidiendo jugada interactiva...`;
-                             }
-                             return;
-                         }
+                        // Manejo del semáforo: Esperando elección
+                        if (dataSala.estadoJugada === 'esperando_eleccion') {
+                            const idxTu = partido.minutosL.indexOf(segundoVirtual);
+                            const idxRiv = partido.minutosV.indexOf(segundoVirtual);
+                            const esLocalAtacando = idxTu !== -1;
+                            const llaveEventoFijo = esLocalAtacando ? (partido.eventosL[idxTu] || "contrataque_favor") : (partido.eventosV[idxRiv] || "defensa_urgente");
+
+                            if (yoJuegoEstePartido) {
+                                const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
+                                if (mod.style.display !== "block") {
+                                    if (esPvpReal) {
+                                        const soyAtacante = (esLocalAtacando && soyElLocalDeEsteMatch) || (!esLocalAtacando && soyElInvitadoDeEsteMatch);
+                                        lanzarBotoneraPVPUI(soyAtacante ? "ataque" : "defensa", soyAtacante);
+                                    } else if (esHumanoVsBot) {
+                                        ejecutarPausaContraBot(llaveEventoFijo, esLocalAtacando);
+                                    }
+                                }
+                            } else {
+                                // 🤖 DESTRABALÍNEA DE BOT VS BOT:
+                                // Si el partido es puramente de bots, el Host toma el control y simula la elección de la IA de inmediato
+                                if (multiEsCreador) {
+                                    const exitoIA = Math.random() <= 0.50; // 50/50 para los partidos simulados de fondo
+                                    fetch(`${URL_BASE}/multijugador/enviar-eleccion-bot`, {
+                                        method: 'POST',
+                                        headers: obtenerHeadersSeguros(),
+                                        body: JSON.stringify({ sala_id: multiSalaId, exito: exitoIA, esLocal: esLocalAtacando })
+                                    }).catch(e => console.error("Error destrabando partido bot:", e));
+                                } else {
+                                    document.getElementById(`consola-incidencias-${idUnico}`).innerText = `👁️ Simulando jugada estratégica de las IA...`;
+                                }
+                            }
+                            return;
+                        }
 
                          // Manejo del semáforo: Mostrar contador (Resolución)
                          if (dataSala.estadoJugada === 'mostrar_contador') {
