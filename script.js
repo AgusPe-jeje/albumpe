@@ -1132,6 +1132,9 @@ async function ejecutarPenalLocal(direccionElegida) {
                // 2. Si terminó en gol, impactamos también el contador de goles anotados
                if (esGol) {
                     await trackearProgresoMision("goles_penales", 1);
+
+                    // 🔥 NUEVO DISPARADOR: Sumamos las 100 monedas de oro al objetivo de acumular oro
+                    await trackearProgresoMision("acumular_oro", 100);
                }
           }
 
@@ -3147,7 +3150,7 @@ async function cargarRankingMundialesLocal() {
                 if (index === 2) posicionText = "🥉";
 
                 // 🛡️ ESCANEO COMPLETO DE PROPIEDADES EN POSTGRES
-                console.log("🕵️ Escaneando datos de la fila del ranking:", user);
+                //console.log("🕵️ Escaneando datos de la fila del ranking:", user);
                 const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
 
                 tr.innerHTML = `
