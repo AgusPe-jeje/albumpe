@@ -2699,43 +2699,52 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                         }
 
                          // Manejo del semáforo: Mostrar contador (Resolución)
-                         if (dataSala.estadoJugada === 'mostrar_contador') {
-                             enPausaDeContador = true; // Congelamos ejecuciones locales
-                             let cuentaRegresiva = 3;
-                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                             
-                             const intervaloContadorVisual = setInterval(async () => {
-                                 cuentaRegresiva--;
-                                 if (cuentaRegresiva > 0) {
-                                     consola.innerText = `⏳ Computando jugada de vestuario en... ${cuentaRegresiva}`;
-                                 } else {
-                                     clearInterval(intervaloContadorVisual);
-                                     
-                                     const resFinal = dataSala.resultado; 
-                                     if (resFinal && resFinal.exito) {
-                                         if (resFinal.esLocalGanador) golesTuActuales++; else golesRivalActuales++;
-                                         dispararImpactoVisualMulti(`🎉 ¡GOOOL! Resolución táctica impecable.`);
-                                     } else {
-                                         consola.innerText = "❌ Movimiento contenido de forma excelente por la zaga defensiva.";
-                                     }
+                        if (dataSala.estadoJugada === 'mostrar_contador') {
+                            enPausaDeContador = true; // Congelamos ejecuciones locales
+                            let cuentaRegresiva = 3;
+                            const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                            
+                            const intervaloContadorVisual = setInterval(async () => {
+                                cuentaRegresiva--;
+                                if (cuentaRegresiva > 0) {
+                                    consola.innerText = `⏳ Computando jugada de vestuario en... ${cuentaRegresiva}`;
+                                } else {
+                                    clearInterval(intervaloContadorVisual);
+                                    
+                                    const resFinal = dataSala.resultado; 
+                                    if (resFinal && resFinal.exito) {
+                                        // 🎯 REPARACIÓN DE MARCADOR: 
+                                        // En vez de hacer ++ e inventar goles, leemos el avance real que dictamina la bitácora
+                                        // sumando 1 gol solo si el minuto actual corresponde a un gol oficial del cronograma.
+                                        const esGolRealLocal = partido.minutosL && partido.minutosL.includes(segundoVirtual);
+                                        const esGolRealRival = partido.minutosV && partido.minutosV.includes(segundoVirtual);
 
-                                     cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
-                                     cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
+                                        if (esGolRealLocal) golesTuActuales++;
+                                        if (esGolRealRival) golesRivalActuales++;
 
-                                     setTimeout(async () => {
-                                         if (multiEsCreador) {
-                                             await fetch(`${URL_BASE}/multijugador/reanudar-partido`, {
-                                                 method: 'POST',
-                                                 headers: obtenerHeadersSeguros(),
-                                                 body: JSON.stringify({ sala_id: multiSalaId })
-                                             });
-                                         }
-                                         enPausaDeContador = false; // Reanudamos el flujo normal
-                                     }, 2000);
-                                 }
-                             }, 1000);
-                             return;
-                         }
+                                        dispararImpactoVisualMulti(`🎉 ¡GOOOL! Resolución táctica impacta en las mallas.`);
+                                    } else {
+                                        consola.innerText = "❌ Movimiento contenido de forma excelente por la zaga defensiva.";
+                                    }
+
+                                    // Limpiamos los minutos procesados para que no vuelvan a gatillar el evento
+                                    cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
+                                    cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
+
+                                    setTimeout(async () => {
+                                        if (multiEsCreador) {
+                                            await fetch(`${URL_BASE}/multijugador/reanudar-partido`, {
+                                                method: 'POST',
+                                                headers: obtenerHeadersSeguros(),
+                                                body: JSON.stringify({ sala_id: multiSalaId })
+                                            });
+                                        }
+                                        enPausaDeContador = false; // Reanudamos el flujo normal
+                                    }, 2000);
+                                }
+                            }, 1000);
+                            return;
+                        }
 
                          // Finalización limpia del encuentro
                         if (segundoVirtual >= 90 && !enPausaDeContador) {
