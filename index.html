@@ -70,14 +70,12 @@
             
             <div id="wrapper-desplegable-misiones" class="desplegable-misiones-anim">
                 <div style="display: flex; flex-direction: column; gap: 12px;" id="contenedor-lista-misiones">
-                    </div>
+                </div>
             </div>
         </div>
         
-<!-- 🟢 Contenedor Padre: Bloquea el desborde vertical y activa el scroll horizontal nativo -->
         <div class="menu-scroll-padre" style="width: 100%; max-width: 900px; margin: 25px auto; overflow-x: auto; overflow-y: hidden; padding: 10px 5px 18px 5px; box-sizing: border-box;">
             
-            <!-- Contenedor Flexible: Fuerza un ancho amplio para garantizar que el scroll se mueva libremente -->
             <nav class="nav-modulos-estadio" style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; width: max-content; min-width: 100%; align-items: center;">
                 <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🛍️ TIENDA</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">📖 MI ÁLBUM</button>
@@ -97,7 +95,7 @@
         <section style="width: 100%; max-width: 900px; box-sizing: border-box;">
 
             <div id="modulo-sobres" class="modulo-contenido activo">
-                <div class="caja-modulo-estadio">
+                <div class="caja-modulo-estadio" id="modulo-tienda">
                     <div class="banner-modulo-imagen banner-tienda">
                         <div class="overlay-banner-texto">
                             <h2>COFRE DE CARTAS LOCAL</h2>
@@ -123,7 +121,7 @@
                             <button class="btn-comprar-pack" onclick="comprarSobreEspecifico('legendario')">ABRIR (🪙500)</button>
                         </div>
                     </div>
-                    <!-- 🔄 FILTRO PREMIUM: SALTEAR REPETIDOS -->
+
                     <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0; font-family: 'Oswald'; color: #fff; letter-spacing: 1px;">
                         <input type="checkbox" id="check-saltear-repetidos" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--dorado);">
                         <label for="check-saltear-repetidos" style="cursor: pointer; font-size: 1rem; text-transform: uppercase;">
