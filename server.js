@@ -3034,7 +3034,7 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Control del tiempo real unificado (Calculamos la fecha estricta hoy en Argentina)
+        // 1. Control del tiempo real (GMT-3 Buenos Aires)
         const ahora = new Date();
         const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
         const [mes, dia, anio] = ahora.toLocaleDateString('en-US', opcionesFecha).split('/');
@@ -3053,18 +3053,24 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
 
         const fechaUltimoResetString = userCheck.rows[0].ultimo_reset;
 
-        // ♻️ 3. GATILLO DEL RESET DIARIO CON ROTACIÓN DE CARTELERA
-        if (!fechaUltimoResetString || fechaUltimoResetString !== fechaHoyString) {
+        // 3. Verificamos si físicamente tiene filas guardadas en la tabla de misiones
+        const chequeoFilasFisicas = await client.query(
+            "SELECT COUNT(*) FROM usuario_misiones WHERE usuario_id = $1",
+            [usuarioId]
+        );
+        const cantidadMisionesFisicas = parseInt(chequeoFilasFisicas.rows[0].count);
+
+        // ♻️ GATILLO INTELIGENTE: Si cambió el día O si por alguna falla la tabla está vacía (0 filas)... ¡Forzamos inyección!
+        if (!fechaUltimoResetString || fechaUltimoResetString !== fechaHoyString || cantidadMisionesFisicas === 0) {
             
-            // A. Borramos las misiones viejas del usuario para hacer lugar
+            // Borramos remanentes por las dudas
             await client.query("DELETE FROM usuario_misiones WHERE usuario_id = $1", [usuarioId]);
 
-            // B. Mezclamos el catálogo y agarramos 3 distintas
+            // Mezclamos catálogo
             const misionesMezcladas = [...POOL_MISIONES_DISPONIBLES].sort(() => 0.5 - Math.random());
             const misionesSeleccionadas = misionesMezcladas.slice(0, 3);
 
-            // C. Las inyectamos asignándoles el mision_id incremental (1, 2, 3)
-            // 🔥 CORREGIDO: Reemplazamos NOW() por el string unificado de fechaHoyString para evitar desfasajes horariales de Render
+            // Inyectamos las misiones usando la fechaHoyString unificada
             for (let index = 0; index < misionesSeleccionadas.length; index++) {
                 const m = misionesSeleccionadas[index];
                 await client.query(`
@@ -3073,29 +3079,22 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
                 `, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa, fechaHoyString]);
             }
 
-            // D. Actualizamos la marca del calendario en el usuario
+            // Actualizamos la marca del calendario en la tabla usuarios
             await client.query(
                 "UPDATE usuarios SET ultimo_reset_misiones = $1 WHERE id = $2", 
                 [fechaHoyString, usuarioId]
             );
 
-            console.log(`♻️ ¡Cartelera Rotada! Se inyectaron 3 misiones nuevas al azar para el usuario ${usuarioId}`);
+            console.log(`♻️ ¡Inyección exitosa! Se forzaron 3 misiones para el usuario ${usuarioId}`);
         }
 
-        // 4. Traemos los datos frescos generados para el día de hoy
+        // 4. Traemos los datos frescos generados
         const resultado = await client.query(
             "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
             [usuarioId]
         );
 
         await client.query('COMMIT');
-        
-        // 🛡️ CONTROL EXTRA: Si por algún motivo la grilla quedó vacía en la base de datos, mandamos un resguardo para que el front no muera
-        if (resultado.rows.length === 0) {
-            console.warn(`⚠️ Advertencia: El usuario ${usuarioId} requirió un resguardo forzado de misiones.`);
-            return res.json({ ok: true, misiones: [] });
-        }
-
         res.json({ ok: true, misiones: resultado.rows });
 
     } catch (err) {
