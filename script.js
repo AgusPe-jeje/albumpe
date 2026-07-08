@@ -599,21 +599,19 @@ async function comprarSobreEspecifico(tipoCofre) {
 }
 
 function alternarBotonesCompraTienda(deshabilitar) {
-    // 🎯 Apuntamos directo a la clase real de tus botones del cofre
-    const botones = document.querySelectorAll(".btn-comprar-pack");
+    // 🎯 FIX: Buscamos los botones de compra SOLO si están dentro del contenedor de la tienda
+    const botones = document.querySelectorAll("#modulo-tienda .btn-comprar-pack");
     
     botones.forEach(btn => {
         btn.disabled = deshabilitar;
         
         if (deshabilitar) {
-            // Estilos premium de bloqueo
             btn.style.opacity = "0.4";
             btn.style.filter = "grayscale(100%) brightness(0.7)";
             btn.style.cursor = "not-allowed";
             btn.style.transform = "scale(0.96)";
             btn.style.transition = "all 0.25s ease";
         } else {
-            // Restauramos su facha original de la Arena
             btn.style.opacity = "1";
             btn.style.filter = "none";
             btn.style.cursor = "pointer";
