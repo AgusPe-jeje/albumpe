@@ -230,6 +230,7 @@ async function autenticarUsuario(accion) {
                
                actualizarInterfazUI();
                cargarAlbumLocal();
+               iniciarCronometroResetRanking();
                if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
                
                if (typeof verificarAvatarInicial === 'function') {
@@ -4436,6 +4437,72 @@ function iniciarCronometroRotacionSBC() {
     // Apagamos cualquier loop heredado viejo ya que el motor unificado de la Arena
     // controla el string de forma atómica en el script central.
     console.log("🦾 Reloj de Contratos acoplado al master de la Arena.");
+}
+
+let intervaloResetRanking = null; // Control atómico anti-loops
+
+function iniciarCronometroResetRanking() {
+    if (intervaloResetRanking) clearInterval(intervaloResetRanking);
+
+    const calcularYRenderizar = () => {
+        const ahora = new Date();
+        
+        // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
+        let diasFaltantes = (1 - ahora.getDay() + 7) % 7;
+        
+        // Si ya es lunes, pero pasó la medianoche, el próximo reset es el lunes que viene
+        if (diasFaltantes === 0 && (ahora.getHours() > 0 || ahora.getMinutes() > 0 || ahora.getSeconds() > 0)) {
+            diasFaltantes = 7;
+        }
+
+        const proximoLunesReset = new Date();
+        proximoLunesReset.setDate(ahora.getDate() + diasFaltantes);
+        proximoLunesReset.setHours(0, 0, 0, 0);
+
+        const tiempoRestanteMs = proximoLunesReset - ahora;
+
+        // 🎯 CAPTURAMOS LAS TRES ETIQUETAS DE LA ARENA
+        const timerPenales = document.getElementById("timer-ranking-semanal");
+        const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
+        const timerSBC = document.getElementById("sbc-timer-rotacion");
+
+        if (tiempoRestanteMs <= 0) {
+            clearInterval(intervaloResetRanking);
+            const msgReset = "🔄 ROTANDO CARTELERA Y DISTRIBUYENDO PREMIOS...";
+            
+            if (timerPenales) timerPenales.innerText = msgReset;
+            if (timerMundial) timerMundial.innerText = msgReset;
+            if (timerSBC) timerSBC.innerText = msgReset;
+            
+            setTimeout(() => {
+                if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
+                if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
+                if (typeof cargarModuloSBC === 'function') cargarModuloSBC();
+                iniciarCronometroResetRanking();
+            }, 10000);
+            return;
+        }
+
+        const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
+        const dias = Math.floor(totalSegundos / 86400);
+        const horas = Math.floor((totalSegundos % 86400) / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+
+        const stringDias = dias > 0 ? `${dias}d ` : "";
+        const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+        
+        // 🚀 INYECCIÓN SIMULTÁNEA CONTROLADA (No rompe si el elemento no está renderizado)
+        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
+    };
+
+    // Executamos una vez al instante para ganarle al delay del primer segundo
+    calcularYRenderizar();
+
+    // Arrancamos el bucle limpio
+    intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
 }
 
 function toggleVisibilidadMisiones() {
