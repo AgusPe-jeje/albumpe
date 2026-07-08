@@ -2217,7 +2217,7 @@ app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) =>
 });
 
 /* ========================================================================
-   🏆 MÓDULO MULTIJUGADOR REFORMADO CON CRONOGRAMAS INTERACTIVOS
+   🏆 MÓDULO MULTIJUGADOR REFORMADO CON CRONOGRAMAS SINCRO-INTERACTIVOS
    ======================================================================== */
 app.post('/api/multijugador/crear', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
@@ -2371,7 +2371,6 @@ app.get('/api/multijugador/sala/:codigo', async (req, res) => {
 function generarMinutosGolesMultijugador(cantidad) {
     let minutos = [];
     while(minutos.length < cantidad) {
-        // Pasos simétricos de a 1 para encajar perfecto con tu reloj de 1 min del Front
         let min = Math.floor(Math.random() * 85) + 3; 
         if (!minutos.includes(min) && min !== 45 && min !== 90) {
             minutos.push(min);
@@ -2398,17 +2397,28 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
         ganador = (penales1 > penales2) ? equipo1 : equipo2;
     }
 
-    // 🛡️ CONTROL CLAVE: Detecta si ambos competidores son humanos reales (NoBots)
     const esPvpPuro = !equipo1.esBot && !equipo2.esBot;
+
+    const minutosL = generarMinutosGolesMultijugador(g1);
+    const minutosV = generarMinutosGolesMultijugador(g2);
+
+    // 🖥️ DETERMINACIÓN DE EVENTOS EN EL SERVIDOR (Sincronía Absoluta)
+    const llavesAtaque = ["penal_favor", "corner_favor", "tirolibre_favor", "contrataque_favor"];
+    const eventosL = minutosL.map(() => llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)]);
+    const eventosV = minutosV.map(() => "defensa_urgente");
 
     return {
         local: equipo1.seleccion,
         visitante: equipo2.seleccion,
-        esPvpReal: esPvpPuro, // 🔌 Flag inyectada para activar intros y pausas simultáneas
+        creador_id: equipo1.id,       // ID del dueño de casa
+        invitado_id: equipo2.id,      // ID del visitante
+        esPvpReal: esPvpPuro, 
         golesLocal: g1,
         golesVisitante: g2,
-        minutosL: generarMinutosGolesMultijugador(g1),
-        minutosV: generarMinutosGolesMultijugador(g2),
+        minutosL: minutosL,
+        eventosL: eventosL,           // Matriz fija local
+        minutosV: minutosV,
+        eventosV: eventosV,           // Matriz fija visitante
         penalesLocal: fueAPenales ? penales1 : null,
         penalesVisitante: fueAPenales ? penales2 : null,
         definicionPenales: fueAPenales,
@@ -2422,7 +2432,7 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
     
     const client = await pool.connect();
     try {
-        await client.query('BEGIN'); // 🔒 Apertura de bloqueo atómico transaccional
+        await client.query('BEGIN'); 
 
         let salaQuery = await client.query("SELECT * FROM mundial_salas WHERE id = $1 FOR UPDATE", [sala_id]);
         if (salaQuery.rows.length === 0 && codigo_sala) {
@@ -2473,7 +2483,7 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
 
         if (modalidadSala === 'oro') {
             const chequearMonedas = await client.query("SELECT id, monedas FROM usuarios WHERE id IN ($1, $2) FOR UPDATE", [idHost, idInvitado]);
-            const oroHost = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
+            const oroHost = cheedas = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
             const oroInvitado = chequearMonedas.rows.find(r => r.id === idInvitado)?.monedas || 0;
 
             if (oroHost < arancelOro) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ El Host no tiene Oro suficiente." }); }
@@ -2512,12 +2522,10 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
 
         // 📊 SIMULACIÓN DE CUARTOS
         let ganadoresCuartos = [];
-        let numeroPartido = 1;
         for (let i = 0; i < 8; i += 2) {
             let cruce = simularPartidoEliminatorio(grillaTorneo[i], grillaTorneo[i+1]);
             bitacoraPartidosPlana.push(cruce);
             ganadoresCuartos.push(competidores.find(c => c.username === cruce.ganadorUsername) || grillaTorneo[i]);
-            numeroPartido++;
         }
 
         // 📊 SIMULACIÓN DE SEMIFINALES
@@ -2558,10 +2566,9 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
 
         await client.query("UPDATE mundial_salas SET estado = 'finalizado' WHERE id = $1", [sala_id_real]);
         
-        // Sincronizamos la variable global caché en memoria de Node
         BITACORAS_SALA_CACHE[sala_id_real] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
 
-        await client.query('COMMIT'); // Se asientan todos los cambios de forma hermética
+        await client.query('COMMIT'); 
         return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
 
     } catch (err) {
