@@ -4904,8 +4904,8 @@ async function equiparAvatarDesdeTienda(fotoId) {
 // ========================================================================
 
 async function cargarFirmasDelPerfil(perfilId) {
-    // 🛡️ ESCUDO: Si no hay id válido o no hay sesión, abortamos para no renderizar cajas rotas
-    if (!usuarioActual || !perfilId) return;
+    // 🛡️ ESCUDO: Si no hay id válido de perfil, abortamos para evitar URLs rotas
+    if (!perfilId || perfilId === "null" || perfilId === "undefined") return;
 
     const esMiMuro = usuarioActual && usuarioActual.id === parseInt(perfilId);
     const idContenedor = esMiMuro ? "mi-contenedor-lista-firmas" : "contenedor-lista-firmas";
@@ -4915,9 +4915,9 @@ async function cargarFirmasDelPerfil(perfilId) {
     contenedor.innerHTML = "<p style='color: #64748b; font-size: 0.9rem;'>Cargando dedicatorias...</p>";
 
     try {
+        // 🔓 Petición pública limpia sin pasar por obtenerHeadersSeguros()
         const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
-            method: 'GET',
-            headers: obtenerHeadersSeguros()
+            method: 'GET'
         });
         const data = await res.json();
 
