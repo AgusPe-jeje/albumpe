@@ -5,40 +5,24 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); 
 const path = require('path');
-const BITACORAS_SALA_CACHE = {};
+const jwt = require('jsonwebtoken'); 
 
 const app = express();
 
-// 🟢 ¡FALTABA ESTO DE ACÁ ABAJO! Inicialización real del pool de conexión para Neon
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL, 
   ssl: {
-    rejectUnauthorized: false // Clave obligatoria para que Render conecte con Neon de forma segura
+    rejectUnauthorized: false // Requisito obligatorio para conectar Render con Neon de forma segura
   }
 });
 
-const jwt = require('jsonwebtoken'); 
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_super_segura_para_la_arena';
 
-// ✨ Clave para leer la IP real del cliente detrás del proxy de Render
 app.set('trust proxy', true);
-
-// ✨ Render asigna el puerto dinámicamente; si no encuentra, usa el 3000
 const PORT = process.env.PORT || 3000;
 
-// Habilitamos CORS y JSON arriba de todo para que los middlewares lean el body sin problemas
 app.use(cors());
 app.use(express.json());
-
-// Genera un código de 6 caracteres únicos para las salas
-function generarCodigoSala() {
-    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let resultado = '';
-    for (let i = 0; i < 6; i++) {
-        resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
-    }
-    return resultado;
-}
 
 /* ========================================================================
    🛡️ MIDDLEWARE CORE: VERIFICACIÓN DE TOKEN JWT
@@ -53,7 +37,7 @@ const verificarToken = (req, res, next) => {
 
     try {
         const verificado = jwt.verify(token, JWT_SECRET);
-        req.usuarioLogueado = verificado; // Guardamos id y username descifrados en la petición
+        req.usuarioLogueado = verificado; 
         next();
     } catch (err) {
         return res.status(403).json({ ok: false, error: "❌ Sesión inválida o expirada. Volvé a loguearte." });
@@ -61,7 +45,7 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -71,12 +55,10 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // A. Permitir descarga de archivos estáticos obligatorios
     if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
-    // B. Rutas de Login (Verificación por Body)
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
         if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
@@ -88,7 +70,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // Bloqueo total de registros en mantenimiento
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
             ok: false,
@@ -96,7 +77,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // 📢 EXCEPCIONES PÚBLICAS RECOLECCIÓN (Rutas permitidas sin login y sin mantenimiento)
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
@@ -105,38 +85,29 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // C. 🛡️ FILTRO PRESTIGIADO PARA LOGUEADOS Y REQUISITOS DE LOGIN INICIAL
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    // 💡 SOLUCIÓN EXTRA: Si no hay token en la petición inicial (peticiones de incógnito antes del login),
-    // dejamos pasar la solicitud para que el front no se rompa y dibuje la pantalla de acceso.
     if (!token) {
         return next();
     }
 
     try {
-        // Desencriptamos el JWT usando tu Secret Key oficial
         const decodificado = jwt.verify(token, JWT_SECRET);
-        
-        // Verificamos si el username encriptado es un tester autorizado
         if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-            return next(); // Es un tester real y verificado, pase libre
+            return next(); 
         }
     } catch (err) {
-        // Si el token es inválido o expiró, lo tratamos como usuario común (va al rebote 503)
         console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
     }
 
-    // D. Si el token pertenece a alguien que NO es tester, rebote general estructurado
     return res.status(503).json({ 
         ok: false,
-        mantenimiento: true, // Flag útil para que tu front sepa qué pasa
+        mantenimiento: true, 
         error: "🚧 La Arena está en mantenimiento por reformas de infraestructura. Acceso exclusivo para Testers oficiales." 
     });
 });
 
-// Carpeta estática asignada después del filtro de mantenimiento
 app.use(express.static(path.join(__dirname)));
 
 /* ========================================================================
@@ -144,7 +115,7 @@ app.use(express.static(path.join(__dirname)));
    ======================================================================== */
 async function inicializarTablas() {
     try {
-        // 1. Tabla de Usuarios (Actualizada con foto_perfil_id y acumuladores de timba)
+        // 1. Tabla de Usuarios
         await pool.query(`CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -157,24 +128,25 @@ async function inicializarTablas() {
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             timbas_hoy INTEGER DEFAULT 10,
             copas_mundiales INTEGER DEFAULT 0, 
-            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            ultimo_mundial_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
             ultimo_reset_misiones VARCHAR(10) DEFAULT NULL,
             racha_login INTEGER DEFAULT 0,
             ultimo_login_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-            foto_perfil_id INTEGER DEFAULT 1, -- 📸 Link directo al avatar activo
-            timbas_jugadas INTEGER DEFAULT 0, -- 📊 Estadísticas acumuladas para el perfil
+            foto_perfil_id INTEGER DEFAULT 1,
+            cromo_destacado TEXT DEFAULT NULL,
+            timbas_jugadas INTEGER DEFAULT 0, 
             timbas_ganadas_exacto INTEGER DEFAULT 0,
             timbas_ganadas_signo INTEGER DEFAULT 0
         )`);
 
-        // 📸 1.5. MÓDULO NUEVO: Tabla de Catálogo de Fotos de Perfil
+        // 📸 1.5. Catálogo de Fotos de Perfil
         await pool.query(`CREATE TABLE IF NOT EXISTS fotos_perfil (
             id SERIAL PRIMARY KEY,
             nombre VARCHAR(100) NOT NULL,
             ruta_jpg VARCHAR(255) NOT NULL
         )`);
 
-        // 🔏 1.6. MÓDULO NUEVO: Tabla Intermedia de posesión de Avatares (Anti-Hackeo de sobres)
+        // 🔏 1.6. Tabla Intermedia de Posesión de Avatares
         await pool.query(`CREATE TABLE IF NOT EXISTS usuario_fotos_perfil (
             usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
             foto_id INTEGER REFERENCES fotos_perfil(id) ON DELETE CASCADE,
@@ -209,7 +181,7 @@ async function inicializarTablas() {
             fecha_publicacion TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )`);
 
-        // 4.5. Tabla de Historial Comercial Global (Requisito para tu endpoint /mercado/historial)
+        // 4.5. Tabla de Historial Comercial Global
         await pool.query(`CREATE TABLE IF NOT EXISTS historial_transferencias (
             id SERIAL PRIMARY KEY,
             vendedor_username VARCHAR(50) NOT NULL,
@@ -220,15 +192,9 @@ async function inicializarTablas() {
             fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         )`);
 
-        // 7. Tabla de Apuestas en la Quiniela
-        await pool.query(`CREATE TABLE IF NOT EXISTS quiniela_apuestas (
-            id SERIAL PRIMARY KEY,
-            usuario_id INTEGER REFERENCES usuarios(id),
-            monto_apostado INTEGER NOT NULL,
-            predicciones JSONB NOT NULL,
-            ganada BOOLEAN NOT NULL,
-            premio_entregado INTEGER DEFAULT 0,
-            fecha_jugada TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        // 7. Tabla de Control de Resets de Lunes (🔥 ¡FALTABA ESTA FILA EN TU BACKEND!)
+        await pool.query(`CREATE TABLE IF NOT EXISTS registro_resets_semanales (
+            fecha_reset VARCHAR(10) PRIMARY KEY
         )`);
 
         // 8. Tabla de Control de Objetivos Diarios
@@ -250,814 +216,29 @@ async function inicializarTablas() {
 
         console.log('Stadium Init: 🏟️ Todas las tablas de la Arena Online inicializadas con éxito en Neon.');
 
-        // ========================================================================
-        // 🚀 SEED DIAL: CARGA DE AVATARES DE PERFIL (Formato _pais.jpg)
-        // ========================================================================
+        // SEED DIAL: CARGA DE AVATARES DE PERFIL
         const checkFotos = await pool.query("SELECT COUNT(*) as count FROM fotos_perfil");
         if (parseInt(checkFotos.rows[0].count) === 0) {
             const listaFotosPerfil = [
-                ['Alemania', 'fotos/_alemania.jpg'],
-                ['Argentina', 'fotos/_argentina.jpg'],
-                ['Argentina', 'fotos/_argentina2.jpg'],
-                ['Brasil', 'fotos/_brasil.jpg'],
-                ['Canada', 'fotos/_canada.jpg'],
-                ['Colombia', 'fotos/_colombia.jpg'],
-                ['Croacia', 'fotos/_croacia.jpg'],
-                ['Ecuador', 'fotos/_ecuador.jpg'],
-                ['España', 'fotos/_españa.jpg'],
-                ['Paises Bajos', 'fotos/_holanda.jpg'],
-                ['Inglaterra', 'fotos/_inglaterra.jpg'],
-                ['Mexico', 'fotos/_mexico.jpg'],
-                ['Mexico', 'fotos/_mexico1.jpg'],
-                ['Uruguay', 'fotos/_uruguay.jpg'],
-                ['Jugadores Colombia', 'fotos/juadorescolombia.jpg'],
-                ['Jugadores Ecuador', 'fotos/juagadoresecuador.jpg'],
-                ['Jugadores Paises Bajos', 'fotos/juagorespaisesbajos.jpg'],
-                ['Jugadores Ghana', 'fotos/jugadores_ghana.jpg'],
-                ['Jugadores Argentina', 'fotos/jugadoresargentina.jpg'],
-                ['Jugadores Brasil', 'fotos/jugadoresbrasil.jpg'],
-                ['Jugadores España', 'fotos/jugadoresespaña.jpg'],
-                ['Jugadores Francia', 'fotos/jugadoresfrancia.jpg'],
-                ['Jugadores Marruecos', 'fotos/jugadoresmarruecos.jpg'],
-                ['Jugadores Mexico', 'fotos/jugadoresmexico.jpg'],
-                ['Jugadores Portugal', 'fotos/jugadoresportugal.jpg'],
-                
+                ['Alemania', 'fotos/_alemania.jpg'], ['Argentina', 'fotos/_argentina.jpg'],
+                ['Argentina', 'fotos/_argentina2.jpg'], ['Brasil', 'fotos/_brasil.jpg'],
+                ['Canada', 'fotos/_canada.jpg'], ['Colombia', 'fotos/_colombia.jpg'],
+                ['Croacia', 'fotos/_croacia.jpg'], ['Ecuador', 'fotos/_ecuador.jpg'],
+                ['España', 'fotos/_españa.jpg'], ['Paises Bajos', 'fotos/_holanda.jpg'],
+                ['Inglaterra', 'fotos/_inglaterra.jpg'], ['Mexico', 'fotos/_mexico.jpg'],
+                ['Mexico', 'fotos/_mexico1.jpg'], ['Uruguay', 'fotos/_uruguay.jpg'],
+                ['Jugadores Colombia', 'fotos/juadorescolombia.jpg'], ['Jugadores Ecuador', 'fotos/juagadoresecuador.jpg'],
+                ['Jugadores Paises Bajos', 'fotos/juagorespaisesbajos.jpg'], ['Jugadores Ghana', 'fotos/jugadores_ghana.jpg'],
+                ['Jugadores Argentina', 'fotos/jugadoresargentina.jpg'], ['Jugadores Brasil', 'fotos/jugadoresbrasil.jpg'],
+                ['Jugadores España', 'fotos/jugadoresespaña.jpg'], ['Jugadores Francia', 'fotos/jugadoresfrancia.jpg'],
+                ['Jugadores Marruecos', 'fotos/jugadoresmarruecos.jpg'], ['Jugadores Mexico', 'fotos/jugadoresmexico.jpg'],
+                ['Jugadores Portugal', 'fotos/jugadoresportugal.jpg']
             ];
 
             for (const fp of listaFotosPerfil) {
-                await pool.query(
-                    "INSERT INTO fotos_perfil (nombre, ruta_jpg) VALUES ($1, $2)",
-                    [fp[0], fp[1]]
-                );
+                await pool.query("INSERT INTO fotos_perfil (nombre, ruta_jpg) VALUES ($1, $2)", [fp[0], fp[1]]);
             }
-            console.log(`📸 [AVATARES] Catálogo de ${listaFotosPerfil.length} banderas inicializado con éxito.`);
-        }
-        const checkJugadores = await pool.query("SELECT COUNT(*) as count FROM jugadores");
-        if (parseInt(checkJugadores.rows[0].count) === 0) {
-            // 📝 Lista vacía para que le agregues tus jugadores cuando quieras, Momito
-            const granListaJugadores = [
-                   // --- AUSTRALIA ---
-                    ['Aiden O\'Neill', 'Australia', '🇦🇺', 'Mediocampista', 'fotos/aus_oneill.jpg', 'comun'],
-                    ['Alessandro Circati', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_circa.jpg', 'comun'],
-                    ['Aziz Behich', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_behich.jpg', 'rara'],
-                    ['Cameron Burgess', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_burges.jpg', 'comun'],
-                    ['Craig Goodwin', 'Australia', '🇦🇺', 'Delantero', 'fotos/aus_goodwin.jpg', 'rara'],
-                    ['Harry Souttar', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_souttar.jpg', 'rara'],
-                    ['Jackson Irvine', 'Australia', '🇦🇺', 'Mediocampista', 'fotos/aus_irvine.jpg', 'rara'],
-                    ['Jordan Bos', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_bos.jpg', 'comun'],
-                    ['Kusini Yengi', 'Australia', '🇦🇺', 'Delantero', 'fotos/aus_yengi.jpg', 'comun'],
-                    ['Lewis Miller', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_miller.jpg', 'comun'],
-                    ['Mathew Ryan', 'Australia', '🇦🇺', 'Arquero', 'fotos/aus_ryan.jpg', 'epica'],
-                    ['Milos Degenek', 'Australia', '🇦🇺', 'Defensor', 'fotos/aus_degenek.jpg', 'comun'],
-                    ['Nestory Irankunda', 'Australia', '🇦🇺', 'Delantero', 'fotos/aus_irankun.jpg', 'legendaria'],
-
-
-                    // --- ARGENTINA ---
-                    ['Lionel Messi', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_messi.jpg', 'legendaria'],
-                    ['Emiliano Martínez', 'Argentina', '🇦🇷', 'Arquero', 'fotos/arg_martinez.jpg', 'epica'],
-                    ['Rodrigo De Paul', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_paul.jpg', 'epica'],
-                    ['Julián Álvarez', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_alvarez.jpg', 'epica'],
-                    ['Lautaro Martínez', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_martinez-.jpg', 'epica'],
-                    ['Alexis Mac Allister', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_allister.jpg', 'rara'],
-                    ['Enzo Fernández', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_fernandez.jpg', 'rara'],
-                    ['Cristian Romero', 'Argentina', '🇦🇷', 'Defensor', 'fotos/arg_romero.jpg', 'epica'],
-                    ['Nicolas Gonzalez', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_gonzalez.jpg', 'comun'],
-                    ['Franco Mastantuono', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_mastantuono.jpg', 'rara'],
-                    ['Exequiel Palacios', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_palacios.jpg', 'comun'],
-                    ['Leandro Paredes', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_paredes.jpg', 'rara'],
-                    ['Nico Paz', 'Argentina', '🇦🇷', 'Mediocampista', 'fotos/arg_paz.jpg', 'rara'],
-                    ['Giuliano Simeone', 'Argentina', '🇦🇷', 'Delantero', 'fotos/arg_simeone.jpg', 'comun'],
-                    
-
-                    // --- BOSNIA Y HERZEGOVINA ---
-                    ['Samed Baždar', 'Bosnia y Herzegovina', '🇧🇦', 'Delantero', 'fotos/bos_bazdar.jpg', 'comun'],
-                    ['Benjamin Tahirović', 'Bosnia y Herzegovina', '🇧🇦', 'Mediocampista', 'fotos/bos_tahirovic.jpg', 'rara'],
-                    ['Edin Džeko', 'Bosnia y Herzegovina', '🇧🇦', 'Delantero', 'fotos/bos_dzeko.jpg', 'epica'],
-                    ['Amir Hadžiahmetović', 'Bosnia y Herzegovina', '🇧🇦', 'Mediocampista', 'fotos/bos_hadziahmetovic.jpg', 'comun'],
-                    ['Ivan Bašić', 'Bosnia y Herzegovina', '🇧🇦', 'Mediocampista', 'fotos/bos_basic.jpg', 'comun'],
-                    ['Sead Kolašinac', 'Bosnia y Herzegovina', '🇧🇦', 'Defensor', 'fotos/bos_kolasinac.jpg', 'rara'],
-                    ['Amar Memić', 'Bosnia y Herzegovina', '🇧🇦', 'Mediocampista', 'fotos/bos_memic.jpg', 'comun'],
-                    ['Tarik Muharemovic', 'Bosnia y Herzegovina', '🇧🇦', 'Defensor', 'fotos/bos_muharemovic.jpg', 'comun'],
-                    ['Nihad Mujakić', 'Bosnia y Herzegovina', '🇧🇦', 'Defensor', 'fotos/bos_mujakic.jpg', 'comun'],
-                    ['Ivan Šunjić', 'Bosnia y Herzegovina', '🇧🇦', 'Mediocampista', 'fotos/bos_sunjic.jpg', 'comun'],
-                    ['Haris Tabaković', 'Bosnia y Herzegovina', '🇧🇦', 'Delantero', 'fotos/bos_tabakovic.jpg', 'comun'],
-                    ['Nikola Vasilj', 'Bosnia y Herzegovina', '🇧🇦', 'Arquero', 'fotos/bos_vasilj.jpg', 'comun'],
-                    
-
-                    // --- BÉLGICA ---
-                    ['Kevin de Bruyne', 'Bélgica', 'bel', 'Mediocampista', 'fotos/bel_bruyne.jpg', 'legendaria'],
-                    ['Timothy Castagne', 'Bélgica', 'bel', 'Defensor', 'fotos/bel_castagne.jpg', 'rara'],
-                    ['Maxim de Cuyper', 'Bélgica', 'bel', 'Mediocampista', 'fotos/bel_cuyper.jpg', 'comun'],
-                    ['Zeno Debast', 'Bélgica', 'bel', 'Defensor', 'fotos/bel_debast.jpg', 'rara'],
-                    ['Jeremy Doku', 'Bélgica', 'bel', 'Delantero', 'fotos/bel_doku.jpg', 'epica'],
-                    ['Romelu Lukaku', 'Bélgica', 'bel', 'Delantero', 'fotos/bel_lukaku.jpg', 'legendaria'],
-                    ['Brandon Mechele', 'Bélgica', 'bel', 'Defensor', 'fotos/bel_mechele.jpg', 'comun'],
-                    ['Thomas Meunier', 'Bélgica', 'bel', 'Defensor', 'fotos/bel_meunier.jpg', 'rara'],
-                    ['Amadou Onana', 'Bélgica', 'bel', 'Arquero', 'fotos/bel_onana.jpg', 'epica'],
-                    ['Lois Openda', 'Bélgica', 'bel', 'Delantero', 'fotos/bel_openda.jpg', 'epica'],
-                    ['Nicolas Raskin', 'Bélgica', 'bel', 'Mediocampista', 'fotos/bel_raskin.jpg', 'comun'],
-                    ['Alexis Saelemaekers', 'Bélgica', 'bel', 'Delantero', 'fotos/bel_saelemaekers.jpg', 'rara'],
-                    ['Arthur Theate', 'Bélgica', 'bel', 'Defensor', 'fotos/bel_theate.jpg', 'rara'],
-                    ['Youri Tielemans', 'Bélgica', 'bel', 'Mediocampista', 'fotos/bel_tielemans.jpg', 'epica'],
-                    ['Hans Vanaken', 'Bélgica', 'bel', 'Mediocampista', 'fotos/bel_vanaken.jpg', 'comun'],
-
-                    // --- CHEQUIA ---
-                    ['Vaclav Cerny', 'Chequia', 'che', 'Delantero', 'fotos/che_cerny.jpg', 'rara'],
-                    ['Lukas Cerv', 'Chequia', 'che', 'Mediocampista', 'fotos/che_cerv.jpg', 'comun'],
-                    ['Tomas Chory', 'Chequia', 'che', 'Delantero', 'fotos/che_chory.jpg', 'comun'],
-                    ['Adam Hlozek', 'Chequia', 'che', 'Delantero', 'fotos/che_hlozek.jpg', 'epica'],
-                    ['Tomas Holes', 'Chequia', 'che', 'Mediocampista', 'fotos/che_holes.jpg', 'rara'],
-                    ['Matej Kovar', 'Chequia', 'che', 'Arquero', 'fotos/che_kovar.jpg', 'rara'],
-                    ['Ladislav Krejci', 'Chequia', 'che', 'Defensor', 'fotos/che_krejci.jpg', 'epica'],
-                    ['Lukas Provod', 'Chequia', 'che', 'Mediocampista', 'fotos/che_provod.jpg', 'rara'],
-                    ['Michal Sadilek', 'Chequia', 'che', 'Mediocampista', 'fotos/che_sadilek.jpg', 'rara'],
-                    ['Patrik Schick', 'Chequia', 'che', 'Delantero', 'fotos/che_schick.jpg', 'legendaria'],
-                    ['Jindrich Stanek', 'Chequia', 'che', 'Arquero', 'fotos/che_stanek.jpg', 'comun'],
-                    ['Pavel Sulc', 'Chequia', 'che', 'Mediocampista', 'fotos/che_sulc.jpg', 'comun'],
-                    ['Matej Vydra', 'Chequia', 'che', 'Delantero', 'fotos/che_vydra.jpg', 'comun'],
-                    ['Jaroslav Zeleny', 'Chequia', 'che', 'Defensor', 'fotos/che_zeleny.jpg', 'comun'],
-                    ['David Zima', 'Chequia', 'che', 'Defensor', 'fotos/che_zima.jpg', 'rara'],
-
-                    // --- COSTA DE MARFIL ---
-                    ['Simon Adingra', 'Costa de Marfil', 'cm', 'Delantero', 'fotos/cm_adingra.jpg', 'rara'],
-                    ['Emmanuel Agbadou', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_agbadou.jpg', 'comun'],
-                    ['Willy Boly', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_boly.jpg', 'rara'],
-                    ['Amad Diallo', 'Costa de Marfil', 'cm', 'Delantero', 'fotos/cm_diallo.jpg', 'epica'],
-                    ['Yan Diomande', 'Costa de Marfil', 'cm', 'Delantero', 'fotos/cm_diomande.jpg', 'epica'],
-                    ['Ousmane Diomande', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_diomande--.jpg', 'epica'],
-                    ['Yahia Fofana', 'Costa de Marfil', 'cm', 'Arquero', 'fotos/cm_fofana.jpg', 'epica'],
-                    ['Seko Fofana', 'Costa de Marfil', 'cm', 'Mediocampista', 'fotos/cm_fofana-.jpg', 'comun'],
-                    ['Sébastien Haller', 'Costa de Marfil', 'cm', 'Delantero', 'fotos/cm_haller.jpg', 'legendaria'],
-                    ['Ghislain Konan', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_konan.jpg', 'comun'],
-                    ['Odilon Kossounou', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_kossounou.jpg', 'rara'],
-                    ['Evan Ndicka', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_ndicka.jpg', 'epica'],
-                    ['Wilfried Singo', 'Costa de Marfil', 'cm', 'Defensor', 'fotos/cm_singo.jpg', 'rara'],
-
-                    // --- COLOMBIA ---
-                    ['Jhon Arias', 'Colombia', 'col', 'Defensor', 'fotos/col_arias.jpg', 'epica'],
-                    ['Santiago Arias', 'Colombia', 'col', 'Defensor', 'fotos/col_arias-.jpg', 'comun'],
-                    ['Jorge Carrascal', 'Colombia', 'col', 'Mediocampista', 'fotos/col_carrascal.jpg', 'rara'],
-                    ['Kevin Castaño', 'Colombia', 'col', 'Mediocampista', 'fotos/col_castaño.jpg', 'comun'],
-                    ['Jhon Córdoba', 'Colombia', 'col', 'Delantero', 'fotos/col_cordoba.jpg', 'rara'],
-                    ['Luis Díaz', 'Colombia', 'col', 'Delantero', 'fotos/col_diaz.jpg', 'legendaria'],
-                    ['Jefferson Lerma', 'Colombia', 'col', 'Mediocampista', 'fotos/col_lerma.jpg', 'epica'],
-                    ['Daniel Muñoz', 'Colombia', 'col', 'Defensor', 'fotos/col_muñoz.jpg', 'epica'],
-                    ['David Ospina', 'Colombia', 'col', 'Arquero', 'fotos/col_ospina.jpg', 'rara'],
-                    ['Juan Fernando Quintero', 'Colombia', 'col', 'Mediocampista', 'fotos/col_quintero.jpg', 'epica'],
-                    ['Richard Ríos', 'Colombia', 'col', 'Mediocampista', 'fotos/col_rios.jpg', 'epica'],
-                    ['James Rodríguez', 'Colombia', 'col', 'Mediocampista', 'fotos/col_rodriguez.jpg', 'legendaria'],
-                    ['Jhon Durán', 'Colombia', 'col', 'Delantero', 'fotos/col_suarez.jpg', 'epica'],
-                    ['Camilo Vargas', 'Colombia', 'col', 'Arquero', 'fotos/col_vargas.jpg', 'epica'],
-
-                    // --- ECUADOR ---
-                    ['Nilson Angulo', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_angulo.jpg', 'comun'],
-                    ['Moises Caicedo', 'Ecuador', 'ecu', 'Mediocampista', 'fotos/ecu_caicedo.jpg', 'legendaria'],
-                    ['Leonardo Campana', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_campana.jpg', 'rara'],
-                    ['Alan Franco', 'Ecuador', 'ecu', 'Mediocampista', 'fotos/ecu_franco.jpg', 'rara'],
-                    ['Hernán Galíndez', 'Ecuador', 'ecu', 'Arquero', 'fotos/ecu_galindez.jpg', 'epica'],
-                    ['Alan Minda', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_minda.jpg', 'rara'],
-                    ['Joel Ordóñez', 'Ecuador', 'ecu', 'Defensor', 'fotos/ecu_ordoñez.jpg', 'rara'],
-                    ['Kendry Páez', 'Ecuador', 'ecu', 'Mediocampista', 'fotos/ecu_paez.jpg', 'epica'],
-                    ['Gonzalo Plata', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_plata.jpg', 'epica'],
-                    ['Kevin Rodríguez', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_rodriguez.jpg', 'comun'],
-                    ['Enner Valencia', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_valencia.jpg', 'legendaria'],
-                    ['Gonzalo Valle', 'Ecuador', 'ecu', 'Arquero', 'fotos/ecu_valle.jpg', 'comun'],
-                    ['Pedro Vite', 'Ecuador', 'ecu', 'Mediocampista', 'fotos/ecu_vite.jpg', 'rara'],
-                    ['John Yeboah', 'Ecuador', 'ecu', 'Delantero', 'fotos/ecu_yeboah.jpg', 'rara'],
-
-                    // --- ESPAÑA ---
-                    ['Dani Carvajal', 'España', 'esp', 'Defensor', 'fotos/esp_carvajal.jpg', 'legendaria'],
-                    ['Marc Cucurella', 'España', 'esp', 'Defensor', 'fotos/esp_cucurella.jpg', 'epica'],
-                    ['Mikel Merino', 'España', 'esp', 'Mediocampista', 'fotos/esp_merino.jpg', 'rara'],
-                    ['Álvaro Morata', 'España', 'esp', 'Delantero', 'fotos/esp_morata.jpg', 'rara'],
-                    ['Dani Olmo', 'España', 'esp', 'Mediocampista', 'fotos/esp_olmo.jpg', 'epica'],
-                    ['Mikel Oyarzabal', 'España', 'esp', 'Delantero', 'fotos/esp_oyarzabal.jpg', 'rara'],
-                    ['Pedri', 'España', 'esp', 'Mediocampista', 'fotos/esp_pedri.jpg', 'epica'],
-                    ['Rodri', 'España', 'esp', 'Mediocampista', 'fotos/esp_rodri.jpg', 'legendaria'],
-                    ['Fabian Ruiz', 'España', 'esp', 'Mediocampista', 'fotos/esp_ruiz.jpg', 'epica'],
-                    ['Unai Simón', 'España', 'esp', 'Arquero', 'fotos/esp_simon.jpg', 'epica'],
-                    ['Ferran Torres', 'España', 'esp', 'Delantero', 'fotos/esp_torres.jpg', 'rara'],
-                    ['Nico Williams', 'España', 'esp', 'Delantero', 'fotos/esp_williams.jpg', 'legendaria'],
-                    ['Lamine Yamal', 'España', 'esp', 'Delantero', 'fotos/esp_yamal.jpg', 'legendaria'],
-                    ['Martin Zubimendi', 'España', 'esp', 'Mediocampista', 'fotos/esp_zubimendi.jpg', 'rara'],
-                    
-                    // --- FRANCIA ---
-                    ['Bradley Barcola', 'Francia', 'fra', 'Delantero', 'fotos/fra_barcola.jpg', 'epica'],
-                    ['Eduardo Camavinga', 'Francia', 'fra', 'Mediocampista', 'fotos/fra_camavinga.jpg', 'epica'],
-                    ['Kingsley Coman', 'Francia', 'fra', 'Delantero', 'fotos/fra_coman.jpg', 'rara'],
-                    ['Ousmane Dembélé', 'Francia', 'fra', 'Delantero', 'fotos/fra_dembele.jpg', 'legendaria'],
-                    ['Lucas Digne', 'Francia', 'fra', 'Defensor', 'fotos/fra_digne.jpg', 'rara'],
-                    ['Desiré Doué', 'Francia', 'fra', 'Mediocampista', 'fotos/fra_doue.jpg', 'rara'],
-                    ['Hugo Ekitike', 'Francia', 'fra', 'Delantero', 'fotos/fra_ekitike.jpg', 'rara'],
-                    ['Manu Koné', 'Francia', 'fra', 'Mediocampista', 'fotos/fra_kone.jpg', 'comun'],
-                    ['Mike Maignan', 'Francia', 'fra', 'Arquero', 'fotos/fra_maignan.jpg', 'epica'],
-                    ['Kylian Mbappé', 'Francia', 'fra', 'Delantero', 'fotos/fra_mbappe.jpg', 'legendaria'],
-                    ['Michael Olise', 'Francia', 'fra', 'Delantero', 'fotos/fra_olise.jpg', 'epica'],
-                    ['Adrien Rabiot', 'Francia', 'fra', 'Mediocampista', 'fotos/fra_rabiot.jpg', 'rara'],
-                    ['Aurélien Tchouaméni', 'Francia', 'fra', 'Mediocampista', 'fotos/fra_tchuamani.jpg', 'epica'],
-                    ['Dayot Upamecano', 'Francia', 'fra', 'Defensor', 'fotos/fra_upamecano.jpg', 'rara'],
-
-                    // --- INGLATERRA ---
-                    ['Jude Bellingham', 'Inglaterra', 'ing', 'Mediocampista', 'fotos/ing_bellingham.jpg', 'legendaria'],
-                    ['Dan Burn', 'Inglaterra', 'ing', 'Defensor', 'fotos/ing_burn.jpg', 'rara'],
-                    ['Phil Foden', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_foden.jpg', 'legendaria'],
-                    ['Anthony Gordon', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_gordon.jpg', 'rara'],
-                    ['Marc Guéhi', 'Inglaterra', 'ing', 'Defensor', 'fotos/ing_guehi.jpg', 'epica'],
-                    ['Dean Henderson', 'Inglaterra', 'ing', 'Arquero', 'fotos/ing_henderson.jpg', 'rara'],
-                    ['Harry Kane', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_kane.jpg', 'legendaria'],
-                    ['Cole Palmer', 'Inglaterra', 'ing', 'Mediocampista', 'fotos/ing_palmer.jpg', 'legendaria'],
-                    ['Jordan Pickford', 'Inglaterra', 'ing', 'Arquero', 'fotos/ing_pickford.jpg', 'epica'],
-                    ['Marcus Rashford', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_rashford.jpg', 'epica'],
-                    ['Declan Rice', 'Inglaterra', 'ing', 'Mediocampista', 'fotos/ing_rice.jpg', 'epica'],
-                    ['Morgan Rogers', 'Inglaterra', 'ing', 'Mediocampista', 'fotos/ing_rogers.jpg', 'comun'],
-                    ['Bukayo Saka', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_saka.jpg', 'legendaria'],
-                    ['John Stones', 'Inglaterra', 'ing', 'Defensor', 'fotos/ing_stones.jpg', 'epica'],
-                    ['Ollie Watkins', 'Inglaterra', 'ing', 'Delantero', 'fotos/ing_watkins.jpg', 'epica'],
-
-                    // --- MEXICO ---
-                    ['Luis Malagon', 'México', '🇲🇽', 'Arquero', 'fotos/mex_malagon.jpg', 'rara'],
-                    ['Edson Álvarez', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_alvarez.jpg', 'epica'],
-                    ['Chucky Lozano', 'México', '🇲🇽', 'Delantero', 'fotos/mex_lozano.jpg', 'rara'],
-                    ['César Montes', 'México', '🇲🇽', 'Defensor', 'fotos/mex_montes.jpg', 'comun'],
-                    ['Carlos Rodriguez', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_rodriguez.jpg', 'comun'],
-                    ['Diego Lainez', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_lainez.jpg', 'comun'],
-                    ['Erick Sanchez', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_sanchez.jpg', 'comun'],
-                    ['Israel Reyes', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_reyes.jpg', 'comun'],
-                    ['Jesus Gallardo', 'México', '🇲🇽', 'Delantero', 'fotos/mex_gallardo.jpg', 'comun'],
-                    ['Marcelo Ruiz', 'México', '🇲🇽', 'Mediocampista', 'fotos/mex_ruiz.jpg', 'comun'],
-                    ['Santiago Gimenez', 'México', '🇲🇽', 'Delantero', 'fotos/mex_gimenez.jpg', 'epica'],
-                    ['Raul Jimenez', 'México', '🇲🇽', 'Delantero', 'fotos/mex_jimenez.jpg', 'rara'],
-                    ['Johan Vasquez', 'México', '🇲🇽', 'Delantero', 'fotos/mex_vasquez.jpg', 'comun'],
-                    ['Jorge Sanchez', 'México', '🇲🇽', 'Delantero', 'fotos/mex_sanchez1.jpg', 'comun'],
-                    ['Orbelin Pineda', 'México', '🇲🇽', 'Delantero', 'fotos/mex_pineda.jpg', 'comun'],
-
-                    // --- JAPÓN ---
-                    ['Junya Ito', 'Japón', 'jap', 'Delantero', 'fotos/jap_ito.jpg', 'epica'],
-                    ['Daichi Kamada', 'Japón', 'jap', 'Mediocampista', 'fotos/jap_kamada.jpg', 'epica'],
-                    ['Takefusa Kubo', 'Japón', 'jap', 'Delantero', 'fotos/jap_kubo.jpg', 'legendaria'],
-                    ['Shuto Machino', 'Japón', 'jap', 'Delantero', 'fotos/jap_machino.jpg', 'comun'],
-                    ['Takumi Minamino', 'Japón', 'jap', 'Mediocampista', 'fotos/jap_minamino.jpg', 'epica'],
-                    ['Keito Nakamura', 'Japón', 'jap', 'Delantero', 'fotos/jap_nakamura.jpg', 'rara'],
-                    ['Kaishu Sano', 'Japón', 'jap', 'Mediocampista', 'fotos/jap_sano.jpg', 'comun'],
-                    ['Yuki Soma', 'Japón', 'jap', 'Delantero', 'fotos/jap_soma.jpg', 'comun'],
-                    ['Zion Suzuki', 'Japón', 'jap', 'Arquero', 'fotos/jap_suzuki.jpg', 'rara'],
-                    ['Ao Tanaka', 'Japón', 'jap', 'Mediocampista', 'fotos/jap_tanaka.jpg', 'rara'],
-                    ['Shogo Taniguchi', 'Japón', 'jap', 'Defensor', 'fotos/jap_taniguchi.jpg', 'rara'],
-                    ['Ayase Ueda', 'Japón', 'jap', 'Delantero', 'fotos/jap_ueda.jpg', 'epica'],
-                    ['Kota Watanabe', 'Japón', 'jap', 'Mediocampista', 'fotos/jap_watanabe.jpg', 'comun'],
-
-                    // --- NORUEGA ---
-                    ['Kristoffer Ajer', 'Noruega', 'nor', 'Defensor', 'fotos/nor_ajer.jpg', 'rara'],
-                    ['Patrick Berg', 'Noruega', 'nor', 'Mediocampista', 'fotos/nor_berg.jpg', 'comun'],
-                    ['Sander Berge', 'Noruega', 'nor', 'Mediocampista', 'fotos/nor_berge.jpg', 'rara'],
-                    ['Oscar Bobb', 'Noruega', 'nor', 'Delantero', 'fotos/nor_bobb.jpg', 'epica'],
-                    ['Aron Dønnum', 'Noruega', 'nor', 'Delantero', 'fotos/nor_donnum.jpg', 'comun'],
-                    ['Erling Haaland', 'Noruega', 'nor', 'Delantero', 'fotos/nor_haaland.jpg', 'legendaria'],
-                    ['Torbiørn Heggem', 'Noruega', 'nor', 'Defensor', 'fotos/nor_heggem.jpg', 'comun'],
-                    ['Jørgen Strand Larsen', 'Noruega', 'nor', 'Delantero', 'fotos/nor_larsen.jpg', 'rara'],
-                    ['Antonio Nusa', 'Noruega', 'nor', 'Delantero', 'fotos/nor_nusa.jpg', 'epica'],
-                    ['Martin Ødegaard', 'Noruega', 'nor', 'Mediocampista', 'fotos/nor_odegaard.jpg', 'legendaria'],
-                    ['Leo Østigård', 'Noruega', 'nor', 'Defensor', 'fotos/nor_ostigard.jpg', 'rara'],
-                    ['Andreas Schjelderup', 'Noruega', 'nor', 'Delantero', 'fotos/nor_schjelderup.jpg', 'rara'],
-                    ['Morten Thorsby', 'Noruega', 'nor', 'Mediocampista', 'fotos/nor_thorsby.jpg', 'rara'],
-                    ['David Møller Wolfe', 'Noruega', 'nor', 'Defensor', 'fotos/nor_wolfe.jpg', 'comun'],
-
-                    // --- PAÍSES BAJOS ---
-                    ['Memphis Depay', 'Países Bajos', 'pai', 'Delantero', 'fotos/pai_depay.jpg', 'epica'],
-                    ['Virgil van Dijk', 'Países Bajos', 'pai', 'Defensor', 'fotos/pai_dijk.jpg', 'legendaria'],
-                    ['Denzel Dumfries', 'Países Bajos', 'pai', 'Defensor', 'fotos/pai_dumfries.jpg', 'epica'],
-                    ['Ryan Gravenberch', 'Países Bajos', 'pai', 'Mediocampista', 'fotos/pai_gravenberch.jpg', 'rara'],
-                    ['Jan Paul van Hecke', 'Países Bajos', 'pai', 'Defensor', 'fotos/pai_hecke.jpg', 'comun'],
-                    ['Frenkie de Jong', 'Países Bajos', 'pai', 'Mediocampista', 'fotos/pai_jong.jpg', 'legendaria'],
-                    ['Justin Kluivert', 'Países Bajos', 'pai', 'Delantero', 'fotos/pai_kluivert.jpg', 'rara'],
-                    ['Teun Koopmeiners', 'Países Bajos', 'pai', 'Mediocampista', 'fotos/pai_koopmeiners.jpg', 'epica'],
-                    ['Donyell Malen', 'Países Bajos', 'pai', 'Delantero', 'fotos/pai_malen.jpg', 'rara'],
-                    ['Tijjani Reijnders', 'Países Bajos', 'pai', 'Mediocampista', 'fotos/pai_reijnders.jpg', 'epica'],
-                    ['Xavi Simons', 'Países Bajos', 'pai', 'Mediocampista', 'fotos/pai_simons.jpg', 'legendaria'],
-                    ['Micky van de Ven', 'Países Bajos', 'pai', 'Defensor', 'fotos/pai_ven.jpg', 'epica'],
-                    ['Bart Verbruggen', 'Países Bajos', 'pai', 'Arquero', 'fotos/pai_verbruggen.jpg', 'epica'],
-                    ['Wout Weghorst', 'Países Bajos', 'pai', 'Delantero', 'fotos/pai_weghorst.jpg', 'rara'],
-
-                    // --- PORTUGAL ---
-                    ['João Cancelo', 'Portugal', 'por', 'Defensor', 'fotos/por_cancelo.jpg', 'epica'],
-                    ['Diogo Costa', 'Portugal', 'por', 'Arquero', 'fotos/por_costa.jpg', 'epica'],
-                    ['Diogo Dalot', 'Portugal', 'por', 'Defensor', 'fotos/por_dalot.jpg', 'rara'],
-                    ['Rúben Dias', 'Portugal', 'por', 'Defensor', 'fotos/por_dias.jpg', 'legendaria'],
-                    ['João Félix', 'Portugal', 'por', 'Delantero', 'fotos/por_felix.jpg', 'rara'],
-                    ['Bruno Fernandes', 'Portugal', 'por', 'Mediocampista', 'fotos/por_fernandes.jpg', 'legendaria'],
-                    ['Gonçalo Inácio', 'Portugal', 'por', 'Defensor', 'fotos/por_inacio.jpg', 'rara'],
-                    ['Nuno Mendes', 'Portugal', 'por', 'Defensor', 'fotos/por_mendes.jpg', 'epica'],
-                    ['Rúben Neves', 'Portugal', 'por', 'Mediocampista', 'fotos/por_neves-.jpg', 'rara'],
-                    ['Joao Neves', 'Portugal', 'por', 'Mediocampista', 'fotos/por_neves.jpg', 'epica'],
-                    ['Cristiano Ronaldo', 'Portugal', 'por', 'Delantero', 'fotos/por_ronaldo.jpg', 'legendaria'],
-                    ['Bernardo Silva', 'Portugal', 'por', 'Mediocampista', 'fotos/por_silva.jpg', 'legendaria'],
-                    ['Trincão', 'Portugal', 'por', 'Delantero', 'fotos/por_trincao.jpg', 'comun'],
-                    ['Vitinha', 'Portugal', 'por', 'Mediocampista', 'fotos/por_vitinha.jpg', 'epica'],
-
-                    // --- ESTADOS UNIDOS ---
-                    ['Brenden Aaronson', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_aaronson.jpg', 'comun'],
-                    ['Tyler Adams', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_adams.jpg', 'rara'],
-                    ['Cristian Roldan', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_roldan.jpg', 'comun'],
-                    ['Diego Luna', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_luna.jpg', 'rara'],
-                    ['Folarin Balogun', 'Estados Unidos', '🇺🇸', 'Delantero', 'fotos/usa_balogun.jpg', 'rara'],
-                    ['Alejandro Zendejas', 'Estados Unidos', '🇺🇸', 'Delantero', 'fotos/usa_freeman.jpg', 'comun'],
-                    ['Matt Freese', 'Estados Unidos', '🇺🇸', 'Arquero', 'fotos/usa_freese.jpg', 'comun'],  
-                    ['Weston McKennie', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_mckennie.jpg', 'rara'],
-                    ['Mark McKenzie', 'Estados Unidos', '🇺🇸', 'Defensor', 'fotos/usa_mckenzie.jpg', 'comun'],
-                    ['Ricardo Pepi', 'Estados Unidos', '🇺🇸', 'Delantero', 'fotos/usa_pepi.jpg', 'comun'],
-                    ['Christian Pulisic', 'Estados Unidos', '🇺🇸', 'Delantero', 'fotos/usa_pulisic.jpg', 'epica'],
-                    ['Chris Richards', 'Estados Unidos', '🇺🇸', 'Defensor', 'fotos/usa_richards.jpg', 'comun'],
-                    ['Antonee Robinson', 'Estados Unidos', '🇺🇸', 'Defensor', 'fotos/usa_robinson.jpg', 'comun'],
-                    ['Tanner Tessmann', 'Estados Unidos', '🇺🇸', 'Mediocampista', 'fotos/usa_tessmann.jpg', 'comun'],
-                    ['Tim Weah', 'Estados Unidos', '🇺🇸', 'Delantero', 'fotos/usa_weah.jpg', 'comun'],
-
-                    // --- CATAR ---
-                    ['Ahmed Alaaeldin', 'Catar', 'qat', 'Delantero', 'fotos/qat_ahmed.jpg', 'comun'],
-                    ['Sultan Al-Brake', 'Catar', 'qat', 'Defensor', 'fotos/qat_albrake.jpg', 'comun'],
-                    ['Almoez Ali', 'Catar', 'qat', 'Delantero', 'fotos/qat_ali.jpg', 'legendaria'],
-                    ['Karim Boudiaf', 'Catar', 'qat', 'Mediocampista', 'fotos/qat_boudiaf.jpg', 'rara'],
-                    ['Homam Ahmed', 'Catar', 'qat', 'Defensor', 'fotos/qat_ganehi.jpg', 'comun'],
-                    ['Abdulaziz Hatem', 'Catar', 'qat', 'Mediocampista', 'fotos/qat_hatem.jpg', 'rara'],
-                    ['Hassan Al-Haydos', 'Catar', 'qat', 'Delantero', 'fotos/qat_haydos.jpg', 'epica'],
-                    ['Boualem Khoukhi', 'Catar', 'qat', 'Defensor', 'fotos/qat_khoukhi.jpg', 'epica'],
-                    ['Assim Madibo', 'Catar', 'qat', 'Mediocampista', 'fotos/qat_madibo.jpg', 'comun'],
-                    ['Lucas Mendes', 'Catar', 'qat', 'Defensor', 'fotos/qat_mendes.jpg', 'rara'],
-                    ['Pedro Miguel', 'Catar', 'qat', 'Defensor', 'fotos/qat_miguel.jpg', 'rara'],
-                    ['Tarek Salman', 'Catar', 'qat', 'Defensor', 'fotos/qat_salman.jpg', 'comun'],
-                    ['Mohammed Waad', 'Catar', 'qat', 'Mediocampista', 'fotos/qat_waad.jpg', 'rara'],
-                    
-                    // --- CANADÁ ---
-                    ['Alphonso Davies', 'Canadá', '🇨🇦', 'Defensor', 'fotos/can_davies.jpg', 'epica'],
-                    ['Samuel Adekugbe', 'Canadá', '🇨🇦', 'Defensor', 'fotos/can_adekugbe.jpg', 'comun'],
-                    ['Moise Bombito', 'Canadá', '🇨🇦', 'Defensor', 'fotos/can_bombito.jpg', 'rara'],
-                    ['Tajon Buchanan', 'Canadá', '🇨🇦', 'Mediocampista', 'fotos/can_buchanan.jpg', 'rara'],
-                    ['Mathieu Choiniere', 'Canadá', '🇨🇦', 'Mediocampista', 'fotos/can_choiniere.jpg', 'comun'],
-                    ['Derek Cornelius', 'Canadá', '🇨🇦', 'Defensor', 'fotos/can_cornelius.jpg', 'comun'],
-                    ['Cyle Larin', 'Canadá', '🇨🇦', 'Delantero', 'fotos/can_larin.jpg', 'comun'],
-                    ['Jonathan David', 'Canadá', '🇨🇦', 'Delantero', 'fotos/can_david.jpg', 'rara'],
-                    ['Dayne St. Clair', 'Canadá', '🇨🇦', 'Arquero', 'fotos/can_clair.jpg', 'comun'],
-                    ['Stephen Eustaquio', 'Canadá', '🇨🇦', 'Mediocampista', 'fotos/can_eustaquio.jpg', 'rara'],
-                    ['Ismael Kone', 'Canadá', '🇨🇦', 'Mediocampista', 'fotos/can_kone.jpg', 'comun'],
-                    ['Liam Millar', 'Canadá', '🇨🇦', 'Delantero', 'fotos/can_millar.jpg', 'comun'],
-                    ['Kamal Miller', 'Canadá', '🇨🇦', 'Defensor', 'fotos/can_miller.jpg', 'comun'],
-                    ['Jonathan Osorio', 'Canadá', '🇨🇦', 'Mediocampista', 'fotos/can_osorio.jpg', 'comun'],
-
-                    // --- BRASIL ---
-                    ['Alisson Becker', 'Brasil', '🇧🇷', 'Arquero', 'fotos/bra_becker.jpg', 'epica'],
-                    ['Gleison Bremer', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_bremer.jpg', 'rara'],
-                    ['Casemiro', 'Brasil', '🇧🇷', 'Mediocampista', 'fotos/bra_casemiro.jpg', 'epica'],
-                    ['Matheus Cunha', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_cunha.jpg', 'comun'],
-                    ['Danilo', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_danilo.jpg', 'comun'],
-                    ['Danilo', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_danilo-.jpg', 'comun'],
-                    ['Endrick', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_endrick.jpg', 'rara'],
-                    ['Fabinho', 'Brasil', '🇧🇷', 'Mediocampista', 'fotos/bra_fabinho.jpg', 'comun'],
-                    ['Bruno Guimarães', 'Brasil', '🇧🇷', 'Mediocampista', 'fotos/bra_guimaraes.jpg', 'rara'],
-                    ['Henrique', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_henriqe.jpg', 'comun'],
-                    ['Roger Ibáñez', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_ibañez.jpg', 'comun'],
-                    ['Gabriel Magalhães', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_magalhaes.jpg', 'rara'],
-                    ['Marquinhos', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_marquinhos.jpg', 'epica'],
-                    ['Gabriel Martinelli', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_martinelli.jpg', 'rara'],
-                    ['Ederson Moraes', 'Brasil', '🇧🇷', 'Arquero', 'fotos/bra_moraes.jpg', 'rara'],
-                    ['Neymar Jr', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_neymar.jpg', 'legendaria'],
-                    ['Lucas Paquetá', 'Brasil', '🇧🇷', 'Mediocampista', 'fotos/bra_paqueta.jpg', 'rara'],
-                    ['Andreas Pereira', 'Brasil', '🇧🇷', 'Mediocampista', 'fotos/bra_pereira.jpg', 'comun'],
-                    ['Raphinha', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_raphinha.jpg', 'epica'],
-                    ['Rayan', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_rayan.jpg', 'comun'],
-                    ['Alex Sandro', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_sandro.jpg', 'comun'],
-                    ['Santos', 'Brasil', '🇧🇷', 'Arquero', 'fotos/bra_santos.jpg', 'comun'],
-                    ['Igor Thiago', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_thiago.jpg', 'comun'],
-                    ['Vinícius Jr', 'Brasil', '🇧🇷', 'Delantero', 'fotos/bra_vinicius.jpg', 'legendaria'],
-                    ['Weverton', 'Brasil', '🇧🇷', 'Arquero', 'fotos/bra_weverton.jpg', 'comun'],
-                    ['Wesley', 'Brasil', '🇧🇷', 'Defensor', 'fotos/bra_wesley.jpg', 'comun'],
-
-                    // --- ESCOCIA ---
-                    ['Ryan Christie', 'Escocia', 'esc', 'Mediocampista', 'fotos/esc_christie.jpg', 'rara'],
-                    ['Lyndon Dykes', 'Escocia', 'esc', 'Delantero', 'fotos/esc_dykes.jpg', 'rara'],
-                    ['Lewis Ferguson', 'Escocia', 'esc', 'Mediocampista', 'fotos/esc_ferguson.jpg', 'rara'],
-                    ['Angus Gunn', 'Escocia', 'esc', 'Arquero', 'fotos/esc_gunn.jpg', 'epica'],
-                    ['Grant Hanley', 'Escocia', 'esc', 'Defensor', 'fotos/esc_hanley.jpg', 'comun'],
-                    ['Jack Hendry', 'Escocia', 'esc', 'Defensor', 'fotos/esc_hendry.jpg', 'rara'],
-                    ['John McGinn', 'Escocia', 'esc', 'Mediocampista', 'fotos/esc_mcginn.jpg', 'epica'],
-                    ['Scott McKenna', 'Escocia', 'esc', 'Defensor', 'fotos/esc_mckenna.jpg', 'comun'],
-                    ['Kenny McLean', 'Escocia', 'esc', 'Mediocampista', 'fotos/esc_mclean.jpg', 'comun'],
-                    ['Scott McTominay', 'Escocia', 'esc', 'Mediocampista', 'fotos/esc_mctominay.jpg', 'legendaria'],
-                    ['Anthony Ralston', 'Escocia', 'esc', 'Defensor', 'fotos/esc_ralston.jpg', 'comun'],
-                    ['John Souttar', 'Escocia', 'esc', 'Defensor', 'fotos/esc_souttar.jpg', 'rara'],
-                    
-                    // --- HAITÍ ---
-                    ['Ricardo Adé', 'Haití', 'hai', 'Delantero', 'fotos/hai_ade.jpg', 'comun'],
-                    ['Carlens Arcus', 'Haití', 'hai', 'Defensor', 'fotos/hai_arcus.jpg', 'comun'],
-                    ['Christopher Attvs', 'Haití', 'hai', 'Defensor', 'fotos/hai_attvs.jpg', 'comun'], 
-                    ['Jean-Ricner Bellegarde', 'Haití', 'hai', 'Mediocampista', 'fotos/hai_bellegarde.jpg', 'epica'],
-                    ['Josué Casimir', 'Haití', 'hai', 'Defensor', 'fotos/hai_casimir.jpg', 'comun'],
-                    ['Don Deedson Louicius', 'Haití', 'hai', 'Delantero', 'fotos/hai_deedson.jpg', 'comun'],
-                    ['Hannes Delcroix', 'Haití', 'hai', 'Defensor', 'fotos/hai_delcroix.jpg', 'comun'],
-                    ['Jean-Kévin Duverne', 'Haití', 'hai', 'Defensor', 'fotos/hai_duverne.jpg', 'rara'],
-                    ['Derrick Etienne Jr.', 'Haití', 'hai', 'Mediocampista', 'fotos/hai_etienne_Jr.jpg', 'comun'],
-                    ['Martin Experience', 'Haití', 'hai', 'Defensor', 'fotos/hai_experience.jpg', 'comun'],
-                    ['Danley Jean Jacques', 'Haití', 'hai', 'Mediocampista', 'fotos/hai_jacques.jpg', 'comun'],
-                    ['Duke Lacroix', 'Haití', 'hai', 'Defensor', 'fotos/hai_lacroix.jpg', 'comun'],
-                    ['Duckens Nazon', 'Haití', 'hai', 'Delantero', 'fotos/hai_nazon.jpg', 'rara'],
-                    ['Leverton Pierre', 'Haití', 'hai', 'Delantero', 'fotos/hai_pierre.jpg', 'comun'],
-                    ['Johny Placide', 'Haití', 'hai', 'Arquero', 'fotos/hai_placide.jpg', 'rara'],
-
-                    // --- COREA DEL SUR ---
-                    ['Jens Castrop', 'Corea del Sur', 'kor', 'Mediocampista', 'fotos/kor_castrop.jpg', 'comun'],
-                    ['Yumin Cho', 'Corea del Sur', 'kor', 'Defensor', 'fotos/kor_cho.jpg', 'comun'],
-                    ['Heechan Hwang', 'Corea del Sur', 'kor', 'Delantero', 'fotos/kor_hwang.jpg', 'epica'],
-                    ['Jaesung Lee', 'Corea del Sur', 'kor', 'Mediocampista', 'fotos/kor_jLee.jpg', 'rara'],
-                    ['Hyeonwoo Jo', 'Corea del Sur', 'kor', 'Arquero', 'fotos/kor_jo.jpg', 'rara'],
-                    ['Seunggyu Kim', 'Corea del Sur', 'kor', 'Arquero', 'fotos/kor_kim.jpg', 'rara'],
-                    ['Kangin Lee', 'Corea del Sur', 'kor', 'Mediocampista', 'fotos/kor_kLee.jpg', 'epica'],
-                    ['Hanbeom Lee', 'Corea del Sur', 'kor', 'Defensor', 'fotos/kor_lee.jpg', 'comun'],
-                    ['Myungjae Lee', 'Corea del Sur', 'kor', 'Defensor', 'fotos/kor_mLee.jpg', 'comun'],
-                    ['Hyeongyu Oh', 'Corea del Sur', 'kor', 'Delantero', 'fotos/kor_oh.jpg', 'comun'],
-                    ['Seungho Paik', 'Corea del Sur', 'kor', 'Mediocampista', 'fotos/kor_paik.jpg', 'comun'],
-                    ['Youngwoo Seol', 'Corea del Sur', 'kor', 'Defensor', 'fotos/kor_seol.jpg', 'comun'],
-                    ['Heungmin Son', 'Corea del Sur', 'kor', 'Delantero', 'fotos/kor_son.jpg', 'legendaria'],
-
-                    // --- PARAGUAY ---
-                    ['Omar Alderete', 'Paraguay', 'par', 'Defensor', 'fotos/par_alderete.jpg', 'rara'],
-                    ['Miguel Almirón', 'Paraguay', 'par', 'Delantero', 'fotos/par_almiron.jpg', 'epica'],
-                    ['Junior Alonso', 'Paraguay', 'par', 'Defensor', 'fotos/par_alonso.jpg', 'comun'],
-                    ['Fabián Balbuena', 'Paraguay', 'par', 'Defensor', 'fotos/par_balbuena.jpg', 'comun'],
-                    ['Juan José Cáceres', 'Paraguay', 'par', 'Defensor', 'fotos/par_caceres.jpg', 'comun'],
-                    ['Andrés Cubas', 'Paraguay', 'par', 'Mediocampista', 'fotos/par_cubas.jpg', 'comun'],
-                    ['Julio Enciso', 'Paraguay', 'par', 'Delantero', 'fotos/par_enciso.jpg', 'epica'],
-                    ['Roberto Fernández', 'Paraguay', 'par', 'Arquero', 'fotos/par_fernandez.jpg', 'comun'],
-                    ['Gustavo Gómez', 'Paraguay', 'par', 'Defensor', 'fotos/par_gGomez.jpg', 'rara'],
-                    ['Orlando Gill', 'Paraguay', 'par', 'Arquero', 'fotos/par_gill.jpg', 'comun'],
-                    ['Diego Gómez', 'Paraguay', 'par', 'Mediocampista', 'fotos/par_gomez.jpg', 'rara'],
-                    ['Ángel Romero', 'Paraguay', 'par', 'Delantero', 'fotos/par_romero.jpg', 'comun'],
-                    ['Ramón Sosa', 'Paraguay', 'par', 'Delantero', 'fotos/par_sosa.jpg', 'rara'],
-                    ['Mathías Villasanti', 'Paraguay', 'par', 'Mediocampista', 'fotos/par_villasanti.jpg', 'comun'],
-
-                    // --- SUIZA ---
-                    ['Michel Aebischer', 'Suiza', 'sui', 'Mediocampista', 'fotos/sui_aebischer.jpg', 'rara'],
-                    ['Manuel Akanji', 'Suiza', 'sui', 'Defensor', 'fotos/sui_akanji.jpg', 'legendaria'],
-                    ['Zeki Amdouni', 'Suiza', 'sui', 'Delantero', 'fotos/sui_amdouni.jpg', 'rara'],
-                    ['Aurèle Amenda', 'Suiza', 'sui', 'Defensor', 'fotos/sui_amenda.jpg', 'comun'],
-                    ['Nico Elvedi', 'Suiza', 'sui', 'Defensor', 'fotos/sui_elvedi.jpg', 'rara'],
-                    ['Remo Freuler', 'Suiza', 'sui', 'Mediocampista', 'fotos/sui_freuler.jpg', 'epica'],
-                    ['Gregor Kobel', 'Suiza', 'sui', 'Arquero', 'fotos/sui_kobel.jpg', 'legendaria'],
-                    ['Joel Monteiro', 'Suiza', 'sui', 'Delantero', 'fotos/sui_manzambi.jpg', 'comun'],
-                    ['Dan Ndoye', 'Suiza', 'sui', 'Delantero', 'fotos/sui_ndoye.jpg', 'epica'],
-                    ['Fabian Rieder', 'Suiza', 'sui', 'Mediocampista', 'fotos/sui_rieder.jpg', 'rara'],
-                    ['Ricardo Rodríguez', 'Suiza', 'sui', 'Defensor', 'fotos/sui_rodriguez.jpg', 'epica'],
-                    ['Ruben Vargas', 'Suiza', 'sui', 'Delantero', 'fotos/sui_vargas.jpg', 'epica'],
-                    ['Silvan Widmer', 'Suiza', 'sui', 'Defensor', 'fotos/sui_widmer.jpg', 'rara'],
-                    ['Granit Xhaka', 'Suiza', 'sui', 'Mediocampista', 'fotos/sui_xhaka.jpg', 'legendaria'],
-                    ['Denis Zakaria', 'Suiza', 'sui', 'Mediocampista', 'fotos/sui_zakaria.jpg', 'epica'],
-
-                    // --- TÚNEZ ---
-                    ['Ali Abdi', 'Túnez', 'tun', 'Defensor', 'fotos/tun_abdi.jpg', 'rara'],
-                    ['Elias Achouri', 'Túnez', 'tun', 'Delantero', 'fotos/tun_achouri.jpg', 'rara'],
-                    ['Aymen Dahmen', 'Túnez', 'tun', 'Arquero', 'fotos/tun_dahmen.jpg', 'comun'],
-                    ['Ismaël Gharbi', 'Túnez', 'tun', 'Mediocampista', 'fotos/tun_gharbi.jpg', 'rara'],
-                    ['Aïssa Laïdouni', 'Túnez', 'tun', 'Mediocampista', 'fotos/tun_laidouni.jpg', 'epica'],
-                    ['Sayfallah Ltaief', 'Túnez', 'tun', 'Delantero', 'fotos/tun_ltaief.jpg', 'comun'],
-                    ['Rani Mastouri', 'Túnez', 'tun', 'Delantero', 'fotos/tun_mastouri.jpg', 'comun'],
-                    ['Hannibal Mejbri', 'Túnez', 'tun', 'Mediocampista', 'fotos/tun_mejbri.jpg', 'epica'],
-                    ['Yassine Meriah', 'Túnez', 'tun', 'Defensor', 'fotos/tun_meriah.jpg', 'rara'],
-                    ['Haythem Jouini', 'Túnez', 'tun', 'Delantero', 'fotos/tun_saad.jpg', 'comun'],
-                    ['Ferjani Sassi', 'Túnez', 'tun', 'Mediocampista', 'fotos/tun_sassi.jpg', 'rara'],
-                    ['Ellyes Skhiri', 'Túnez', 'tun', 'Mediocampista', 'fotos/tun_skhiri.jpg', 'legendaria'],
-                    ['Naïm Sliti', 'Túnez', 'tun', 'Delantero', 'fotos/tun_sliti.jpg', 'rara'],
-                    ['Montassar Talbi', 'Túnez', 'tun', 'Defensor', 'fotos/tun_talbi.jpg', 'epica'],
-                    ['Yan Valery', 'Túnez', 'tun', 'Defensor', 'fotos/tun_valery.jpg', 'rara'],
-
-                    // --- ALEMANIA ---
-                    ['Jamal Musiala', 'Alemania', 'ger', 'Mediocampista', 'fotos/ale_musiala.jpg', 'legendaria'],
-                    ['Florian Wirtz', 'Alemania', 'ger', 'Mediocampista', 'fotos/ale_wirtz.jpg', 'legendaria'],
-                    ['Kai Havertz', 'Alemania', 'ger', 'Delantero', 'fotos/ale_havertz.jpg', 'rara'],
-                    ['Leon Goretzka', 'Alemania', 'ger', 'Mediocampista', 'fotos/ale_goretzka.jpg', 'rara'],
-                    ['Joshua Kimmich', 'Alemania', 'ger', 'Mediocampista', 'fotos/ale_kimmich.jpg', 'epica'],
-                    ['Antonio Rüdiger', 'Alemania', 'ger', 'Defensor', 'fotos/ale_rudiger.jpg', 'epica'],
-                    ['Marc-André ter Stegen', 'Alemania', 'ger', 'Arquero', 'fotos/ale_stegen.jpg', 'epica'],
-                    ['Serge Gnabry', 'Alemania', 'ger', 'Delantero', 'fotos/ale_gnabry.jpg', 'rara'],
-                    ['Maximilian Mittelstädt', 'Alemania', 'ger', 'Defensor', 'fotos/ale_mittle.jpg', 'comun'],
-                    ['Felix Nmecha', 'Alemania', 'ger', 'Mediocampista', 'fotos/ale_nmecha.jpg', 'comun'],
-                    ['Ridle Baku', 'Alemania', 'ger', 'Defensor', 'fotos/ale_baku.jpg', 'comun'],
-                    ['Nico Schlotterbeck', 'Alemania', 'ger', 'Defensor', 'fotos/ale_schlotterbeck.jpg', 'comun'],
-                    ['Nick Woltemade', 'Alemania', 'ger', 'Delantero', 'fotos/ale_woltemade.jpg', 'comun'],
-                    ['Jonathan Tah', 'Alemania', 'ger', 'Defensor', 'fotos/ale_tah.jpg', 'comun'],
-
-                    // --- URUGUAY ---
-                    ['Ronald Araújo', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_araujo.jpg', 'legendaria'],
-                    ['Maxi Araujo', 'Uruguay', 'uru', 'Delantero', 'fotos/uru_araujo-.jpg', 'comun'],
-                    ['Rodrigo Bentancur', 'Uruguay', 'uru', 'Mediocampista', 'fotos/uru_bentancur.jpg', 'epica'],
-                    ['Sebastián Cáceres', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_caceres.jpg', 'rara'],
-                    ['José María Giménez', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_gimenez.jpg', 'epica'],
-                    ['Alan Matturro', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_miele.jpg', 'comun'],
-                    ['Nahitan Nández', 'Uruguay', 'uru', 'Mediocampista', 'fotos/uru_nandez.jpg', 'epica'],
-                    ['Darwin Núñez', 'Uruguay', 'uru', 'Delantero', 'fotos/uru_nuñez.jpg', 'legendaria'],
-                    ['Mathías Olivera', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_olivera.jpg', 'rara'],
-                    ['Facundo Pellistri', 'Uruguay', 'uru', 'Delantero', 'fotos/uru_pellistri.jpg', 'epica'],
-                    ['Sergio Rochet', 'Uruguay', 'uru', 'Arquero', 'fotos/uru_rochet.jpg', 'epica'],
-                    ['Manuel Ugarte', 'Uruguay', 'uru', 'Mediocampista', 'fotos/uru_ugarte.jpg', 'epica'],
-                    ['Federico Valverde', 'Uruguay', 'uru', 'Mediocampista', 'fotos/uru_valverde.jpg', 'legendaria'],
-                    ['Guillermo Varela', 'Uruguay', 'uru', 'Defensor', 'fotos/uru_varela.jpg', 'rara'],
-                    ['Federico Viñas', 'Uruguay', 'uru', 'Delantero', 'fotos/uru_viñas.jpg', 'rara'],
-
-                    // --- UZBEKISTÁN ---
-                    ['Khojiakbar Alijonov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_alijonov.jpg', 'comun'],
-                    ['Khusniddin Aliqulov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_aliqulov.jpg', 'rara'],
-                    ['Rustam Ashurmatov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_ashurmatov.jpg', 'comun'],
-                    ['Khojimat Erkinov', 'Uzbekistán', 'uzb', 'Delantero', 'fotos/uzb_erkinov.jpg', 'rara'],
-                    ['Umar Eshmurodov', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_eshmurodov.jpg', 'comun'],
-                    ['Abbosbek Fayzullaev', 'Uzbekistán', 'uzb', 'Mediocampista', 'fotos/uzb_fayzullaev.jpg', 'epica'],
-                    ['Jamshid Iskanderov', 'Uzbekistán', 'uzb', 'Mediocampista', 'fotos/uzb_iskanderov.jpg', 'comun'],
-                    ['Jaloliddin Masharipov', 'Uzbekistán', 'uzb', 'Mediocampista', 'fotos/uzb_masharipov.jpg', 'rara'],
-                    ['Sherzod Nasrullaev', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_nasrullaev.jpg', 'comun'],
-                    ['Farrukh Sayfiev', 'Uzbekistán', 'uzb', 'Defensor', 'fotos/uzb_sayfiev.jpg', 'rara'],
-                    ['Igor Sergeev', 'Uzbekistán', 'uzb', 'Delantero', 'fotos/uzb_sergeev.jpg', 'rara'],
-                    ['Eldor Shomurodov', 'Uzbekistán', 'uzb', 'Delantero', 'fotos/uzb_shomurodov.jpg', 'legendaria'],
-                    ['Otabek Shukurov', 'Uzbekistán', 'uzb', 'Mediocampista', 'fotos/uzb_shukurov.jpg', 'epica'],
-                    ['Azizbek Turgunboev', 'Uzbekistán', 'uzb', 'Mediocampista', 'fotos/uzb_turgunboev.jpg', 'rara'],
-                    ['Oston Urunov', 'Uzbekistán', 'uzb', 'Delantero', 'fotos/uzb_urunov.jpg', 'rara'],
-                    
-
-                    // --- MARRUECOS ---
-                    ['Nayef Aguerd', 'Marruecos', 'mar', 'Defensor', 'fotos/mar_aguerd.jpg', 'rara'],
-                    ['Sofyan Amrabat', 'Marruecos', 'mar', 'Mediocampista', 'fotos/mar_amrabat.jpg', 'rara'],
-                    ['Yassine Bounou', 'Marruecos', 'mar', 'Arquero', 'fotos/mar_bounou.jpg', 'epica'],
-                    ['Brahim Díaz', 'Marruecos', 'mar', 'Mediocampista', 'fotos/mar_diaz.jpg', 'epica'],
-                    ['Abde Ezzalzouli', 'Marruecos', 'mar', 'Delantero', 'fotos/mar_ezzalzouli.jpg', 'comun'],
-                    ['Ayoub El Kaabi', 'Marruecos', 'mar', 'Delantero', 'fotos/mar_kaabi.jpg', 'rara'],
-                    ['Bilal El Khannouss', 'Marruecos', 'mar', 'Mediocampista', 'fotos/mar_khannouss.jpg', 'comun'],
-                    ['Adam Masina', 'Marruecos', 'mar', 'Defensor', 'fotos/mar_masina.jpg', 'comun'],
-                    ['Youssef En-Nesyri', 'Marruecos', 'mar', 'Delantero', 'fotos/mar_nesyri.jpg', 'comun'],
-                    ['Ismael Saibari', 'Marruecos', 'mar', 'Mediocampista', 'fotos/mar_saibari.jpg', 'comun'],
-                    ['Romain Saiss', 'Marruecos', 'mar', 'Defensor', 'fotos/mar_saiss.jpg', 'comun'],
-                    ['Eliesse Ben Seghir', 'Marruecos', 'mar', 'Mediocampista', 'fotos/mar_seghir.jpg', 'comun'],
-                    ['Jawad El Yamiq', 'Marruecos', 'mar', 'Defensor', 'fotos/mar_yamiq.jpg', 'comun'],
-
-
-		    // --- ARGELIA ---
-                    ['Houssem Aouar', 'Argelia', '🇩🇿', 'Mediocampista', 'fotos/arg_aquar.jpg', 'rara'],
-                    ['Youcef Atal', 'Argelia', '🇩🇿', 'Defensor', 'fotos/arg_atal.jpg', 'comun'],
-                    ['Ismaël Bennacer', 'Argelia', '🇩🇿', 'Mediocampista', 'fotos/arg_bennacer.jpg', 'epica'],
-                    ['Saïd Benrahma', 'Argelia', '🇩🇿', 'Delantero', 'fotos/arg_benrahma.jpg', 'rara'],
-                    ['Ramy Bensebaini', 'Argelia', '🇩🇿', 'Defensor', 'fotos/arg_bensebaini.jpg', 'rara'],
-                    ['Hicham Boudaoui', 'Argelia', '🇩🇿', 'Mediocampista', 'fotos/arg_boudaqui.jpg', 'comun'],
-                    ['Baghdad Bounedjah', 'Argelia', '🇩🇿', 'Delantero', 'fotos/arg_bounedjah.jpg', 'comun'],
-                    ['Farès Chaïbi', 'Argelia', '🇩🇿', 'Mediocampista', 'fotos/arg_chaibi.jpg', 'comun'],
-                    ['Amine Gouiri', 'Argelia', '🇩🇿', 'Delantero', 'fotos/arg_gouiri.jpg', 'rara'],
-                    ['Mustapha Zeghba', 'Argelia', '🇩🇿', 'Arquero', 'fotos/arg_guendouz.jpg', 'comun'],
-                    ['Riyad Mahrez', 'Argelia', '🇩🇿', 'Delantero', 'fotos/arg_mahrez.jpg', 'legendaria'],
-                    ['Aïssa Mandi', 'Argelia', '🇩🇿', 'Defensor', 'fotos/arg_mandi.jpg', 'rara'],
-                    ['Nadjib Amine Tougai', 'Argelia', '🇩🇿', 'Defensor', 'fotos/arg_tougai.jpg', 'comun'],
-                    ['Ramiz Zerrouki', 'Argelia', '🇩🇿', 'Mediocampista', 'fotos/arg_zerrouki.jpg', 'comun'],
-
-		    // --- AUSTRIA ---
-                    ['David Alaba', 'Austria', '🇦🇹', 'Defensor', 'fotos/aus_alaba.jpg', 'legendaria'],
-                    ['Christoph Baumgartner', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_baumgartner.jpg', 'rara'],
-                    ['Kevin Danso', 'Austria', '🇦🇹', 'Defensor', 'fotos/aus_danso.jpg', 'rara'],
-                    ['Michael Gregoritsch', 'Austria', '🇦🇹', 'Delantero', 'fotos/aus_gregoritsch.jpg', 'comun'],
-                    ['Konrad Laimer', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_laimer.jpg', 'epica'],
-                    ['Philipp Lienhart', 'Austria', '🇦🇹', 'Defensor', 'fotos/aus_lienhart.jpg', 'comun'],
-                    ['Patrick Pentz', 'Austria', '🇦🇹', 'Arquero', 'fotos/aus_pentz.jpg', 'comun'],
-                    ['Stefan Posch', 'Austria', '🇦🇹', 'Defensor', 'fotos/aus_posch.jpg', 'rara'],
-                    ['Alexander Prass', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_prass.jpg', 'comun'],
-                    ['Marcel Sabitzer', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_sabitzer.jpg', 'epica'],
-                    ['Xaver Schlager', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_schlager-.jpg', 'rara'],
-                    ['Alexander Schlager', 'Austria', '🇦🇹', 'Arquero', 'fotos/aus_schlager.jpg', 'comun'], // REPETIDA - COMPLETAR
-                    ['Romano Schmid', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_schmid.jpg', 'comun'],
-                    ['Nicolas Seiwald', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_seiwald.jpg', 'comun'],
-                    ['Patrick Wimmer', 'Austria', '🇦🇹', 'Mediocampista', 'fotos/aus_wimmer.jpg', 'comun'],
-
-		    // --- ARABIA SAUDITA ---
-                    ['Saud Abdulhamid', 'Arabia Saudita', '🇸🇦', 'Defensor', 'fotos/ara_abdulhamid.jpg', 'rara'],
-                    ['Salem Al-Dawsari', 'Arabia Saudita', '🇸🇦', 'Mediocampista', 'fotos/ara_aldawsari.jpg', 'legendaria'],
-                    ['Nasser Aldawsari', 'Arabia Saudita', '🇸🇦', 'Mediocampista', 'fotos/ara_aldawsari-.jpg', 'comun'], // REPETIDA - COMPLETAR
-                    ['Moteb Al-Harbi', 'Arabia Saudita', '🇸🇦', 'Defensor', 'fotos/ara_alharbi.jpg', 'comun'],
-                    ['Fahad Al-Johani', 'Arabia Saudita', '🇸🇦', 'Delantero', 'fotos/ara_aljohani.jpg', 'comun'],
-                    ['Musab Al-Juwayr', 'Arabia Saudita', '🇸🇦', 'Mediocampista', 'fotos/ara_aljuwayr.jpg', 'comun'],
-                    ['Abdullah Al-Khaibari', 'Arabia Saudita', '🇸🇦', 'Mediocampista', 'fotos/ara_alkhaibari.jpg', 'rara'],
-                    ['Abdulelah Al-Amri', 'Arabia Saudita', '🇸🇦', 'Defensor', 'fotos/ara_alobud.jpg', 'rara'],
-                    ['Marwan Al-Sahafi', 'Arabia Saudita', '🇸🇦', 'Delantero', 'fotos/ara_alsahafi.jpg', 'comun'],
-                    ['Ahmed Al-Ghamdi', 'Arabia Saudita', '🇸🇦', 'Mediocampista', 'fotos/ara_alsanbi.jpg', 'comun'],
-                    ['Mohammed Al-Shamat', 'Arabia Saudita', '🇸🇦', 'Defensor', 'fotos/ara_alshamat.jpg', 'comun'],
-                    ['Saleh Al-Shehri', 'Arabia Saudita', '🇸🇦', 'Delantero', 'fotos/ara_alsheri.jpg', 'epica'],
-                    ['Hassan Al-Tambakti', 'Arabia Saudita', '🇸🇦', 'Defensor', 'fotos/ara_altambakti.jpg', 'rara'],
-                    ['Ayman Yahya', 'Arabia Saudita', '🇸🇦', 'Delantero', 'fotos/ara_thikri.jpg', 'comun'],
-
-		    // --- REPÚBLICA DEMOCRÁTICA DEL CONGO ---
-                    ['Cédric Bakambu', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_bakambu.jpg', 'epica'],
-                    ['Aaron Wan-Bissaka', 'Congo', '🇨🇩', 'Defensor', 'fotos/con_bissaka.jpg', 'epica'],
-                    ['Brian Cipenga', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_cipenga.jpg', 'comun'], // Nota: El archivo dice cipenga pero la figu es Sadiki
-                    ['Meschack Elia', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_elia.jpg', 'rara'],
-                    ['Joris Kayembe', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_kayembe.jpg', 'rara'],
-                    ['Edo Kayembe', 'Congo', '🇨🇩', 'Mediocampista', 'fotos/con_kayembe-.jpg', 'comun'], // REPETIDA - COMPLETAR
-                    ['Arthur Masuaku', 'Congo', '🇨🇩', 'Defensor', 'fotos/con_masuaku.jpg', 'rara'],
-                    ['Fiston Mayele', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_mayele.jpg', 'comun'],
-                    ['Chancel Mbemba', 'Congo', '🇨🇩', 'Defensor', 'fotos/con_mbemba.jpg', 'legendaria'],
-                    ['Nathanaël Mbuku', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_mbuku.jpg', 'comun'],
-                    ['Lionel Mpasi', 'Congo', '🇨🇩', 'Arquero', 'fotos/con_mpasi.jpg', 'comun'],
-                    ['Ngal\'ayel Mukau', 'Congo', '🇨🇩', 'Mediocampista', 'fotos/con_mukau.jpg', 'comun'],
-                    ['Charles Pickel', 'Congo', '🇨🇩', 'Mediocampista', 'fotos/con_pickel.jpg', 'comun'],
-                    ['Axel Tuanzebe', 'Congo', '🇨🇩', 'Defensor', 'fotos/con_tuanzebe.jpg', 'rara'],
-                    ['Yoane Wissa', 'Congo', '🇨🇩', 'Delantero', 'fotos/con_wissa.jpg', 'epica'],
-
-		    // --- EGIPTO ---
-                    ['Mohamed El-Shenawy', 'Egipto', '🇪🇬', 'Arquero', 'fotos/egi_elshenawy.jpg', 'epica'],
-                    ['Ahmed Fatouh', 'Egipto', '🇪🇬', 'Defensor', 'fotos/egi_fatouh.jpg', 'rara'],
-                    ['Mohamed Hany', 'Egipto', '🇪🇬', 'Defensor', 'fotos/egi_handy.jpg', 'rara'], // Nota: El archivo dice handy pero es Hany
-                    ['Mohanad Lasheen', 'Egipto', '🇪🇬', 'Mediocampista', 'fotos/egi_laheen.jpg', 'comun'], // Nota: El archivo dice laheen pero es Ahmed Hassan (Kouka)
-                    ['Omar Marmoush', 'Egipto', '🇪🇬', 'Delantero', 'fotos/egi_marniysh.jpg', 'epica'],
-                    ['Ramy Rabia', 'Egipto', '🇪🇬', 'Defensor', 'fotos/egi_rabia.jpg', 'comun'],
-                    ['Mohamed Salah', 'Egipto', '🇪🇬', 'Delantero', 'fotos/egi_salah.jpg', 'legendaria'],
-                    ['Ramadan Sobhi', 'Egipto', '🇪🇬', 'Delantero', 'fotos/egi_sobhi.jpg', 'rara'],
-                    ['Trézéguet', 'Egipto', '🇪🇬', 'Delantero', 'fotos/egi_trezeguet.jpg', 'epica'],
-
-		    // --- JORDANIA ---
-                    ['Abualnadi', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_abualnadi.jpg', 'comun'],
-                    ['Yazeed Abulaila', 'Jordania', '🇯🇴', 'Arquero', 'fotos/jor_abulaila.jpg', 'rara'],
-                    ['Ihsan Haddad', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_haddad.jpg', 'rara'],
-                    ['Mohammad Abu Jamous', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_jamous.jpg', 'comun'],
-                    ['Mahmoud Al-Mardi', 'Jordania', '🇯🇴', 'Mediocampista', 'fotos/jor_mardi.jpg', 'rara'],
-                    ['Yazan Al-Naimat', 'Jordania', '🇯🇴', 'Delantero', 'fotos/jor_naimat.jpg', 'rara'],
-                    ['Obaid', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_obaid.jpg', 'comun'],
-                    ['Ali Olwan', 'Jordania', '🇯🇴', 'Delantero', 'fotos/jor_olwan.jpg', 'comun'],
-                    ['Abdallah Rashdan', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_rashdan.jpg', 'comun'],
-                    ['Noor Al-Rawabdeh', 'Jordania', '🇯🇴', 'Mediocampista', 'fotos/jor_rawabdeh.jpg', 'comun'],
-                    ['Ibrahim Sadeh', 'Jordania', '🇯🇴', 'Mediocampista', 'fotos/jor_saadeh.jpg', 'comun'], // Nota: Basado en saadeh
-                    ['Koubaib Al-Sabra', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_sabra.jpg', 'comun'],
-                    ['Mousa Al-Tamari', 'Jordania', '🇯🇴', 'Delantero', 'fotos/jor_taamari.jpg', 'epica'],
-                    ['Moouath Taha', 'Jordania', '🇯🇴', 'Defensor', 'fotos/jor_taha.jpg', 'comun'],
-                    ['Mohammad Abu Zrayq', 'Jordania', '🇯🇴', 'Delantero', 'fotos/jor_zrayq.jpg', 'comun'],
-
-
-		    // --- SUDÁFRICA ---
-                    ['Oswin Appollis', 'Sudáfrica', '🇿🇦', 'Delantero', 'fotos/sud_appollis.jpg', 'rara'],
-                    ['Sipho Chaine', 'Sudáfrica', '🇿🇦', 'Arquero', 'fotos/sud_cahine.jpg', 'comun'], // Nota: Basado en el archivo de Chaine
-                    ['Samukele Kabini', 'Sudáfrica', '🇿🇦', 'Defensor', 'fotos/sud_kabini.jpg', 'comun'], // Nota: Basado en el archivo de Kabini
-                    ['Thalente Mbatha', 'Sudáfrica', '🇿🇦', 'Mediocampista', 'fotos/sud_mbatha.jpg', 'comun'], // Nota: Basado en el archivo de Maseko/Mbatha
-                    ['Sipho Mbule', 'Sudáfrica', '🇿🇦', 'Mediocampista', 'fotos/sud_mbule.jpg', 'comun'],
-                    ['Khuliso Mudau', 'Sudáfrica', '🇿🇦', 'Defensor', 'fotos/sud_mudau.jpg', 'rara'],
-                    ['Khulumani Ndamane', 'Sudáfrica', '🇿🇦', 'Defensor', 'fotos/sud_ndamane.jpg', 'rara'], // Nota: Basado en el archivo de Modiba/Ndamane
-                    ['Siyabonga Ngezana', 'Sudáfrica', '🇿🇦', 'Defensor', 'fotos/sud_negezana.jpg', 'rara'],
-                    ['Mohau Nkota', 'Sudáfrica', '🇿🇦', 'Defensor', 'fotos/sud_nkota.jpg', 'comun'], // Nota: Basado en el archivo de Nkota/Sibisi
-                    ['Iqraam Rayners', 'Sudáfrica', '🇿🇦', 'Delantero', 'fotos/sud_rayners.jpg', 'comun'],
-                    ['Ronwen Williams', 'Sudáfrica', '🇿🇦', 'Arquero', 'fotos/sud_williams.jpg', 'epica'],
-
-		    // --- TURQUÍA ---
-                    ['Bariş Alper Yilmaz', 'Turquía', '🇹🇷', 'Delantero', 'fotos/tur_akgun.jpg', 'rara'], // Nota: Basado en el archivo akgun/Yılmaz
-                    ['Kerem Aktürkoğlu', 'Turquía', '🇹🇷', 'Delantero', 'fotos/tur_akturkoglu.jpg', 'epica'],
-                    ['Kaan Ayhan', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_ayhan.jpg', 'rara'],
-                    ['Abdülkerim Bardakci', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_bardakci.jpg', 'rara'],
-                    ['Uğurcan Çakir', 'Turquía', '🇹🇷', 'Arquero', 'fotos/tur_cakir.jpg', 'rara'],
-                    ['Zeki Çelik', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_celik.jpg', 'rara'],
-                    ['Merih Demiral', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_demiral.jpg', 'epica'],
-                    ['Arda Güler', 'Turquía', '🇹🇷', 'Mediocampista', 'fotos/tur_guler.jpg', 'legendaria'],
-                    ['İrfan Can Kahveci', 'Turquía', '🇹🇷', 'Mediocampista', 'fotos/tur_kahveci.jpg', 'rara'],
-                    ['Orkun Kökçü', 'Turquía', '🇹🇷', 'Mediocampista', 'fotos/tur_kokcu.jpg', 'epica'],
-                    ['Mert Müldür', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_muldur.jpg', 'comun'],
-                    ['Çağlar Söyüncü', 'Turquía', '🇹🇷', 'Defensor', 'fotos/tur_soyuncu.jpg', 'epica'],
-                    ['Semih Kiliçsoy', 'Turquía', '🇹🇷', 'Delantero', 'fotos/tur_uzun.jpg', 'comun'], // Nota: Basado en el archivo uzun/Kılıçsoy
-                    ['Kenan Yildiz', 'Turquía', '🇹🇷', 'Delantero', 'fotos/tur_yildiz.jpg', 'legendaria'],
-                    ['Hakan Çalhanoğlu', 'Turquía', '🇹🇷', 'Mediocampista', 'fotos/tur_yilmaz.jpg', 'legendaria'], // Nota: Basado en el archivo yilmaz/Çalhanoğlu
-
-		    // --- CABO VERDE ---
-                    ['Patrick Andrade', 'Cabo Verde', '🇨🇻', 'Mediocampista', 'fotos/ver_andrade.jpg', 'comun'],
-                    ['Bebé', 'Cabo Verde', '🇨🇻', 'Delantero', 'fotos/ver_bebe.jpg', 'epica'],
-                    ['Jovane Cabral', 'Cabo Verde', '🇨🇻', 'Delantero', 'fotos/ver_cabral.jpg', 'epica'],
-                    ['Logan Costa', 'Cabo Verde', '🇨🇻', 'Defensor', 'fotos/ver_costa.jpg', 'rara'],
-                    ['Diney', 'Cabo Verde', '🇨🇻', 'Defensor', 'fotos/ver_dinev.jpg', 'comun'], // Nota: Basado en el archivo dinev
-                    ['Deroy Duarte', 'Cabo Verde', '🇨🇻', 'Mediocampista', 'fotos/ver_duarte.jpg', 'rara'],
-                    ['Dailon Livramento', 'Cabo Verde', '🇨🇻', 'Delantero', 'fotos/ver_livramento.jpg', 'comun'], // Nota: Basado en el archivo livramento
-                    ['Ryan Mendes', 'Cabo Verde', '🇨🇻', 'Delantero', 'fotos/ver_mendes.jpg', 'legendaria'],
-                    ['Steven Moreira', 'Cabo Verde', '🇨🇻', 'Defensor', 'fotos/ver_moreira.jpg', 'rara'],
-                    ['João Paulo', 'Cabo Verde', '🇨🇻', 'Mediocampista', 'fotos/ver_paulo.jpg', 'comun'],
-                    ['Pico', 'Cabo Verde', '🇨🇻', 'Defensor', 'fotos/ver_pico.jpg', 'rara'],
-                    ['Jamiro Monteiro', 'Cabo Verde', '🇨🇻', 'Mediocampista', 'fotos/ver_pina.jpg', 'rara'], // Nota: Basado en el archivo pina
-                    ['Semedo', 'Cabo Verde', '🇨🇻', 'Mediocampista', 'fotos/ver_semedo.jpg', 'comun'],
-                    ['Wagner Pina', 'Cabo Verde', '🇨🇻', 'Defensor', 'fotos/ver_semedo-.jpg', 'comun'], // REPETIDA - COMPLETAR
-                    ['Vozinha', 'Cabo Verde', '🇨🇻', 'Arquero', 'fotos/ver_vozinha.jpg', 'rara'],
-
-		    // --- NUEVA ZELANDA ---
-                    ['Kosta Barbarouses', 'Nueva Zelanda', '🇳🇿', 'Delantero', 'fotos/zel_barbarouses.jpg', 'rara'], //
-                    ['Joe Bell', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_bell.jpg', 'rara'], //
-                    ['Michael Boxall', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_boxall.jpg', 'comun'], //
-                    ['Liberato Cacace', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_cacace.jpg', 'epica'], //
-                    ['Max Crocombe', 'Nueva Zelanda', '🇳🇿', 'Arquero', 'fotos/zel_crocombe.jpg', 'comun'], //
-                    ['Matthew Garbett', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_garbett.jpg', 'rara'], //
-                    ['Callum McCowatt', 'Nueva Zelanda', '🇳🇿', 'Delantero', 'fotos/zel_mccowatt.jpg', 'comun'], //
-                    ['Alex Paulsen', 'Nueva Zelanda', '🇳🇿', 'Arquero', 'fotos/zel_paulsen.jpg', 'rara'], //
-                    ['Tim Payne', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_payne.jpg', 'comun'], //
-                    ['Marko Stamenic', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_stamenic.jpg', 'epica'], //
-                    ['Finn Surman', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_surman.jpg', 'comun'], // Nota: Basado en su archivo surman
-                    ['Ryan Thomas', 'Nueva Zelanda', '🇳🇿', 'Mediocampista', 'fotos/zel_thomas.jpg', 'comun'], //
-                    ['Francis de Vries', 'Nueva Zelanda', '🇳🇿', 'Defensor', 'fotos/zel_vries.jpg', 'comun'], //
-                    ['Chris Wood', 'Nueva Zelanda', '🇳🇿', 'Delantero', 'fotos/zel_wood.jpg', 'legendaria'], //
-
-// --- CURAZAO ---
-                    ['Jeremy Antonisse', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_antonisse.jpg', 'comun'],
-                    ['Juninho Bacuna', 'Curazao', '🇨🇼', 'Mediocampista', 'fotos/cur_bacuna.jpg', 'legendaria'],
-                    ['Joshua Brenet', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_brenet.jpg', 'epica'],
-                    ['Roshon van Eijma', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_eijima.jpg', 'comun'],
-                    ['Shuriqi Floranus', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_floranus.jpg', 'rara'],
-                    ['Jurien Gaari', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_gaari.jpg', 'comun'],
-                    ['Kenji Gorré', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_gorre.jpg', 'rara'],
-                    ['Sontje Hansen', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_hansen.jpg', 'rara'],
-                    ['Gervane Kastaneer', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_kastaneer.jpg', 'comun'],
-                    ['Jürgen Locadia', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_locadia.jpg', 'epica'],
-                    ['Jearl Margaritha', 'Curazao', '🇨🇼', 'Delantero', 'fotos/cur_margaritha.jpg', 'comun'],
-                    ['Armando Obispo', 'Curazao', '🇨🇼', 'Defensor', 'fotos/cur_obispo.jpg', 'epica'],
-                    ['Godfried Roemeratoe', 'Curazao', '🇨🇼', 'Mediocampista', 'fotos/cur_roemeratoe.jpg', 'comun'],
-                    ['Eloy Room', 'Curazao', '🇨🇼', 'Arquero', 'fotos/cur_room.jpg', 'epica'],
-
-
-// --- GHANA ---
-                    ['Osman Bukari', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_bukari.jpg', 'comun'],
-                    ['Alexander Djiku', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_djiku.jpg', 'rara'],
-                    ['Abdul Fatawu', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_fatawu.jpg', 'rara'],
-                    ['Tariq Lamptey', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_lamptey.jpg', 'comun'],
-                    ['Joseph Paintsil', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_paintsil.jpg', 'comun'],
-                    ['Thomas Partey', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_partey.jpg', 'legendaria'],
-                    ['Mohammed Salisu', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_salisu.jpg', 'rara'],
-                    ['Salis Abdul Samed', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_samed.jpg', 'comun'],
-                    ['Alidu Seidu', 'Ghana', '🇬🇭', 'Defensor', 'fotos/gha_seidu.jpg', 'comun'],
-                    ['Antoine Semenyo', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_semenyo.jpg', 'rara'],
-                    ['Kamaldeen Sulemana', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_sulemana.jpg', 'comun'],
-                    ['Salis Virenkyi', 'Ghana', '🇬🇭', 'Mediocampista', 'fotos/gha_virenkyi.jpg', 'comun'],
-                    ['Iñaki Williams', 'Ghana', '🇬🇭', 'Delantero', 'fotos/gha_williams.jpg', 'epica'],
-
-// --- IRÁN ---
-                    ['Sardar Azmoun', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_azmo.jpg', 'epica'],
-                    ['Alireza Beiranvand', 'Irán', '🇮🇷', 'Arquero', 'fotos/ira_beiran.jpg', 'rara'],
-                    ['Rouzbeh Cheshmi', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_chesh.jpg', 'comun'],
-                    ['Saeid Ezatolahi', 'Irán', '🇮🇷', 'Mediocampista', 'fotos/ira_ezato.jpg', 'rara'],
-                    ['Saleh Hardani', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_harda.jpg', 'comun'],
-                    ['Saman Ghoddos', 'Irán', '🇮🇷', 'Mediocampista', 'fotos/ira_hgod.jpg', 'comun'],
-                    ['Alireza Jahanbakhsh', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_jahan.jpg', 'rara'],
-                    ['Hossein Kanaanizadegan', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_kanaa.jpg', 'comun'],
-                    ['Milad Mohammadi', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_mohamma.jpg', 'comun'],
-                    ['Mohammad Mohebi', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_mohebi.jpg', 'comun'],
-                    ['Omid Noorafkan', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_noora.jpg', 'comun'],
-                    ['Morteza Pouraliganji', 'Irán', '🇮🇷', 'Defensor', 'fotos/ira_poura.jpg', 'rara'],
-                    ['Mehdi Taremi', 'Irán', '🇮🇷', 'Delantero', 'fotos/ira_taremi.jpg', 'legendaria'],
-
-// --- IRAK ---
-                    ['Ali Al-Hamadi', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_alhamadi.jpg', 'rara'],
-                    ['Hussein Ali', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_ali.jpg', 'comun'],
-                    ['Mohanad Ali', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_ali1.jpg', 'epica'],
-                    ['Youssef Amyn', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_amyn.jpg', 'comun'],
-                    ['Ibrahim Bayesh', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_bayesh.jpg', 'rara'],
-                    ['Merchas Doski', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_doski.jpg', 'comun'],
-                    ['Marco Farji', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_garji.jpg', 'comun'],
-                    ['Zaid Tahsin', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_hashem.jpg', 'comun'],
-                    ['Zidane Iqbal', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_iqbal.jpg', 'legendaria'],
-                    ['Ali Jasim', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_jasim.jpg', 'rara'],
-                    ['Osama Rashid', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_rashid.jpg', 'comun'],
-                    ['Danilo Al-Saed', 'Irak', '🇮🇶', 'Delantero', 'fotos/irak_sher.jpg', 'comun'],
-                    ['Rebin Sulaka', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_sulaka.jpg', 'rara'],
-                    ['Saad Natiq', 'Irak', '🇮🇶', 'Defensor', 'fotos/irak_tahseen.jpg', 'comun'],
-                    ['Amir Al-Ammari', 'Irak', '🇮🇶', 'Mediocampista', 'fotos/irak_younis.jpg', 'rara'],
-
-// --- PANAMÁ ---
-                    ['Yoel Bárcenas', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_barcenas.jpg', 'rara'],
-                    ['César Blackman', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_blackman.jpg', 'comun'],
-                    ['Adalberto Carrasquilla', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_carrasquilla.jpg', 'legendaria'],
-                    ['José Córdoba', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_cordoba.jpg', 'rara'],
-                    ['Eric Davis', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_davis.jpg', 'comun'],
-                    ['Fidel Escobar', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_escobar.jpg', 'rara'],
-                    ['José Fajardo', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_fajardo.jpg', 'comun'],
-                    ['Aníbal Godoy', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_godov.jpg', 'epica'],
-                    ['Carlos Harvey', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_harvey.jpg', 'comun'],
-                    ['Cristian Martínez', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_martinez.jpg', 'comun'],
-                    ['Luis Mejía', 'Panamá', '🇵🇦', 'Arquero', 'fotos/pan_mejia.jpg', 'epica'],
-                    ['Michael Amir Murillo', 'Panamá', '🇵🇦', 'Defensor', 'fotos/pan_murillo.jpg', 'epica'],
-                    ['Alberto Quintero', 'Panamá', '🇵🇦', 'Mediocampista', 'fotos/pan_quintero.jpg', 'comun'],
-                    ['José Luis Rodríguez', 'Panamá', '🇵🇦', 'Delantero', 'fotos/pan_rodriquez.jpg', 'rara'],
-
-// --- SENEGAL ---
-                    ['Lamine Camara', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_camara.jpg', 'comun'],
-                    ['Boulaye Dia', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_dia.jpg', 'rara'],
-                    ['Habib Diarra', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_diarra.jpg', 'comun'],
-                    ['Krépin Diatta', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_diatta.jpg', 'rara'],
-                    ['Idrissa Gana Gueye', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_gana.jpg', 'epica'],
-                    ['Nicolas Jackson', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_jackson.jpg', 'epica'],
-                    ['Ismail Jakobs', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_jakobs.jpg', 'comun'],
-                    ['Kalidou Koulibaly', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_koulibaly.jpg', 'legendaria'],
-                    ['Édouard Mendy', 'Senegal', '🇸🇳', 'Arquero', 'fotos/sen_mendy.jpg', 'epica'],
-                    ['Iliman Ndiaye', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_ndiaye.jpg', 'rara'],
-                    ['Moussa Niakhaté', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_niakha.jpg', 'rara'],
-                    ['Ismaïla Sarr', 'Senegal', '🇸🇳', 'Delantero', 'fotos/sen_sarr.jpg', 'rara'],
-                    ['Pape Matar Sarr', 'Senegal', '🇸🇳', 'Mediocampista', 'fotos/sen_sarr1.jpg', 'epica'],
-                    ['Abdoulaye Seck', 'Senegal', '🇸🇳', 'Defensor', 'fotos/sen_seck.jpg', 'comun'],
-
-
-                
-            ]
-            for (const j of granListaJugadores) {
-                await pool.query(
-                    `INSERT INTO jugadores (nombre, pais, bandera, posicion, foto, rareza) 
-                     VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (nombre) DO NOTHING`,
-                    [j[0], j[1], j[2], j[3], j[4], j[5]]
-                );
-            }
-            console.log(`✅ Estructuras inicializadas. ${granListaJugadores.length} jugadores cargados de forma inicial.`);
+            console.log(`📸 [AVATARES] Catálogo de ${listaFotosPerfil.length} banderas inicializado.`);
         }
     } catch (err) {
         console.error("❌ Error al inicializar estructuras en Neon:", err.message);
@@ -1072,7 +253,6 @@ inicializarTablas();
 app.post('/api/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        // 🟢 CORREGIDO: Eliminamos el .toLowerCase() para respetar el casing de la base de datos
         const userCheck = await pool.query("SELECT * FROM usuarios WHERE username = $1", [username.trim()]);
           
         if (userCheck.rows.length === 0) {
@@ -1081,12 +261,9 @@ app.post('/api/login', async (req, res) => {
 
         const user = userCheck.rows[0];
         
-        // ¡OJO ACÁ! Si estás usando bcrypt para comparar contraseñas, asegurate de usar await bcrypt.compare(password, user.password)
-        // Por ahora mantenemos tu lógica, pero recordá que comparar passwords en texto plano es inseguro.
         if (user.password === password) {
              console.log(`🔑 [LOGIN] El usuario "${username}" ingresó a la Arena.`);
              
-             // 🔥 RESERVA DE SEGURIDAD: Inicializa misiones para usuarios viejos (No pisa el progreso si ya existen)
              const queryVerificarMisionesLogin = `
                  INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, meta, recompensa)
                  VALUES 
@@ -1096,7 +273,6 @@ app.post('/api/login', async (req, res) => {
                  ON CONFLICT (usuario_id, mision_id) DO NOTHING;
              `;
              await pool.query(queryVerificarMisionesLogin, [user.id]);
-             console.log(`🎯 [MISIONES] Sincronización diaria garantizada para el usuario ID: ${user.id}`);
 
              const token = jwt.sign(
                  { id: user.id, username: user.username }, 
@@ -1134,20 +310,17 @@ app.post('/api/registro', async (req, res) => {
         if (ipCliente && ipCliente !== '::1' && ipCliente !== '127.0.0.1') {
             const ipCheck = await pool.query("SELECT * FROM usuarios WHERE ip_registro = $1", [ipCliente]);
             if (ipCheck.rows.length > 0) {
-                return res.status(400).json({ error: "❌ Límite excedido: Ya se creó una cuenta desde esta conexión a Internet." });
+                return res.status(400).json({ error: "❌ Límite excedido: Ya se creó una cuenta desde esta conexión." });
             }
         }
 
-        // 1. Insertamos el usuario como siempre
         const nuevoUsuario = await pool.query(
             "INSERT INTO usuarios (username, password, ip_registro) VALUES ($1, $2, $3) RETURNING *", 
             [username.trim().toLowerCase(), password, ipCliente]
         );
         
-        const nuevoUsuarioId = nuevoUsuario.rows[0].id; // 🔑 Guardamos el ID que generó la base de datos
-        console.log(`✨ [REGISTRO] Nuevo usuario creado: "${username.toUpperCase()}" (ID: ${nuevoUsuarioId}) desde la IP: ${ipCliente}`);
+        const nuevoUsuarioId = nuevoUsuario.rows[0].id;
 
-        // 2. 🎯 ASIGNACIÓN DE OBJETIVOS DIARIOS: Insertamos las 3 misiones iniciales ligadas a su id
         const queryMisionesIniciales = `
             INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, meta, recompensa)
             VALUES 
@@ -1158,19 +331,14 @@ app.post('/api/registro', async (req, res) => {
             SET progreso = 0, reclamada = FALSE, actualizado_en = CURRENT_TIMESTAMP;
         `;
         
-        // Ejecutamos la consulta pasándole el nuevoUsuarioId al marcador $1 de Postgres
         await pool.query(queryMisionesIniciales, [nuevoUsuarioId]);
-        console.log(`🎯 [MISIONES] Inicializadas con éxito para el usuario ID: ${nuevoUsuarioId}`);
 
-        // 3. Respondemos al frontend con éxito total
-        return res.json({ mensaje: "Registrado con éxito", usuario: nuevoUsuario.rows[0] });
-
-        // Otorgarle el avatar id: 1 (Por Defecto) en su inventario al registrarse
         await pool.query(
             "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, 1) ON CONFLICT DO NOTHING",
             [nuevoUsuarioId]
         );
-        console.log(`📸 [PERFIL] Avatar inicial asignado al usuario ID: ${nuevoUsuarioId}`);
+
+        return res.json({ mensaje: "Registrado con éxito", usuario: nuevoUsuario.rows[0] });
 
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -1182,23 +350,7 @@ app.post('/api/logout', (req, res) => {
     if (username) {
         console.log(`🚪 [LOGOUT] El usuario "${username.toUpperCase()}" salió de la Arena.`);
     }
-    res.json({ success: true, mensaje: "Sesión cerrada en servidor" });
-});
-
-app.post('/api/actualizar-progreso', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const { monedas, puntos } = req.body;
-
-    try {
-        await pool.query(
-            `UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3`, 
-            [monedas, puntos, usuario_id]
-        );
-        const result = await pool.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
-        return res.json({ datos: result.rows[0] });
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
-    }
+    res.json({ success: true, mensaje: "Sesión cerrada en el servidor" });
 });
 
 /* ========================================================================
@@ -1224,22 +376,13 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
     const { tipoCofre } = req.body; 
     const usuario_id = req.usuarioLogueado.id;
 
-    let costo = 250;
-    let probLegendaria = 0.015; 
-    let probEpica = 0.10;       
-    let probRara = 0.25;        
+    let costo = 250; let probLegendaria = 0.015; let probEpica = 0.10; let probRara = 0.25;        
 
     if (tipoCofre === 'plata') {
-        costo = 100;
-        probLegendaria = 0.001; 
-        probEpica = 0.03;       
-        probRara = 0.15;    
+        costo = 100; probLegendaria = 0.001; probEpica = 0.03; probRara = 0.15;    
     } 
     else if (tipoCofre === 'legendario') {
-        costo = 500;
-        probLegendaria = 0.08;  
-        probEpica = 0.30;       
-        probRara = 0.40;    
+        costo = 500; probLegendaria = 0.08; probEpica = 0.30; probRara = 0.40;    
     }
 
     try {
@@ -1254,78 +397,54 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
         if (todosLosJugadores.length === 0) return res.status(400).json({ error: "No hay jugadores en la DB" });
 
         let sobreAbierto = [];
-        // 1. Mantenemos tus 5 jugadores nativos intactos
         for (let i = 0; i < 5; i++) {
             let rand = Math.random();
             let rarezaElegida = 'comun';
 
-            if (rand < probLegendaria) {
-                rarezaElegida = 'legendaria';
-            } else if (rand < probLegendaria + probEpica) {
-                rarezaElegida = 'epica';
-            } else if (rand < probLegendaria + probEpica + probRara) {
-                rarezaElegida = 'rara'; 
-            }
+            if (rand < probLegendaria) rarezaElegida = 'legendaria';
+            else if (rand < probLegendaria + probEpica) rarezaElegida = 'epica';
+            else if (rand < probLegendaria + probEpica + probRara) rarezaElegida = 'rara'; 
 
             let poolFiltrado = todosLosJugadores.filter(j => j.rareza === rarezaElegida);
-            
-            if (poolFiltrado.length === 0) {
-                poolFiltrado = todosLosJugadores.filter(j => j.rareza === 'comun');
-            }
+            if (poolFiltrado.length === 0) poolFiltrado = todosLosJugadores.filter(j => j.rareza === 'comun');
             
             let elegido = poolFiltrado[Math.floor(Math.random() * poolFiltrado.length)];
             sobreAbierto.push({ ...elegido });
         }
 
-        // 2. 🎲 GATILLO SORPRESA: 10% de chances de meter un Avatar cosmético como 6ta carta
         let reembolsoAvatar = 0;
-        const PROBABILIDAD_AVATAR = 0.10; // 0.10 = 10% | Puedes subirlo o bajarlo aquí
+        const PROBABILIDAD_AVATAR = 0.10; 
         
         if (Math.random() < PROBABILIDAD_AVATAR) {
             const fotoAzarQuery = await pool.query("SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 1");
-            
             if (fotoAzarQuery.rows.length > 0) {
                 const avatarGanado = fotoAzarQuery.rows[0];
-
-                // Verificamos si ya lo tenía desbloqueado
-                const yaLaTiene = await pool.query(
-                    "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
-                    [usuario_id, avatarGanado.id]
-                );
+                const yaLaTiene = await pool.query("SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2", [usuario_id, avatarGanado.id]);
 
                 let esRepetido = false;
                 if (yaLaTiene.rows.length === 0) {
-                    // Si es nuevo, va derecho a su colección
-                    await pool.query(
-                        "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2)",
-                        [usuario_id, avatarGanado.id]
-                    );
+                    await pool.query("INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2)", [usuario_id, avatarGanado.id]);
                 } else {
-                    esRepetido = true;
-                    reembolsoAvatar = 100; // 🪙 Monedas de consuelo si sale repetido dentro del sobre común
+                    esRepetido = true; reembolsoAvatar = 100; 
                 }
 
-                // 🎭 EL DISFRAZ: Lo metemos al final simulando ser un jugador para no romper tu JS
                 sobreAbierto.push({
                     id: `avatar_${avatarGanado.id}`, 
                     nombre: avatarGanado.nombre,
                     foto: avatarGanado.ruta_jpg,
-                    posicion: "AVATAR",        // 👈 La clave para filtrar en tu frontend
-                    rareza: "legendaria",      // 👈 Para que brille con marco dorado en la animación
-                    es_foto_perfil: true,      // Flag útil
+                    posicion: "AVATAR", 
+                    rareza: "legendaria", 
+                    es_foto_perfil: true, 
                     es_repetido_avatar: esRepetido,
                     obtenido: esRepetido ? 1 : 0
                 });
             }
         }
 
-        // 3. Cobramos el costo del sobre y sumamos el reembolso si correspondió
         const nuevoOro = usuario.monedas - costo + reembolsoAvatar;
         await pool.query("UPDATE usuarios SET monedas = $1 WHERE id = $2", [nuevoOro, usuario_id]);
 
-        // 4. Tu loop original de guardado para los jugadores
         for (let jugador of sobreAbierto) {
-            // Saltamos el guardado de progreso si es el ítem simulado de avatar
             if (jugador.es_foto_perfil) continue;
 
             const resProg = await pool.query(
@@ -1346,32 +465,23 @@ app.post('/api/comprar-sobre', verificarToken, async (req, res) => {
 });
 
 /* ========================================================================
-   ⚽ MODULE DE PENALES (SISTEMA DE ENERGÍA POR HORA)
+   ⚽ MODULO DE PENALES (SISTEMA DE ENERGÍA POR HORA)
    ======================================================================== */
 const MAX_TIROS = 10;
 const MILISEGUNDOS_POR_TIRO = 6 * 60 * 1000; 
 
 function calcularTirosActuales(usuario) {
     const ahora = new Date();
-    
-    if (!usuario.ultimo_tiro_timestamp) {
-        return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
-    }
+    if (!usuario.ultimo_tiro_timestamp) return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
 
     const ultimoTiro = new Date(usuario.ultimo_tiro_timestamp);
     const tiempoTranscurrido = ahora - ultimoTiro;
-
     const tirosRegenerados = Math.floor(tiempoTranscurrido / MILISEGUNDOS_POR_TIRO);
     let tirosActuales = usuario.tiros_hoy + tirosRegenerados;
 
-    if (tirosActuales >= MAX_TIROS) {
-        return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
-    }
+    if (tirosActuales >= MAX_TIROS) return { tirosActuales: MAX_TIROS, tiempoParaSiguiente: 0 };
 
-    const tiempoConsumidoEnEsteTiro = tiempoTranscurrido % MILISEGUNDOS_POR_TIRO;
-    const tiempoParaSiguiente = MILISEGUNDOS_POR_TIRO - tiempoConsumidoEnEsteTiro;
-
-    return { tirosActuales, tiempoParaSiguiente };
+    return { tirosActuales, tiempoParaSiguiente: MILISEGUNDOS_POR_TIRO - (tiempoTranscurrido % MILISEGUNDOS_POR_TIRO) };
 }
 
 app.get('/api/tiros-restantes/:usuarioId', async (req, res) => {
@@ -1400,16 +510,12 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
         let { tirosActuales } = calcularTirosActuales(usuario);
 
         if (tirosActuales <= 0) {
-            return res.json({ 
-                error_limite: true, 
-                mensaje: "❌ ¡Te quedaste sin energía! Esperá a que se recupere un tiro. ⏱️" 
-            });
+            return res.json({ ok: false, error_limite: true, mensaje: "❌ ¡Te quedaste sin energía! Esperá a que se recupere un tiro. ⏱️" });
         }
 
         const nuevosTirosGuardados = tirosActuales - 1;
-        
-        let monedasGanadas = gano ? 100 : 0;
-        let puntosGanados = gano ? 15 : 0;
+        let monedasGanadas = gano ? 100 : 0; let puntosGanados = gano ? 15 : 0;
+
         const nuevasMonedas = usuario.monedas + monedasGanadas;
         const nuevosPuntos = usuario.puntos_ranking + puntosGanados;
 
@@ -1418,12 +524,10 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
             [nuevasMonedas, nuevosPuntos, ahora, nuevosTirosGuardados, usuario_id]
         );
         
-        const tiempoActualizado = nuevosTirosGuardados >= MAX_TIROS ? 0 : MILISEGUNDOS_POR_TIRO;
-
         return res.json({
             success: true,
             tiros_restantes: nuevosTirosGuardados,
-            siguienteIn: tiempoActualizado,
+            siguienteIn: nuevosTirosGuardados >= MAX_TIROS ? 0 : MILISEGUNDOS_POR_TIRO,
             datos: { monedas: nuevasMonedas, puntos_ranking: nuevosPuntos }
         });
     } catch (err) {
@@ -1432,14 +536,8 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
 });
 
 app.get('/api/ranking', async (req, res) => {
-    const query = `
-        SELECT id, username, puntos_ranking 
-        FROM usuarios 
-        ORDER BY puntos_ranking DESC 
-        LIMIT 10
-    `;
     try {
-        const result = await pool.query(query);
+        const result = await pool.query("SELECT id, username, puntos_ranking FROM usuarios ORDER BY puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
     } catch (err) {
         return res.status(500).json({ error: err.message });
@@ -1447,20 +545,10 @@ app.get('/api/ranking', async (req, res) => {
 });
 
 app.get('/api/ranking-mundiales', async (req, res) => {
-    // 🎯 INYECTAMOS EL ID EN EL SELECT (Aseguráte de que tu columna se llame id o usuario_id)
-    const query = `
-        SELECT id, username, copas_mundiales 
-        FROM usuarios 
-        WHERE copas_mundiales > 0
-        ORDER BY copas_mundiales DESC, puntos_ranking DESC 
-        LIMIT 10
-    `;
     try {
-        const result = await pool.query(query);
-        // Devolvemos el array con la estructura completa { id, username, copas_mundiales }
+        const result = await pool.query("SELECT id, username, copas_mundiales FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
     } catch (err) {
-        console.error("❌ Error en la query del ranking:", err.message);
         return res.status(500).json({ error: err.message });
     }
 });
@@ -1473,34 +561,25 @@ const MILISEGUNDOS_POR_TIMBA = 6 * 60 * 1000;
 
 function calcularTimbasActuales(usuario) {
     const ahora = new Date();
-    
-    if (!usuario.ultimo_giro_timestamp) {
-        return { timbasActuales: MAX_TIMBAS, tiempoParaSiguienteTimba: 0 };
-    }
+    if (!usuario.ultimo_giro_timestamp) return { timbasActuales: MAX_TIMBAS, tiempoParaSiguienteTimba: 0 };
 
     const ultimoGiro = new Date(usuario.ultimo_giro_timestamp);
     const tiempoTranscurrido = ahora - ultimoGiro;
-
     const timbasRegeneradas = Math.floor(tiempoTranscurrido / MILISEGUNDOS_POR_TIMBA);
     let timbasActuales = usuario.timbas_hoy + timbasRegeneradas;
 
-    if (timbasActuales >= MAX_TIMBAS) {
-        return { timbasActuales: MAX_TIMBAS, tiempoParaSiguienteTimba: 0 };
-    }
+    if (timbasActuales >= MAX_TIMBAS) return { timbasActuales: MAX_TIMBAS, tiempoParaSiguienteTimba: 0 };
 
-    const tiempoConsumidoEnEsteGiro = tiempoTranscurrido % MILISEGUNDOS_POR_TIMBA;
-    const tiempoParaSiguienteTimba = MILISEGUNDOS_POR_TIMBA - tiempoConsumidoEnEsteGiro;
-
-    return { timbasActuales, tiempoParaSiguienteTimba };
+    return { timbasActuales, tiempoParaSiguienteTimba: MILISEGUNDOS_POR_TIMBA - (tiempoTranscurrido % MILISEGUNDOS_POR_TIMBA) };
 }
 
 const apuestasActivasServidor = {};
 
 function generarGolesServidor() {
     const r = Math.random();
-    if (r < 0.08) return 0;  // 📉 Bajamos el 0 absoluto a solo un 8% (Chau arco en cero constante)
-    if (r < 0.38) return 1;  // 🎯 30% de chances para 1 gol
-    if (r < 0.68) return 2;  // 🎯 30% de chances para 2 goles (El resultado más común en el fútbol)
+    if (r < 0.08) return 0;  
+    if (r < 0.38) return 1;  
+    if (r < 0.68) return 2;  
     if (r < 0.88) return 3;
     return Math.floor(Math.random() * 3) + 4;
 }
@@ -1533,107 +612,66 @@ app.post('/api/timba/preparar', verificarToken, async (req, res) => {
                 return res.json({ ok: false, error_oro: true, mensaje: "🪙 No tenés suficiente Oro para bancar esa apuesta." });
             }
         } else {
-            const progCheck = await pool.query(
-                "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, jugadorIdApostado]
-            );
+            const progCheck = await pool.query("SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
             if (progCheck.rows.length === 0 || progCheck.rows[0].cantidad <= 1) {
                 return res.json({ ok: false, mensaje: "❌ No tenés stock de repetidas de ese cromo para apostar." });
             }
         }
 
         let { timbasActuales } = calcularTimbasActuales(usuario);
-
         if (timbasActuales <= 0) {
-            return res.json({ 
-                ok: false,
-                error_limite: true, 
-                mensaje: "❌ ¡Te quedaste sin energía para apostar! Esperá a que recargue el cronómetro de la banca. ⏱️" 
-            });
+            return res.json({ ok: false, error_limite: true, mensaje: "❌ ¡Te quedaste sin energía para apostar! Esperá a que recargue el cronómetro. ⏱️" });
         }
 
         const nuevasTimbasGuardadas = timbasActuales - 1;
         await pool.query(`UPDATE usuarios SET ultimo_giro_timestamp = NOW(), timbas_hoy = $1 WHERE id = $2`, [nuevasTimbasGuardadas, usuario_id]);
 
-        // 🎲 1. GENERACIÓN REAL DE LA BANCA
-        const golesLReal = generarGolesServidor();
-        const golesVReal = generarGolesServidor();
+        const golesLReal = generarGolesServidor(); const golesVReal = generarGolesServidor();
         const labelReal = `${golesLReal} - ${golesVReal}`;
 
-        // 🎡 2. INICIALIZACIÓN DE LA RULETA (6 casilleros físicos fijos)
         const ruletaCasilleros = Array(6).fill(null);
         const combinacionesUsadas = new Set([labelReal]);
-
-        // Decidimos en qué posición exacta va a caer el premio mayor en este giro (del 0 al 5)
         const casilleroGanadorAzar = Math.floor(Math.random() * 6);
         
-        // Clavamos el resultado real directamente en su casillero asignado
         ruletaCasilleros[casilleroGanadorAzar] = { label: labelReal, tipo: 'exacto', idOpcion: casilleroGanadorAzar };
 
-        // Función puramente caótica para rellenar el resto de la ruleta
         function crearMarcadorRuleta() {
             const r = Math.random();
             if (r < 0.12) return { l: 0, v: 0 }; 
-            if (r < 0.38) return { l: Math.floor(Math.random() * 3) + 1, v: Math.floor(Math.random() * 2) }; // Locales variados
-            if (r < 0.64) return { l: Math.floor(Math.random() * 2), v: Math.floor(Math.random() * 3) + 1 }; // Visitantes variados
-            if (r < 0.82) return { l: Math.floor(Math.random() * 2) + 2, v: Math.floor(Math.random() * 2) + 2 }; // Empates/Scores altos
-            return { l: Math.floor(Math.random() * 3) + 3, v: Math.floor(Math.random() * 3) }; // Goleadas locas
+            if (r < 0.38) return { l: Math.floor(Math.random() * 3) + 1, v: Math.floor(Math.random() * 2) };
+            if (r < 0.64) return { l: Math.floor(Math.random() * 2), v: Math.floor(Math.random() * 3) + 1 };
+            if (r < 0.82) return { l: Math.floor(Math.random() * 2) + 2, v: Math.floor(Math.random() * 2) + 2 };
+            return { l: Math.floor(Math.random() * 3) + 3, v: Math.floor(Math.random() * 3) };
         }
 
-        // 🌪️ 3. RELLENAMOS LOS CASILLEROS RESTANTES UNO POR UNO
         for (let i = 0; i < 6; i++) {
-            // Si es la posición del ganador, saltamos porque ya está ocupada
             if (i === casilleroGanadorAzar) continue;
-
-            let safeBucle = 0;
-            let asignado = false;
+            let safeBucle = 0; let asignado = false;
 
             while (!asignado && safeBucle < 150) {
                 safeBucle++;
-                const marcador = crearMarcadorRuleta();
-                const combo = `${marcador.l} - ${marcador.v}`;
-
+                const marcador = crearMarcadorRuleta(); const combo = `${marcador.l} - ${marcador.v}`;
                 if (!combinacionesUsadas.has(combo)) {
                     combinacionesUsadas.add(combo);
                     ruletaCasilleros[i] = { label: combo, tipo: 'ruido', idOpcion: i };
                     asignado = true;
                 }
             }
-
-            // Salvaguarda total anti-repetidos por si se traba el set
             if (!ruletaCasilleros[i]) {
-                const comboFuerzaBruta = `${golesLReal + i + 1} - ${golesVReal + i}`;
-                ruletaCasilleros[i] = { label: comboFuerzaBruta, tipo: 'ruido', idOpcion: i };
+                ruletaCasilleros[i] = { label: `${golesLReal + i + 1} - ${golesVReal + i}`, tipo: 'ruido', idOpcion: i };
             }
         }
 
-        // 🧠 4. MAPEO LIMPIO DIRECTO AL ENVIAR (Mantiene el orden físico de los casilleros del 0 al 5)
-        const poolParaCliente = ruletaCasilleros.map(slot => ({
-            idOpcion: slot.idOpcion, // Vinculado a su índice real fijo
-            label: slot.label
-        }));
+        const poolParaCliente = ruletaCasilleros.map(slot => ({ idOpcion: slot.idOpcion, label: slot.label }));
+        apuestasActivasServidor[usuario_id] = { golesLReal, golesVReal, tipoApuesta, montoApuesta, jugadorIdApostado, mapeoOpciones: ruletaCasilleros };
 
-        // Guardamos la configuración en la sesión temporal de la Arena
-        apuestasActivasServidor[usuario_id] = {
-            golesLReal,
-            golesVReal,
-            tipoApuesta,
-            montoApuesta,
-            jugadorIdApostado,
-            mapeoOpciones: ruletaCasilleros // Mantiene la verdad indexada por posición
-        };
-
-        const tiempoActualizado = nuevasTimbasGuardadas >= MAX_TIMBAS ? 0 : MILISEGUNDOS_POR_TIMBA;
-        
         return res.json({ 
             ok: true, 
             opciones: poolParaCliente,
             timbas_restantes: nuevasTimbasGuardadas,
-            siguienteIn: tiempoActualizado
+            siguienteIn: nuevasTimbasGuardadas >= MAX_TIMBAS ? 0 : MILISEGUNDOS_POR_TIMBA
         });
-
     } catch (err) {
-        console.error("❌ Fallo en motor de Ruleta de Timba:", err.message);
         return res.status(500).json({ ok: false, mensaje: "Error en el servidor al preparar la ruleta." });
     }
 });
@@ -1643,48 +681,26 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
     const { idOpcionElegida } = req.body;
     const apuesta = apuestasActivasServidor[usuario_id];
 
-    if (!apuesta) {
-        return res.status(400).json({ ok: false, mensaje: "No hay una apuesta activa preparada." });
-    }
+    if (!apuesta) return res.status(400).json({ ok: false, mensaje: "No hay una apuesta activa preparada." });
 
     const { golesLReal, golesVReal, tipoApuesta, montoApuesta, jugadorIdApostado, mapeoOpciones } = apuesta;
-    
-    // 🕵️‍♂️ Recuperamos la opción elegida del array barajado usando el ID oculto
     const opcionElegida = mapeoOpciones.find(o => o.idOpcion === parseInt(idOpcionElegida)) || mapeoOpciones[idOpcionElegida];
 
-    if (!opcionElegida) {
-        return res.status(400).json({ ok: false, mensaje: "Opción de apuesta inválida o alterada." });
-    }
+    if (!opcionElegida) return res.status(400).json({ ok: false, mensaje: "Opción de apuesta inválida o alterada." });
 
-    // 🛡️ DETECTOR DE VERDAD MATEMÁTICO PURO (Sin patrones, lee texto directo)
     const labelReal = `${golesLReal} - ${golesVReal}`;
     const signoReal = golesLReal > golesVReal ? 'L' : (golesLReal < golesVReal ? 'V' : 'E');
-
-    // Desarmamos el string de lo que el usuario seleccionó en la interfaz
     const [golesLElegidos, golesVElegidos] = opcionElegida.label.split(' - ').map(Number);
     const signoElegido = golesLElegidos > golesVElegidos ? 'L' : (golesLElegidos < golesVElegidos ? 'V' : 'E');
 
-    // Clasificación dinámica en caliente
-    let tipoDictamen = 'error'; 
-    if (opcionElegida.label === labelReal) {
-        tipoDictamen = 'exacto';
-    } else if (signoElegido === signoReal) {
-        tipoDictamen = 'signo';
-    }
-
-    let balanceMonedas = 0;
-    let puntosAsignados = 0;
-    let mensajeResultado = "";
+    let tipoDictamen = (opcionElegida.label === labelReal) ? 'exacto' : ((signoElegido === signoReal) ? 'signo' : 'error');
+    let balanceMonedas = 0; let puntosAsignados = 0; let mensajeResultado = "";
 
     try {
-        // ========================================================================
-        // 🪙 CASO A: APUESTA POR MONEDAS DE ORO
-        // ========================================================================
         if (tipoApuesta === "monedas") {
             if (tipoDictamen === 'exacto') {
-                balanceMonedas = montoApuesta * 3; 
-                puntosAsignados = 20;
-                mensajeResultado = `¡QUÉ ANIMAL! Acertaste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${montoApuesta * 3} monedas.`;
+                balanceMonedas = montoApuesta * 3; puntosAsignados = 20;
+                mensajeResultado = `¡QUÉ ANIMAL! Acertaste el resultado exacto (${golesLReal}-${golesVReal}).\nGanaste: ${balanceMonedas} monedas.`;
             } else if (tipoDictamen === 'signo') {
                 balanceMonedas = Math.round(montoApuesta * 0.5);
                 mensajeResultado = `¡BIEN AHÍ! Acertaste el ganador (${opcionElegida.label}). El resultado fue ${golesLReal}-${golesVReal}.\nGanaste: ${balanceMonedas} monedas.`;
@@ -1692,39 +708,20 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
                 balanceMonedas = -montoApuesta;
                 mensajeResultado = `¡ERRASTE! El partido terminó ${golesLReal}-${golesVReal} y elegiste ${opcionElegida.label}.\nPerdiste: ${montoApuesta} monedas.`;
             }
-
-            await pool.query(
-                `UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3`, 
-                [balanceMonedas, puntosAsignados, usuario_id]
-            );
-
-        // ========================================================================
-        // 🃏 CASO B: TIMBA POR CROMOS REPETIDOS
-        // ========================================================================
+            await pool.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [balanceMonedas, puntosAsignados, usuario_id]);
         } else {
             const cardQuery = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugadorIdApostado]);
-            const cromoApostado = cardQuery.rows[0];
-            const rarezaOriginal = cromoApostado.rareza.toLowerCase();
+            const cromoApostado = cardQuery.rows[0]; const rarezaOriginal = cromoApostado.rareza.toLowerCase();
 
             if (tipoDictamen === 'exacto' || tipoDictamen === 'signo') {
+                await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
                 
                 if (rarezaOriginal === "legendaria") {
-                    let oroPremio = (tipoDictamen === 'exacto') ? 2500 : 1000;
-                    puntosAsignados = (tipoDictamen === 'exacto') ? 40 : 20;
-
-                    await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
+                    let oroPremio = (tipoDictamen === 'exacto') ? 2500 : 1000; puntosAsignados = (tipoDictamen === 'exacto') ? 40 : 20;
                     await pool.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [oroPremio, puntosAsignados, usuario_id]);
-
-                    if (tipoDictamen === 'exacto') {
-                        mensajeResultado = `👑 ¡DIOS SANTO PE! Apostaste a ${cromoApostado.nombre.toUpperCase()} Legendario y la clavaste al ángulo (${golesLReal}-${golesVReal}).\n\n💰 ¡LA CASA TE PAGA 🪙2.500 MONEDAS!`;
-                    } else {
-                        mensajeResultado = `💰 ¡BIEN AHÍ! Acertaste el ganador con tu Legendario (${golesLReal}-${golesVReal}).\n\n🎁 ¡Te llevás 🪙1.000 monedas!`;
-                    }
-
+                    mensajeResultado = (tipoDictamen === 'exacto') ? `👑 ¡DIOS SANTO! Clavaste el resultado con tu Legendario.\n\n💰 ¡Cobrás 🪙2.500 MONEDAS!` : `💰 ¡BIEN AHÍ! Acertaste el ganador con tu Legendario.\n\n🎁 ¡Te llevás 🪙1.000 monedas!`;
                 } else {
-                    await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
-                    
-                    let rarezaPremio = rarezaOriginal; 
+                    let rarezaPremio = rarezaOriginal;
                     if (tipoDictamen === 'exacto') {
                         if (rarezaOriginal === "comun") rarezaPremio = "rara";
                         else if (rarezaOriginal === "rara") rarezaPremio = "epica";
@@ -1734,100 +731,35 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
                     const poolPremio = await pool.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaPremio]);
                     const cromoGanado = poolPremio.rows[0];
 
-                    await pool.query(
-                        `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
-                         ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
-                        [usuario_id, cromoGanado.id]
-                    );
+                    await pool.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [usuario_id, cromoGanado.id]);
 
                     puntosAsignados = (tipoDictamen === 'exacto') ? 30 : 15;
-                    let sumExacto = (tipoDictamen === 'exacto') ? 1 : 0;
-                    let sumSigno = (tipoDictamen === 'signo') ? 1 : 0;
+                    await pool.query(`UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2, timbas_jugadas = timbas_jugadas + 1, timbas_ganadas_exacto = timbas_ganadas_exacto + $3, timbas_ganadas_signo = timbas_ganadas_signo + $4 WHERE id = $5`, [0, puntosAsignados, (tipoDictamen === 'exacto' ? 1 : 0), (tipoDictamen === 'signo' ? 1 : 0), usuario_id]);
 
-                    await pool.query(
-                        `UPDATE usuarios 
-                        SET monedas = monedas + $1, 
-                            puntos_ranking = puntos_ranking + $2,
-                            timbas_jugadas = timbas_jugadas + 1,
-                            timbas_ganadas_exacto = timbas_ganadas_exacto + $3,
-                            timbas_ganadas_signo = timbas_ganadas_signo + $4
-                        WHERE id = $5`, 
-                        [balanceMonedas, puntosAsignados, sumExacto, sumSigno, usuario_id]
-                    );
-
-                    if (tipoDictamen === 'exacto') {
-                        mensajeResultado = `🔥 ¡PRO DISPARO! Acertaste el exacto (${golesLReal}-${golesVReal}).\n🎁 ¡EVOLUCIÓN! Te ganaste un cromo SUPERIOR: ${cromoGanado.nombre.toUpperCase()} [${cromoGanado.rareza.toUpperCase()}]`;
-                    } else {
-                        mensajeResultado = `⚽ ¡GOOOL! Acertaste el ganador. El partido terminó ${golesLReal}-${golesVReal}.\n🃏 La banca te devuelve otro cromo: ${cromoGanado.nombre.toUpperCase()} [${cromoGanado.rareza.toUpperCase()}]`;
-                    }
+                    mensajeResultado = (tipoDictamen === 'exacto') ? `🔥 ¡PRO DISPARO! Acertaste el exacto (${golesLReal}-${golesVReal}).\n🎁 ¡EVOLUCIÓN! Te ganaste un cromo SUPERIOR: ${cromoGanado.nombre.toUpperCase()}` : `⚽ ¡GOOOL! Acertaste el ganador.\n🃏 La banca te devuelve otro cromo: ${cromoGanado.nombre.toUpperCase()}`;
                 }
-
             } else {
-                // Perdió el cromo repetido de forma permanente
                 await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
-                mensajeResultado = `❌ ¡CROMO PERDIDO! El partido terminó ${golesLReal}-${golesVReal} y tu opción fue ${opcionElegida.label}.\nPerdiste 1 copia de ${cromoApostado.nombre.toUpperCase()}.`;
+                mensajeResultado = `❌ ¡CROMO PERDIDO! El partido terminó ${golesLReal}-${golesVReal}.\nPerdiste 1 copia de ${cromoApostado.nombre.toUpperCase()}.`;
             }
         }
 
-        // Limpieza atómica de la jugada activa para evitar doble procesamiento (Exploit Fix)
         const userCheck = await pool.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
         delete apuestasActivasServidor[usuario_id];
 
-        return res.json({
-            ok: true,
-            mensajeResultado,
-            golesLReal,
-            golesVReal,
-            datos: userCheck.rows[0]
-        });
-
+        return res.json({ ok: true, mensajeResultado, golesLReal, golesVReal, datos: userCheck.rows[0] });
     } catch (err) {
-        console.error("❌ Fallo crítico en el procesamiento de la timba:", err);
         return res.status(500).json({ ok: false, mensaje: "Error en DB al procesar tu jugada." });
     }
 });
 
 /* ========================================================================
-   ⚽ GENERADOR DE INCIDENCIAS PARA EL FIXTURE
-   ======================================================================== */
-const generarIncidenciasPartido = (golesL, golesV, tuPais, rival) => {
-    let eventos = {};
-    
-    eventos[45] = "⏳ ENTRETIEMPO: Los equipos van a los vestuarios. ¡Momento de la charla técnica!";
-
-    const minsPeligro = [15, 28, 62, 78, 87];
-    const textosPeligro = [
-        `🧤 ¡Mano a mano agónico! El arquero salva en la línea de gol.`,
-        `🟥 ¡Tarjeta Roja! Un defensor se va expulsado por juego brusco.`,
-        `⚠️ ¡Tiro libre peligroso en la puerta del área! Pasa rozando el palo.`,
-        `⚡ ¡Contraataque letal comandado por las tácticas del DT! El estadio es un hervidero.`,
-        `🥅 ¡Al palo! El remate rebota en el travesaño y se salva el arco.`
-    ];
-
-    minsPeligro.forEach((min, idx) => {
-        if (Math.random() < 0.6) { 
-            eventos[min] = textosPeligro[idx];
-        }
-    });
-
-    return eventos;
-};
-
-/* ========================================================================
-   🏆 MÓDULO MINIMUNDIAL BLINDADO (SINGLE PLAYER / BOTS / COOLDOWNS)
+   🏆 MÓDULO MINIMUNDIAL (SINGLE PLAYER / BOTS / COOLDOWNS ATÓMICOS)
    ======================================================================== */
 const COOLDOWN_MUNDIAL_MS = 3 * 60 * 60 * 1000; 
+const VALOR_STATS_RAREZA = { 'comun': 60, 'rara': 75, 'epica': 85, 'legendaria': 96 };
 
-const VALOR_STATS_RAREZA = {
-    'comun': 60,
-    'rara': 75,
-    'epica': 85,
-    'legendaria': 96
-};
-
-function mezclarArray(arr) {
-    return arr.sort(() => Math.random() - 0.5);
-}
+function mezclarArray(arr) { return arr.sort(() => Math.random() - 0.5); }
 
 const SELECCIONES_BOTS = [
     "Francia", "Brasil", "Alemania", "España", "Italia", "Inglaterra", 
@@ -1838,329 +770,157 @@ const SELECCIONES_BOTS = [
     "Arabia Saudita", "Irán", "Suiza", "Dinamarca", "Suecia", "Polonia", "Ucrania", "Austria"
 ];
 
-// 1️⃣ ENDPOINT SEGURO: ESTADO Y COOLDOWN DEL MINIMUNDIAL
 app.get('/api/mundial/estado', verificarToken, async (req, res) => {
     const usuarioId = req.usuarioLogueado.id; 
     const client = await pool.connect();
     try {
-        const queryText = "SELECT copas_mundiales, ultima_timba_mundial FROM usuarios WHERE id = $1";
-        const userCheck = await client.query(queryText, [usuarioId]);
-        
-        if (userCheck.rows.length === 0) {
-            return res.status(404).json({ ok: false, error: "Usuario inexistente en los registros." });
+        const userCheck = await client.query("SELECT copas_mundiales, ultimo_mundial_timestamp FROM usuarios WHERE id = $1", [usuarioId]);
+        if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, error: "Usuario inexistente." });
+
+        const user = userCheck.rows[0]; const ahora = new Date(); let tiempoRestante = 0;
+
+        if (user.ultimo_mundial_timestamp) {
+            const transcurrido = ahora - new Date(user.ultimo_mundial_timestamp);
+            if (transcurrido < COOLDOWN_MUNDIAL_MS) tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
         }
 
-        const user = userCheck.rows[0];
-        const ahora = new Date();
-        let tiempoRestante = 0;
-
-        if (user.ultima_timba_mundial) {
-            const ultimaVez = new Date(user.ultima_timba_mundial);
-            const transcurrido = ahora - ultimaVez;
-            if (transcurrido < COOLDOWN_MUNDIAL_MS) {
-                tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
-            }
-        }
-
-        return res.json({
-            ok: true,
-            copas: Number(user.copas_mundiales) || 0,
-            milisegundosRestantes: Math.floor(tiempoRestante)
-        });
+        return res.json({ ok: true, copas: Number(user.copas_mundiales) || 0, milisegundosRestantes: Math.floor(tiempoRestante) });
     } catch (err) {
-        console.error("❌ Error en /mundial/estado:", err.message);
-        return res.status(500).json({ ok: false, error: "Error de sincronización en los servidores." });
-    } finally {
-        client.release(); 
-    }
+        return res.status(500).json({ ok: false, error: "Error de sincronización en el servidor." });
+    } finally { client.release(); }
 });
 
-// 2️⃣ ENDPOINT SEGURO: PREPARAR E INSCRIPCIÓN AL MUNDIAL
 app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-
-        const userCheck = await client.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
-        if (userCheck.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
-        }
+        const userCheck = await client.query("SELECT monedas, ultimo_mundial_timestamp FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
+        if (userCheck.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ ok: false, mensaje: "Usuario inválido." }); }
 
         const usuario = userCheck.rows[0];
-
-        if (usuario.ultima_timba_mundial) {
-            const transcurrido = new Date() - new Date(usuario.ultima_timba_mundial);
-            if (transcurrido < COOLDOWN_MUNDIAL_MS) {
-                await client.query('ROLLBACK');
-                return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Vestuario cerrado. Esperá a que se cumpla el cooldown.` });
-            }
+        if (usuario.ultimo_mundial_timestamp && (new Date() - new Date(usuario.ultimo_mundial_timestamp) < COOLDOWN_MUNDIAL_MS)) {
+            await client.query('ROLLBACK'); return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Cooldown activo en el vestuario.` });
         }
 
-        if (usuario.monedas < 1500) {
-            await client.query('ROLLBACK');
-            return res.json({ ok: false, mensaje: "🪙 No tenés suficiente Oro. La inscripción cuesta 1.500 monedas." });
-        }
+        if (usuario.monedas < 1500) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "🪙 Se necesitan 1.500 monedas para la inscripción." }); }
 
-        const paisesValidosQuery = await client.query(`
-            SELECT j.pais 
-            FROM usuario_progreso up 
-            JOIN jugadores j ON up.jugador_id = j.id 
-            WHERE up.usuario_id = $1 AND up.cantidad > 0 
-            GROUP BY j.pais 
-            HAVING COUNT(j.id) >= 3
-        `, [usuario_id]);
-
+        const paisesValidosQuery = await client.query(`SELECT j.pais FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.cantidad > 0 GROUP BY j.pais HAVING COUNT(j.id) >= 3`, [usuario_id]);
         const paisesCandidatos = paisesValidosQuery.rows.map(r => r.pais);
 
-        if (paisesCandidatos.length === 0) {
-            await client.query('ROLLBACK');
-            return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores de un mismo país desbloqueados para poder inscribirte." });
-        }
+        if (paisesCandidatos.length === 0) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores del mismo país desbloqueados." }); }
 
         const nuevoOro = usuario.monedas - 1500;
-        await client.query(
-            "UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", 
-            [nuevoOro, usuario_id]
-        );
+        await client.query("UPDATE usuarios SET monedas = $1, ultimo_mundial_timestamp = NOW() WHERE id = $2", [nuevoOro, usuario_id]);
 
         const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
         let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
-        while (ternaFiltrada.includes(rivalClasificacion)) {
-            rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
-        }
+        while (ternaFiltrada.includes(rivalClasificacion)) { rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)]; }
 
         await client.query('COMMIT');
-
-        return res.json({
-            ok: true,
-            terna: ternaFiltrada,
-            rivalClasificacion: rivalClasificacion,
-            monedasActualizadas: nuevoOro
-        });
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("❌ Error en /mundial/preparar:", err.message);
-        return res.status(500).json({ ok: false, error: err.message });
-    } finally {
-        client.release();
-    }
+        return res.json({ ok: true, terna: ternaFiltrada, rivalClasificacion, monedasActualizadas: nuevoOro });
+    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: err.message }); } finally { client.release(); }
 });
 
-// 3️⃣ ENDPOINT SEGURO: JUGAR Y PROCESAR PLANILLA DE PARTIDOS (ANTI-CHEAT)
 app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
-    const { seleccionElegida, rivalClasificacion, jugadorIds } = req.body;
+    const { seleccionElegida, jugadorIds } = req.body;
 
-    if (!jugadorIds || jugadorIds.length !== 3) {
-        return res.status(400).json({ ok: false, mensaje: "Debés alinear exactamente 3 jugadores." });
-    }
+    if (!jugadorIds || jugadorIds.length !== 3) return res.status(400).json({ ok: false, mensaje: "Alineá exactamente 3 jugadores." });
 
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const jCheck = await client.query("SELECT j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2) AND up.cantidad > 0", [usuario_id, jugadorIds]);
 
-        // Validamos de forma estricta la propiedad de las cartas seleccionadas
-        const jCheck = await client.query(
-            "SELECT j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2) AND up.cantidad > 0",
-            [usuario_id, jugadorIds]
-        );
+        if (jCheck.rows.length !== 3) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Error: Jugadores no disponibles en tu plantel." }); }
 
-        if (jCheck.rows.length !== 3) {
-            await client.query('ROLLBACK');
-            return res.json({ ok: false, mensaje: "❌ Uno o más jugadores seleccionados no están disponibles en tu plantel." });
-        }
+        const promedio = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0) / 3;
+        let estrellas = (promedio >= 90) ? 5 : ((promedio >= 79) ? 4 : ((promedio >= 70) ? 3 : ((promedio >= 62) ? 2 : 1)));
+        let chanceVictoria = { 1: 0.10, 2: 0.25, 3: 0.48, 4: 0.70, 5: 0.88 }[estrellas] || 0.10;
 
-        const sumaStats = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0);
-        const promedio = sumaStats / 3;
-        
-        let estrellas = 1;
-        if (promedio >= 90) estrellas = 5;
-        else if (promedio >= 79) estrellas = 4;
-        else if (promedio >= 70) estrellas = 3;
-        else if (promedio >= 62) estrellas = 2;
-
-        let chanceVictoria = 0.10; 
-        if (estrellas === 2) chanceVictoria = 0.25;
-        else if (estrellas === 3) chanceVictoria = 0.48;
-        else if (estrellas === 4) chanceVictoria = 0.70;
-        else if (estrellas === 5) chanceVictoria = 0.88;
-
-        let botsDisponibles = SELECCIONES_BOTS.filter(s => s !== seleccionElegida);
-        botsDisponibles = mezclarArray(botsDisponibles);
-
-        const rivalGrupo1 = botsDisponibles[0];
-        const rivalGrupo2 = botsDisponibles[1];
-        const rivalGrupo3 = botsDisponibles[2];
+        let botsDisponibles = mezclarArray(SELECCIONES_BOTS.filter(s => s !== seleccionElegida));
+        const [rivalGrupo1, rivalGrupo2, rivalGrupo3] = botsDisponibles;
         const integrantesGrupo = [seleccionElegida, rivalGrupo1, rivalGrupo2, rivalGrupo3];
 
         function generarMinutosGolesFútbol(cantidad) {
             let minutos = [];
             while(minutos.length < cantidad) {
-                let min = Math.floor(Math.random() * 29) * 3 + 3; 
-                if (!minutos.includes(min) && min !== 45 && min !== 90) {
-                    minutos.push(min);
-                }
+                let min = Math.floor(Math.random() * 29) * 3 + 3;
+                if (!minutos.includes(min) && min !== 45 && min !== 90) minutos.push(min);
             }
             return minutos.sort((a, b) => a - b);
         }
 
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            let g1 = Math.floor(Math.random() * 3);
-            let g2 = Math.floor(Math.random() * 3);
+            let g1 = Math.floor(Math.random() * 3); let g2 = Math.floor(Math.random() * 3);
             if (esUsuario) {
                 if (Math.random() <= chanceVictoria && g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
                 else if (Math.random() > chanceVictoria && g2 <= g1) g2 = g1 + Math.floor(Math.random() * 2) + 1;
             }
-            return {
-                goles1: g1,
-                goles2: g2,
-                minutosEq1: generarMinutosGolesFútbol(g1),
-                minutosEq2: generarMinutosGolesFútbol(g2)
-            };
+            return { goles1: g1, goles2: g2, minutosEq1: generarMinutosGolesFútbol(g1), minutosEq2: generarMinutosGolesFútbol(g2) };
         }
 
-        // Simulamos la Fase de Grupos
         let let_f1_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo1, true);
         let let_f1_m2 = simularMatchCompleto(rivalGrupo2, rivalGrupo3, false);
-        
-        let bitacoraGrupo = [];
-        bitacoraGrupo.push({ 
-            fecha: 1, local: seleccionElegida, visitante: rivalGrupo1, 
-            gL: let_f1_m1.goles1, gV: let_f1_m1.goles2, 
-            minutosL: let_f1_m1.minutosEq1, minutosV: let_f1_m1.minutosEq2, 
-            botL: rivalGrupo2, botV: rivalGrupo3, 
-            gBL: let_f1_m2.goles1, gBV: let_f1_m2.goles2,
-            minutosBL: let_f1_m2.minutosEq1, minutosBV: let_f1_m2.minutosEq2
-        });
+        let bitacoraGrupo = [{ fecha: 1, local: seleccionElegida, visitante: rivalGrupo1, gL: let_f1_m1.goles1, gV: let_f1_m1.goles2, minutosL: let_f1_m1.minutosEq1, minutosV: let_f1_m1.minutosEq2, botL: rivalGrupo2, botV: rivalGrupo3, gBL: let_f1_m2.goles1, gBV: let_f1_m2.goles2, minutosBL: let_f1_m2.minutosEq1, minutosBV: let_f1_m2.minutosEq2 }];
 
         let let_f2_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo2, true);
         let let_f2_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo3, false);
-        bitacoraGrupo.push({ 
-            fecha: 2, local: seleccionElegida, visitante: rivalGrupo2, 
-            gL: let_f2_m1.goles1, gV: let_f2_m1.goles2, 
-            minutosL: let_f2_m1.minutosEq1, minutosV: let_f2_m1.minutosEq2,
-            botL: rivalGrupo1, botV: rivalGrupo3, 
-            gBL: let_f2_m2.goles1, gBV: let_f2_m2.goles2,
-            minutosBL: let_f2_m2.minutosEq1, minutosBV: let_f2_m2.minutosEq2
-        });
+        bitacoraGrupo.push({ fecha: 2, local: seleccionElegida, visitante: rivalGrupo2, gL: let_f2_m1.goles1, gV: let_f2_m1.goles2, minutosL: let_f2_m1.minutosEq1, minutosV: let_f2_m1.minutosEq2, botL: rivalGrupo1, botV: rivalGrupo3, gBL: let_f2_m2.goles1, gBV: let_f2_m2.goles2, minutosBL: let_f2_m2.minutosEq1, minutosBV: let_f2_m2.minutosEq2 });
 
         let let_f3_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo3, true);
         let let_f3_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo2, false);
-        bitacoraGrupo.push({ 
-            fecha: 3, local: seleccionElegida, visitante: rivalGrupo3, 
-            gL: let_f3_m1.goles1, gV: let_f3_m1.goles2, 
-            minutosL: let_f3_m1.minutosEq1, minutosV: let_f3_m1.minutosEq2,
-            botL: rivalGrupo1, botV: rivalGrupo2, 
-            gBL: let_f3_m2.goles1, gBV: let_f3_m2.goles2,
-            minutosBL: let_f3_m2.minutosEq1, minutosBV: let_f3_m2.minutosEq2
-        });
+        bitacoraGrupo.push({ fecha: 3, local: seleccionElegida, visitante: rivalGrupo3, gL: let_f3_m1.goles1, gV: let_f3_m1.goles2, minutosL: let_f3_m1.minutosEq1, minutosV: let_f3_m1.minutosEq2, botL: rivalGrupo1, botV: rivalGrupo2, gBL: let_f3_m2.goles1, gBV: let_f3_m2.goles2, minutosBL: let_f3_m2.minutosEq1, minutosBV: let_f3_m2.minutosEq2 });
 
-        let tablaPuntos = {};
-        integrantesGrupo.forEach(p => { tablaPuntos[p] = { pais: p, pts: 0, gf: 0, gc: 0 }; });
+        let tablaPuntos = {}; integrantesGrupo.forEach(p => { tablaPuntos[p] = { pais: p, pts: 0, gf: 0, gc: 0 }; });
 
         function acumular(loc, vis, gl, gv) {
-            tablaPuntos[loc].gf += gl; tablaPuntos[loc].gc += gv;
-            tablaPuntos[vis].gf += gv; tablaPuntos[vis].gc += gl;
-            if (gl > gv) tablaPuntos[loc].pts += 3;
-            else if (gl < gv) tablaPuntos[vis].pts += 3;
-            else { tablaPuntos[loc].pts += 1; tablaPuntos[vis].pts += 1; }
+            tablaPuntos[loc].gf += gl; tablaPuntos[loc].gc += gv; tablaPuntos[vis].gf += gv; tablaPuntos[vis].gc += gl;
+            if (gl > gv) tablaPuntos[loc].pts += 3; else if (gl < gv) tablaPuntos[vis].pts += 3; else { tablaPuntos[loc].pts += 1; tablaPuntos[vis].pts += 1; }
         }
+        bitacoraGrupo.forEach(f => { acumular(f.local, f.visitante, f.gL, f.gV); acumular(f.botL, f.botV, f.gBL, f.gBV); });
 
-        bitacoraGrupo.forEach(f => {
-            acumular(f.local, f.visitante, f.gL, f.gV);
-            acumular(f.botL, f.botV, f.gBL, f.gBV);
-        });
-
-        let tablaOrdenada = Object.values(tablaPuntos).sort((a,b) => {
-            if (b.pts !== a.pts) return b.pts - a.pts;
-            return (b.gf - b.gc) - (a.gf - a.gc);
-        });
-
+        let tablaOrdenada = Object.values(tablaPuntos).sort((a,b) => (b.pts !== a.pts) ? (b.pts - a.pts) : ((b.gf - b.gc) - (a.gf - a.gc)));
         let posicionUsuario = tablaOrdenada.findIndex(r => r.pais === seleccionElegida) + 1;
         let clasificaALlaves = posicionUsuario <= 2; 
 
-        let bitacoraPlayoffs = [];
-        let campeon = false;
-        let faseAlcanzada = "Fase de Grupos";
+        let bitacoraPlayoffs = []; let campeon = false; let faseAlcanzada = "Fase de Grupos";
 
         if (clasificaALlaves) {
-            faseAlcanzada = "Octavos de Final";
             const llaves = [
-                { ronda: "Octavos de Final", rival: botsDisponibles[3], penalizacion: 0 },
-                { ronda: "Cuartos de Final", rival: botsDisponibles[4], penalizacion: 0.08 },
-                { ronda: "Semifinal", rival: botsDisponibles[5], penalizacion: 0.16 },
-                { ronda: "Gran Final del Mundo", rival: botsDisponibles[6], penalizacion: 0.24 }
+                { ronda: "Octavos de Final", rival: botsDisponibles[3], pen: 0 }, { ronda: "Cuartos de Final", rival: botsDisponibles[4], pen: 0.08 },
+                { ronda: "Semifinal", rival: botsDisponibles[5], pen: 0.16 }, { ronda: "Gran Final del Mundo", rival: botsDisponibles[6], pen: 0.24 }
             ];
-
             campeon = true;
             for (let llave of llaves) {
                 faseAlcanzada = llave.ronda;
-                const chanceRondaReal = Math.max(0.10, chanceVictoria - llave.penalizacion);
-                
-                let gTu = Math.floor(Math.random() * 3);
-                let gRiv = Math.floor(Math.random() * 3);
-                const ganoEsteCruce = Math.random() <= chanceRondaReal;
-                
-                if (ganoEsteCruce) {
+                let gTu = Math.floor(Math.random() * 3); let gRiv = Math.floor(Math.random() * 3);
+                if (Math.random() <= Math.max(0.10, chanceVictoria - llave.pen)) {
                     if (gTu <= gRiv) gTu = gRiv + 1;
-                    bitacoraPlayoffs.push({ 
-                        ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste bombazo ✅",
-                        gL: gTu, gV: gRiv, ganoUsuarioReal: true,
-                        minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv)
-                    });
+                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅", gL: gTu, gV: gRiv, ganoUsuarioReal: true, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                 } else {
-                    campeon = false;
-                    if (gRiv <= gTu) gRiv = gTu + 1;
-                    bitacoraPlayoffs.push({ 
-                        ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌",
-                        gL: gTu, gV: gRiv, ganoUsuarioReal: false,
-                        minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv)
-                    });
+                    campeon = false; if (gRiv <= gTu) gRiv = gTu + 1;
+                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                     break;
                 }
             }
         }
 
-        // 🔥 APLICACIÓN ATÓMICA DE PREMIOS DIRECTAMENTE EN EL COMMIT DEL BACKEND
         const ahora = new Date();
         if (campeon) {
-            await client.query(
-                "UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2",
-                [ahora, usuario_id]
-            );
+            await client.query("UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultimo_mundial_timestamp = $1 WHERE id = $2", [ahora, usuario_id]);
         } else {
-            await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
+            await client.query("UPDATE usuarios SET ultimo_mundial_timestamp = $1 WHERE id = $2", [ahora, usuario_id]);
         }
 
         const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
-
         await client.query('COMMIT');
 
-        return res.json({
-            ok: true,
-            progreso: {
-                ganoClasificacion: true,
-                integrantesGrupo, 
-                bitacoraGrupo,     
-                clasifico: clasificaALlaves,
-                posicionFinalGrupo: posicionUsuario,
-                campeon: campeon,
-                faseAlcanzada: faseAlcanzada,
-                bitacoraPlayoffs
-            },
-            datosActualizados: userFinal.rows[0]
-        });
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("❌ Error grave en /mundial/jugar:", err.message);
-        return res.status(500).json({ ok: false, error: "Fallo estructural en la base de datos de la Arena." });
-    } finally {
-        client.release(); // Evita cuellos de botella y errores 503
-    }
+        return res.json({ ok: true, progreso: { integrantesGrupo, bitacoraGrupo, clasifico: clasificaALlaves, posicionFinalGrupo: posicionUsuario, campeon, faseAlcanzada, bitacoraPlayoffs }, datosActualizados: userFinal.rows[0] });
+    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: "Fallo estructural en la Arena." }); } finally { client.release(); }
 });
+
 /* ========================================================================
    🃏 BOT COMERCIANTE MUTADO: ESCALERA DE RAREZAS + EVENTOS ULTRA RAROS
    ======================================================================== */
@@ -2168,402 +928,167 @@ app.post('/api/album/comerciar-bot', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const { jugadorIdsASacar } = req.body; 
 
-    if (!jugadorIdsASacar || jugadorIdsASacar.length !== 3) {
-        return res.status(400).json({ ok: false, mensaje: "El Bot exige exactamente 3 cartas para el trato." });
-    }
+    if (!jugadorIdsASacar || jugadorIdsASacar.length !== 3) return res.status(400).json({ ok: false, mensaje: "El Bot exige exactamente 3 cartas." });
 
     try {
-        const conteoSolicitado = {};
-        jugadorIdsASacar.forEach(id => {
-            conteoSolicitado[id] = (conteoSolicitado[id] || 0) + 1;
-        });
+        const conteoSolicitado = {}; jugadorIdsASacar.forEach(id => { conteoSolicitado[id] = (conteoSolicitado[id] || 0) + 1; });
+        const cartasInfo = await pool.query(`SELECT up.jugador_id, up.cantidad, j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2)`, [usuario_id, jugadorIdsASacar]);
 
-        const cartasInfo = await pool.query(
-            `SELECT up.jugador_id, up.cantidad, j.rareza 
-             FROM usuario_progreso up 
-             JOIN jugadores j ON up.jugador_id = j.id 
-             WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2)`,
-            [usuario_id, jugadorIdsASacar]
-        );
-
-        if (cartasInfo.rows.length === 0) {
-            return res.json({ ok: false, mensaje: "❌ No se encontraron los cromos seleccionados en tu inventario." });
-        }
+        if (cartasInfo.rows.length === 0) return res.json({ ok: false, mensaje: "❌ No se encontraron los cromos en tu inventario." });
 
         for (let row of cartasInfo.rows) {
-            const pedidas = conteoSolicitado[row.jugador_id];
-            if (row.cantidad - pedidas < 1) {
-                return res.json({ ok: false, mensaje: "❌ No tenés repetidas suficientes de alguno de los jugadores elegidos." });
-            }
+            if (row.cantidad - conteoSolicitado[row.jugador_id] < 1) return res.json({ ok: false, mensaje: "❌ No tenés repetidas suficientes." });
         }
 
         const rarezaBase = cartasInfo.rows[0].rareza.toLowerCase();
-        const todasIgualRareza = cartasInfo.rows.every(row => row.rareza.toLowerCase() === rarezaBase);
+        if (!cartasInfo.rows.every(row => row.rareza.toLowerCase() === rarezaBase)) return res.json({ ok: false, mensaje: "❌ Deben ser de la misma rareza." });
 
-        if (!todasIgualRareza) {
-            return res.json({ ok: false, mensaje: "❌ El Bot exige que las 3 cartas sacrificadas sean de la misma rareza para calcular el escalón." });
-        }
+        let rarezaRecompensa = (rarezaBase === "comun") ? "rara" : ((rarezaBase === "rara") ? "epica" : "legendaria");
 
-        let rarezaRecompensa = "rara"; 
-        if (rarezaBase === "rara") rarezaRecompensa = "epica";
-        else if (rarezaBase === "epica") rarezaRecompensa = "legendaria";
-        else if (rarezaBase === "legendaria") rarezaRecompensa = "legendaria"; 
+        for (let jId of jugadorIdsASacar) { await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jId]); }
 
-        for (let jId of jugadorIdsASacar) {
-            await pool.query(
-                "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-                [usuario_id, jId]
-            );
-        }
-
-        const lootBot = await pool.query(
-            "SELECT id, nombre, rareza FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1",
-            [rarezaRecompensa]
-        );
+        const lootBot = await pool.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaRecompensa]);
         const cartaPremio = lootBot.rows[0];
 
-        // Corregido con EXCLUDED
-        await pool.query(
-            `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) 
-             ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
-            [usuario_id, cartaPremio.id]
-        );
+        await pool.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [usuario_id, cartaPremio.id]);
 
         let eventoActivado = null;
-        const esElite = (rarezaBase === "epica" || rarezaBase === "legendaria");
-
-        if (esElite && Math.random() <= 0.08) { 
-            const dadosEvento = Math.random();
-
-            if (dadosEvento < 0.50) {
+        if ((rarezaBase === "epica" || rarezaBase === "legendaria") && Math.random() <= 0.08) {
+            if (Math.random() < 0.50) {
                 await pool.query("UPDATE usuarios SET tiros_hoy = 10 WHERE id = $1", [usuario_id]);
-                eventoActivado = "⚡ ¡EL BOT SE COPÓ! Te recargó los tiros: Volvés a tener 10 penales disponibles al toque.";
+                eventoActivado = "⚡ ¡EL BOT SE COPÓ! Tenés 10 penales disponibles al toque.";
             } else {
-                await pool.query(
-                    "UPDATE usuarios SET ultima_timba_mundial = NOW() - INTERVAL '4 hours' WHERE id = $1", 
-                    [usuario_id]
-                );
-                eventoActivado = "⏳ ¡CONTRABANDO TÁCTICO! El Bot alteró los papeles del vestuario. ¡Podés jugar el Mundial de vuelta YA!";
+                await pool.query("UPDATE usuarios SET ultimo_mundial_timestamp = NOW() - INTERVAL '4 hours' WHERE id = $1", [usuario_id]);
+                eventoActivado = "⏳ ¡CONTRABANDO TÁCTICO! El Bot alteró los papeles del vestuario. ¡Mundial disponible YA!";
             }
         }
 
-        return res.json({
-            ok: true,
-            mensaje: `🤝 ¡Trato hecho! Cambiaste 3 cartas de tipo [${rarezaBase.toUpperCase()}] por un escalón superior.`,
-            cartaGanada: {
-                id: cartaPremio.id,
-                nombre: cartaPremio.nombre,
-                rareza: cartaPremio.rareza.toUpperCase()
-            },
-            eventoEspecial: eventoActivado 
-        });
-
-    } catch (err) {
-        console.error("❌ Error en Mercado Bot Mutado:", err);
-        return res.status(500).json({ ok: false, error: err.message });
-    }
+        return res.json({ ok: true, mensaje: `🤝 ¡Trato hecho!`, cartaGanada: { id: cartaPremio.id, nombre: cartaPremio.nombre, rareza: cartaPremio.rareza.toUpperCase() }, eventoEspecial: eventoActivado });
+    } catch (err) { return res.status(500).json({ ok: false, error: err.message }); }
 });
 
 /* ========================================================================
    💸 ENGINE MERCADO DE PASES INTER-JUGADORES (P2P)
    ======================================================================== */
 app.post('/api/mercado/publicar', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const { jugador_id, precio } = req.body;
-
+    const usuario_id = req.usuarioLogueado.id; const { jugador_id, precio } = req.body;
     try {
-        const checkStock = await pool.query(
-            "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2",
-            [usuario_id, jugador_id]
-        );
+        const checkStock = await pool.query("SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugador_id]);
+        if (checkStock.rows.length === 0 || checkStock.rows[0].cantidad <= 1) return res.json({ ok: false, mensaje: "❌ Sin stock repetido." });
 
-        if (checkStock.rows.length === 0 || checkStock.rows[0].cantidad <= 1) {
-            return res.json({ ok: false, mensaje: "❌ No tenés copias repetidas suficientes de esta carta para vender." });
-        }
-
-        await pool.query(
-            "UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2",
-            [usuario_id, jugador_id]
-        );
-
-        await pool.query(
-            "INSERT INTO mercado_pases (vendedor_id, jugador_id, precio_oro) VALUES ($1, $2, $3)",
-            [usuario_id, jugador_id, precio]
-        );
-
+        await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugador_id]);
+        await pool.query("INSERT INTO mercado_pases (vendedor_id, jugador_id, precio_oro) VALUES ($1, $2, $3)", [usuario_id, jugador_id, precio]);
         return res.json({ ok: true, mensaje: "Carta publicada con éxito." });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ ok: false, error: err.message });
-    }
+    } catch (err) { return res.status(500).json({ ok: false, error: err.message }); }
 });
 
 app.get('/api/mercado/ofertas', async (req, res) => {
     try {
-        const ofertas = await pool.query(
-            `SELECT m.id, m.precio_oro, m.vendedor_id, j.nombre, j.rareza, j.bandera, u.username AS nombre_vendedor,
-                    EXTRACT(EPOCH FROM (m.fecha_publicacion + INTERVAL '1 day' - NOW())) AS segundos_restantes
-             FROM mercado_pases m
-             JOIN jugadores j ON m.jugador_id = j.id
-             JOIN usuarios u ON m.vendedor_id = u.id
-             WHERE m.fecha_publicacion >= NOW() - INTERVAL '1 day'
-             ORDER BY m.fecha_publicacion DESC`
-        );
+        const ofertas = await pool.query(`SELECT m.id, m.precio_oro, m.vendedor_id, j.nombre, j.rareza, j.bandera, u.username AS nombre_vendedor, EXTRACT(EPOCH FROM (m.fecha_publicacion + INTERVAL '1 day' - NOW())) AS segundos_restantes FROM mercado_pases m JOIN jugadores j ON m.jugador_id = j.id JOIN usuarios u ON m.vendedor_id = u.id WHERE m.fecha_publicacion >= NOW() - INTERVAL '1 day' ORDER BY m.fecha_publicacion DESC`);
         return res.json({ ok: true, ofertas: ofertas.rows });
-    } catch (err) {
-        console.error("❌ Error en GET ofertas mercado:", err);
-        return res.json({ ok: false, error: err.message, mensaje: "Error al sincronizar con Neon." });
-    }
+    } catch (err) { return res.json({ ok: false, error: err.message }); }
 });
 
-// Limpiador automático del Mercado P2P
 setInterval(async () => {
-    console.log("🧹 Revisando vitrinas del mercado para limpiar pases vencidos...");
     try {
-        const vencidas = await pool.query(
-            "SELECT id, vendedor_id, jugador_id FROM mercado_pases WHERE fecha_publicacion < NOW() - INTERVAL '1 day'"
-        );
-
+        const vencidas = await pool.query("SELECT id, vendedor_id, jugador_id FROM mercado_pases WHERE fecha_publicacion < NOW() - INTERVAL '1 day'");
         if (vencidas.rows.length > 0) {
-            console.log(`📦 Encontradas ${vencidas.rows.length} ofertas vencidas. Devolviendo cromos...`);
             for (let oferta of vencidas.rows) {
-                // Corregido con EXCLUDED
-                await pool.query(
-                    `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
-                     ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
-                    [oferta.vendedor_id, oferta.jugador_id]
-                );
+                await pool.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [oferta.vendedor_id, oferta.jugador_id]);
                 await pool.query("DELETE FROM mercado_pases WHERE id = $1", [oferta.id]);
             }
-            console.log("✅ Devolución y limpieza completada.");
         }
-    } catch (err) {
-        console.error("❌ Error crítico en el limpiador del mercado:", err.message);
-    }
+    } catch (err) { console.error("❌ Error en limpiador:", err.message); }
 }, 15 * 60 * 1000); 
 
 app.post('/api/mercado/comprar', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const { oferta_id } = req.body; 
-
+    const usuario_id = req.usuarioLogueado.id; const { oferta_id } = req.body; 
     try {
-        // 1. Buscamos la oferta en tu tabla real mercado_pases
-        const buscarOferta = await pool.query(
-            "SELECT vendedor_id, jugador_id, precio_oro FROM mercado_pases WHERE id = $1",
-            [oferta_id]
-        );
-
-        if (buscarOferta.rows.length === 0) {
-            return res.json({ ok: false, mensaje: "❌ La oferta ya no está disponible en el mercado." });
-        }
+        const buscarOferta = await pool.query("SELECT vendedor_id, jugador_id, precio_oro FROM mercado_pases WHERE id = $1", [oferta_id]);
+        if (buscarOferta.rows.length === 0) return res.json({ ok: false, mensaje: "❌ Oferta no disponible." });
 
         const { vendedor_id, jugador_id, precio_oro } = buscarOferta.rows[0];
-
-        if (parseInt(vendedor_id) === usuario_id) {
-            return res.json({ ok: false, mensaje: "❌ No podés comprar tu propia publicación." });
-        }
+        if (parseInt(vendedor_id) === usuario_id) return res.json({ ok: false, mensaje: "❌ No podés comprar tu post." });
 
         const checkOro = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-        if (checkOro.rows.length === 0 || checkOro.rows[0].monedas < precio_oro) {
-            return res.json({ ok: false, mensaje: "❌ No tenés suficiente Oro en tu cuenta para este fichaje." });
-        }
+        if (checkOro.rows.length === 0 || checkOro.rows[0].monedas < precio_oro) return res.json({ ok: false, mensaje: "❌ Oro insuficiente." });
 
-        // Intercambio de Oro
         await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [precio_oro, usuario_id]);
         await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [precio_oro, vendedor_id]);
-
-        // Sincronización del Álbum (usuario_progreso)
-        await pool.query(
-            `INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1)
-             ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`,
-            [usuario_id, jugador_id]
-        );
-
-        // Eliminamos la publicación de la vitrina
+        await pool.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [usuario_id, jugador_id]);
         await pool.query("DELETE FROM mercado_pases WHERE id = $1", [oferta_id]);
 
-        // Obtenemos datos esenciales para la respuesta y el historial
         const infoJugador = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugador_id]);
         const checkOroNuevo = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-
-        const nombreJugador = infoJugador.rows[0]?.nombre || "Desconocido";
-        const rarezaJugador = infoJugador.rows[0]?.rareza || "comun";
-
-        // 🟢 INYECCIÓN DEL FEED: Buscamos los nombres de usuario para registrar la transferencia
-        const datosUsuarios = await pool.query(
-            "SELECT id, username FROM usuarios WHERE id IN ($1, $2)",
-            [vendedor_id, usuario_id]
-        );
+        const datosUsuarios = await pool.query("SELECT id, username FROM usuarios WHERE id IN ($1, $2)", [vendedor_id, usuario_id]);
         
-        let vendedorUsername = "Vendedor";
-        let compradorUsername = "Comprador";
+        let vend = "Vendedor"; let comp = "Comprador";
+        datosUsuarios.rows.forEach(u => { if (u.id === usuario_id) comp = u.username; if (u.id === parseInt(vendedor_id)) vend = u.username; });
 
-        datosUsuarios.rows.forEach(u => {
-            if (u.id === usuario_id) compradorUsername = u.username;
-            if (u.id === parseInt(vendedor_id)) vendedorUsername = u.username;
-        });
+        await pool.query(`INSERT INTO historial_transferencias (vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro) VALUES ($1, $2, $3, $4, $5)`, [vend, comp, infoJugador.rows[0]?.nombre, infoJugador.rows[0]?.rareza, precio_oro]);
 
-        // Insertamos la fila en la tabla de registros comerciales globales
-        await pool.query(
-            `INSERT INTO historial_transferencias (vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [vendedorUsername, compradorUsername, nombreJugador, rarezaJugador, precio_oro]
-        );
-
-        return res.json({ 
-            ok: true, 
-            jugador: nombreJugador,
-            nuevoOro: checkOroNuevo.rows[0].monedas 
-        });
-    } catch (err) {
-        console.error(err);
-        return res.status(500).json({ ok: false, error: err.message });
-    }
+        return res.json({ ok: true, jugador: infoJugador.rows[0]?.nombre, nuevoOro: checkOroNuevo.rows[0].monedas });
+    } catch (err) { return res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// ========================================================================
-// 📈 FEED EN VIVO: ÚLTIMAS 5 TRANSFERENCIAS DEL MERCADO P2P
-// ========================================================================
 app.get('/api/mercado/historial', async (req, res) => {
     try {
-        const query = `
-            SELECT vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro, fecha_registro,
-                   EXTRACT(EPOCH FROM (NOW() - fecha_registro))::INT as segundos_atras
-            FROM historial_transferencias
-            ORDER BY fecha_registro DESC
-            LIMIT 5;
-        `;
-        const result = await pool.query(query);
+        const result = await pool.query(`SELECT vendedor_username, comprador_username, jugador_nombre, rareza, precio_oro, fecha_registro, EXTRACT(EPOCH FROM (NOW() - fecha_registro))::INT as segundos_atras FROM historial_transferencias ORDER BY fecha_registro DESC LIMIT 5`);
         res.json({ ok: true, historial: result.rows });
-    } catch (err) {
-        console.error("❌ Error al leer historial de transferencias:", err.message);
-        res.status(500).json({ ok: false, error: "Error al recuperar el feed del mercado." });
-    }
+    } catch (err) { res.status(500).json({ ok: false, error: "Error en el feed." }); }
 });
 
 /* ========================================================================
-   🎰 ENGINE QUINIELA COMBINADA (ROTATIVA Y ATÓMICA)
+   🎰 ENGINE QUINIELA COMBINADA
    ======================================================================== */
 const BANCO_PARTIDOS_QUINIELA = [
-    { local: "BOCA", visitante: "RIVER", emoji: "🔥" },
-    { local: "REAL MADRID", visitante: "BARCELONA", emoji: "👑" },
-    { local: "MANCHESTER CITY", visitante: "ARSENAL", emoji: "🦈" },
-    { local: "RACING", visitante: "INDEPENDIENTE", emoji: "🎓" },
-    { local: "MILAN", visitante: "INTER", emoji: "⚔️" },
-    { local: "FLAMENGO", visitante: "PALMEIRAS", emoji: "🇧🇷" },
-    { local: "LIVERPOOL", visitante: "MAN. UNITED", emoji: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
-    { local: "HURACÁN", visitante: "SAN LORENZO", emoji: "🎈" },
-    { local: "BAYERN MUNICH", visitante: "DORTMUND", emoji: "🇩🇪" },
-    { local: "JUVENTUS", visitante: "ROMA", emoji: "🇮🇹" }
+    { local: "BOCA", visitante: "RIVER", emoji: "🔥" }, { local: "REAL MADRID", visitante: "BARCELONA", emoji: "👑" },
+    { local: "MANCHESTER CITY", visitante: "ARSENAL", emoji: "🦈" }, { local: "RACING", visitante: "INDEPENDIENTE", emoji: "🎓" },
+    { local: "MILAN", visitante: "INTER", emoji: "⚔️" }, { local: "FLAMENGO", visitante: "PALMEIRAS", emoji: "🇧🇷" },
+    { local: "LIVERPOOL", visitante: "MAN. UNITED", emoji: "🏴" }, { local: "HURACÁN", visitante: "SAN LORENZO", emoji: "🎈" },
+    { local: "BAYERN MUNICH", visitante: "DORTMUND", emoji: "🇩🇪" }, { local: "JUVENTUS", visitante: "ROMA", emoji: "🇮🇹" }
 ];
-
 let partidosActivosQuiniela = [];
-
-function rotarFixtureQuiniela() {
-    const copia = [...BANCO_PARTIDOS_QUINIELA];
-    const mezclados = copia.sort(() => 0.5 - Math.random());
-    partidosActivosQuiniela = mezclados.slice(0, 3);
-}
-
-// Genera la terna inicial al prender el servidor
+function rotarFixtureQuiniela() { partidosActivosQuiniela = [...BANCO_PARTIDOS_QUINIELA].sort(() => 0.5 - Math.random()).slice(0, 3); }
 rotarFixtureQuiniela();
 
-app.get('/api/timba/quiniela/partidos', (req, res) => {
-    res.json({ ok: true, partidos: partidosActivosQuiniela });
-});
+app.get('/api/timba/quiniela/partidos', (req, res) => { res.json({ ok: true, partidos: partidosActivosQuiniela }); });
 
 app.post('/api/timba/quiniela', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    let { monto, elecciones } = req.body;
-
+    const usuario_id = req.usuarioLogueado.id; let { monto, elecciones } = req.body;
     try {
         monto = parseInt(monto);
-
-        if (!monto || monto < 50) {
-            return res.json({ ok: false, mensaje: "⚠️ El monto mínimo para la boleta es de 50 de Oro." });
-        }
+        if (!monto || monto < 50) return res.json({ ok: false, mensaje: "⚠️ Mínimo 50 de Oro." });
 
         const checkUser = await pool.query("SELECT monedas, ultimo_giro_timestamp, timbas_hoy FROM usuarios WHERE id = $1", [usuario_id]);
-        if (checkUser.rows.length === 0) {
-            return res.json({ ok: false, mensaje: "❌ Usuario no encontrado." });
-        }
+        if (checkUser.rows.length === 0) return res.json({ ok: false, mensaje: "❌ Usuario no encontrado." });
 
         const usuario = checkUser.rows[0];
-
-        if (usuario.monedas < monto) {
-            return res.json({ ok: false, mensaje: "❌ No tenés suficiente Oro in tu cuenta para esta jugada." });
-        }
+        if (usuario.monedas < monto) return res.json({ ok: false, mensaje: "❌ Oro insuficiente." });
 
         let { timbasActuales } = calcularTimbasActuales(usuario);
+        if (timbasActuales <= 0) return res.json({ ok: false, mensaje: "❌ ¡Sin energía en la banca! ⏱️" });
 
-        if (timbasActuales <= 0) {
-            return res.json({ 
-                ok: false, 
-                mensaje: "❌ ¡Te quedaste sin energía para apostar en la quiniela! Esperá a que recargue el cronómetro. ⏱️" 
-            });
-        }
-
-        const nuevasTimbasGuardadas = timbasActuales - 1;
-        const ahora = new Date();
-
-        // Guardamos una copia exacta de los partidos con los que el usuario jugó esta boleta
-        // antes de tirarlos a la basura y rotar la cartelera
         const partidosDeEstaBoleta = [...partidosActivosQuiniela];
+        await pool.query(`UPDATE usuarios SET monedas = monedas - $1, ultimo_giro_timestamp = $2, timbas_hoy = $3 WHERE id = $4`, [monto, new Date(), timbasActuales - 1, usuario_id]);
 
-        await pool.query(
-            `UPDATE usuarios SET monedas = monedas - $1, ultimo_giro_timestamp = $2, timbas_hoy = $3 WHERE id = $4`,
-            [monto, ahora, nuevasTimbasGuardadas, usuario_id]
-        );
-
-        const opciones = ['L', 'E', 'V'];
-        const reales = {
-            p1: opciones[Math.floor(Math.random() * 3)],
-            p2: opciones[Math.floor(Math.random() * 3)],
-            p3: opciones[Math.floor(Math.random() * 3)]
-        };
-
+        const op = ['L', 'E', 'V']; const reales = { p1: op[Math.floor(Math.random() * 3)], p2: op[Math.floor(Math.random() * 3)], p3: op[Math.floor(Math.random() * 3)] };
         const boletaGanadora = (elecciones.p1 === reales.p1 && elecciones.p2 === reales.p2 && elecciones.p3 === reales.p3);
-        let premio = 0;
-        let mensaje = "";
+        let premio = boletaGanadora ? monto * 10 : 0;
 
-        if (boletaGanadora) {
-            premio = monto * 10;
-            await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [premio, usuario_id]);
-            mensaje = `🔥 ¡QUINIELA DE ORO PERFECTA! Acertaste los 3 partidos y ganaste 🪙${premio}.`;
-        } else {
-            mensaje = "❌ Boleta perdedora. Fallaste en el pronóstico combinado.";
-        }
+        if (boletaGanadora) await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [premio, usuario_id]);
 
-        await pool.query(
-            "INSERT INTO quiniela_apuestas (usuario_id, monto_apostado, predicciones, ganada, premio_entregado) VALUES ($1, $2, $3, $4, $5)",
-            [usuario_id, monto, JSON.stringify(elecciones), boletaGanadora, premio]
-        );
-
+        await pool.query("INSERT INTO quiniela_apuestas (usuario_id, monto_apostado, predicciones, ganada, premio_entregado) VALUES ($1, $2, $3, $4, $5)", [usuario_id, monto, JSON.stringify(elecciones), boletaGanadora, premio]);
         const checkOroFinal = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuario_id]);
-
-        // 🔥 LA SOLUCIÓN: Forzamos la rotación inmediata acá en el servidor.
-        // La próxima consulta que haga el frontend va a encontrar una terna nuevita de la tartera.
         rotarFixtureQuiniela();
 
-        return res.json({
-            ok: true,
-            ganó: boletaGanadora,
-            mensaje: mensaje,
-            resultadosReales: reales,
-            partidosSimulados: partidosDeEstaBoleta, // Le mandamos los que corresponden a la jugada real
-            nuevoOro: checkOroFinal.rows[0].monedas
-        });
-
-    } catch (err) {
-        console.error("❌ Error en la quiniela:", err);
-        return res.status(500).json({ ok: false, error: err.message });
-    }
+        return res.json({ ok: true, ganó: boletaGanadora, mensaje: boletaGanadora ? `🔥 ¡QUINIELA GANADA! 🪙${premio}` : "❌ Boleta fallida.", resultadosReales: reales, partidosSimulados: partidosDeEstaBoleta, nuevoOro: checkOroFinal.rows[0].monedas });
+    } catch (err) { return res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// ========================================================================
-// 🏅 ENDPOINTS SEGUROS PARA EL SISTEMA DE MISIONES DIARIAS (CONEXIÓN NEON)
-// ========================================================================
-// 🎯 CATÁLOGO OFICIAL DE MISIONES ROTATIVAS DE LA ARENA
+/* ========================================================================
+   🎯 SISTEMA DE MISIONES DIARIAS
+   ======================================================================== */
 const POOL_MISIONES_DISPONIBLES = [
     { descripcion: "Abre 3 sobres de cualquier tipo en la tienda", tipo: "sobres", meta: 3, recompensa: 150 },
     { descripcion: "Abre 7 sobres para expandir tu plantel", tipo: "sobres", meta: 7, recompensa: 300 },
@@ -2576,861 +1101,278 @@ const POOL_MISIONES_DISPONIBLES = [
     { descripcion: "Hacé 2 intercambios (trades) de cromos repetidos", tipo: "trades", meta: 2, recompensa: 150 }
 ];
 
-
 app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
-    const usuarioId = req.usuarioLogueado.id;
-    const client = await pool.connect();
-
+    const usuarioId = req.usuarioLogueado.id; const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const ahora = new Date(); const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
+        const [mes, dia, anio] = ahora.toLocaleDateString('en-US', opcionesFecha).split('/'); const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // 1. Control del tiempo real (GMT-3 Buenos Aires)
-        const ahora = new Date();
-        const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
-        const [mes, dia, anio] = ahora.toLocaleDateString('en-US', opcionesFecha).split('/');
-        const fechaHoyString = `${anio}-${mes}-${dia}`;
+        const userCheck = await client.query("SELECT TO_CHAR(ultimo_reset_misiones, 'YYYY-MM-DD') as ultimo_reset FROM usuarios WHERE id = $1", [usuarioId]);
+        if (userCheck.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ ok: false, error: "Usuario no encontrado." }); }
 
-        // 2. Chequeamos al usuario
-        const userCheck = await client.query(
-            "SELECT TO_CHAR(ultimo_reset_misiones, 'YYYY-MM-DD') as ultimo_reset FROM usuarios WHERE id = $1",
-            [usuarioId]
-        );
-
-        if (userCheck.rows.length === 0) {
-            await client.query('ROLLBACK');
-            return res.status(404).json({ ok: false, error: "Usuario no encontrado." });
-        }
-
-        const fechaUltimoResetString = userCheck.rows[0].ultimo_reset;
-
-        // 3. Verificamos si físicamente tiene filas guardadas en la tabla de misiones
-        const chequeoFilasFisicas = await client.query(
-            "SELECT COUNT(*) FROM usuario_misiones WHERE usuario_id = $1",
-            [usuarioId]
-        );
-        const cantidadMisionesFisicas = parseInt(chequeoFilasFisicas.rows[0].count);
-
-        // ♻️ GATILLO INTELIGENTE: Si cambió el día O si por alguna falla la tabla está vacía (0 filas)... ¡Forzamos inyección!
-        if (!fechaUltimoResetString || fechaUltimoResetString !== fechaHoyString || cantidadMisionesFisicas === 0) {
-            
-            // Borramos remanentes por las dudas
+        const chequeoFilasFisicas = await client.query("SELECT COUNT(*) FROM usuario_misiones WHERE usuario_id = $1", [usuarioId]);
+        if (!userCheck.rows[0].ultimo_reset || userCheck.rows[0].ultimo_reset !== fechaHoyString || parseInt(chequeoFilasFisicas.rows[0].count) === 0) {
             await client.query("DELETE FROM usuario_misiones WHERE usuario_id = $1", [usuarioId]);
+            const misionesSeleccionadas = [...POOL_MISIONES_DISPONIBLES].sort(() => 0.5 - Math.random()).slice(0, 3);
 
-            // Mezclamos catálogo
-            const misionesMezcladas = [...POOL_MISIONES_DISPONIBLES].sort(() => 0.5 - Math.random());
-            const misionesSeleccionadas = misionesMezcladas.slice(0, 3);
-
-            // Inyectamos las misiones usando la fechaHoyString unificada
             for (let index = 0; index < misionesSeleccionadas.length; index++) {
                 const m = misionesSeleccionadas[index];
-                await client.query(`
-                    INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada, actualizado_en)
-                    VALUES ($1, $2, $3, $4, 0, $5, $6, FALSE, $7)
-                `, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa, fechaHoyString]);
+                await client.query(`INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada, actualizado_en) VALUES ($1, $2, $3, $4, 0, $5, $6, FALSE, $7)`, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa, fechaHoyString]);
             }
-
-            // Actualizamos la marca del calendario en la tabla usuarios
-            await client.query(
-                "UPDATE usuarios SET ultimo_reset_misiones = $1 WHERE id = $2", 
-                [fechaHoyString, usuarioId]
-            );
-
-            console.log(`♻️ ¡Inyección exitosa! Se forzaron 3 misiones para el usuario ${usuarioId}`);
+            await client.query("UPDATE usuarios SET ultimo_reset_misiones = $1 WHERE id = $2", [fechaHoyString, usuarioId]);
         }
 
-        // 4. Traemos los datos frescos generados
-        const resultado = await client.query(
-            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
-            [usuarioId]
-        );
-
-        await client.query('COMMIT');
-        res.json({ ok: true, misiones: resultado.rows });
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("❌ Error al rotar cartelera de misiones:", err.message);
-        res.status(500).json({ error: "Error interno al procesar las misiones diarias." });
-    } finally {
-        client.release();
-    }
+        const resultado = await client.query("SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC", [usuarioId]);
+        await client.query('COMMIT'); res.json({ ok: true, misiones: resultado.rows });
+    } catch (err) { await client.query('ROLLBACK'); res.status(500).json({ error: "Error interno en misiones." }); } finally { client.release(); }
 });
 
-// 2. SINCRONIZAR PROGRESO DE MISIONES (REEMPLAZO DE TRACKEAR)
 app.post('/api/misiones/trackear', verificarToken, async (req, res) => {
     try {
-        const { tipo, cantidad } = req.body;
-        const usuarioId = req.usuarioLogueado.id; // 🔥 Sincronizado con tu middleware real
-
-        // 🛡️ Consulta Atómica en Postgres: Incrementa el progreso sin pasarse de la meta
-        const queryUpdate = `
-            UPDATE usuario_misiones 
-            SET progreso = LEAST(progreso + $1, meta), actualizado_en = NOW()
-            WHERE usuario_id = $2 AND tipo = $3 AND reclamada = FALSE;
-        `;
-        await pool.query(queryUpdate, [cantidad || 1, usuarioId, tipo]);
-
-        // Traemos la lista actualizada completa para que el front redibuje los porcentajes
-        const misionesActualizadas = await pool.query(
-            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
-            [usuarioId]
-        );
-
-        // Retornamos el formato exacto que espera recibir el front en el .json()
+        const { tipo, cantidad } = req.body; const usuarioId = req.usuarioLogueado.id;
+        await pool.query(`UPDATE usuario_misiones SET progreso = LEAST(progreso + $1, meta), actualizado_en = NOW() WHERE usuario_id = $2 AND tipo = $3 AND reclamada = FALSE;`, [cantidad || 1, usuarioId, tipo]);
+        const misionesActualizadas = await pool.query("SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC", [usuarioId]);
         res.json({ ok: true, misiones: misionesActualizadas.rows });
-
-    } catch (err) {
-        console.error("❌ Error en /misiones/trackear:", err.message);
-        res.status(500).json({ error: "Error al actualizar misiones en el servidor." });
-    }
+    } catch (err) { res.status(500).json({ error: "Error al actualizar misiones." }); }
 });
 
-// 3. RECLAMAR EL PREMIO DE FORMA BLINDADA (REEMPLAZO DE RECLAMAR)
 app.post('/api/misiones/reclamar', verificarToken, async (req, res) => {
     try {
-        const { misionId } = req.body; // Viene el ID de la fila desde el botón del cliente
-        const usuarioId = req.usuarioLogueado.id; // 🔥 Sincronizado con tu middleware real
+        const { misionId } = req.body; const usuarioId = req.usuarioLogueado.id;
+        const buscarMision = await pool.query("SELECT * FROM usuario_misiones WHERE usuario_id = $1 AND id = $2", [usuarioId, misionId]);
 
-        // 1. Buscamos la misión específica para verificar su estado en el Servidor
-        const buscarMision = await pool.query(
-            "SELECT * FROM usuario_misiones WHERE usuario_id = $1 AND id = $2",
-            [usuarioId, misionId]
-        );
-
-        if (buscarMision.rows.length === 0) {
-            return res.status(404).json({ error: "Misión no encontrada." });
-        }
-        
+        if (buscarMision.rows.length === 0) return res.status(404).json({ error: "Misión no encontrada." });
         const mision = buscarMision.rows[0];
 
-        if (mision.progreso < mision.meta) {
-            return res.status(400).json({ error: "Objetivo no cumplido todavía." });
-        }
-        if (mision.reclamada) {
-            return res.status(400).json({ error: "Esta recompensa ya fue cobrada." });
-        }
+        if (mision.progreso < mision.meta || mision.reclamada) return res.status(400).json({ error: "No apta para cobro." });
 
-        // 2. Transacción Blindada: Marcamos como reclamada
-        await pool.query(
-            "UPDATE usuario_misiones SET reclamada = TRUE WHERE id = $1",
-            [misionId]
-        );
+        await pool.query("UPDATE usuario_misiones SET reclamada = TRUE WHERE id = $1", [misionId]);
+        const resultadoUsuario = await pool.query(`UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2 RETURNING monedas;`, [mision.recompensa, usuarioId]);
+        const misionesFinales = await pool.query("SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC", [usuarioId]);
 
-        // 3. 🔥 REGLA DE ORO AUTOMÁTICA: Sumamos las monedas directo a la tabla usuarios
-        const queryOro = `
-            UPDATE usuarios 
-            SET monedas = monedas + $1 
-            WHERE id = $2 
-            RETURNING monedas;
-        `;
-        const resultadoUsuario = await pool.query(queryOro, [mision.recompensa, usuarioId]);
-        const nuevoOro = resultadoUsuario.rows[0].monedas;
-
-        // 4. Buscamos el estado final de todas las misiones para el cliente
-        const misionesFinales = await pool.query(
-            "SELECT id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada FROM usuario_misiones WHERE usuario_id = $1 ORDER BY mision_id ASC",
-            [usuarioId]
-        );
-
-        // Enviamos la respuesta limpia con el nuevo saldo de Oro calculado por Neon
-        res.json({ 
-            ok: true, 
-            monedas: nuevoOro, 
-            misiones: misionesFinales.rows 
-        });
-
-    } catch (err) {
-        console.error("❌ Error en /misiones/reclamar:", err.message);
-        res.status(500).json({ error: "Error al procesar el cobro en el servidor." });
-    }
+        res.json({ ok: true, monedas: resultadoUsuario.rows[0].monedas, misiones: misionesFinales.rows });
+    } catch (err) { res.status(500).json({ error: "Error en cobro de misiones." }); }
 });
 
-// ========================================================================
-// 🎁 RECOMPENSAS DIARIAS: RECLAMO ATÓMICO EN ZONA HORARIA ARGENTINA (FIXED)
-// ========================================================================
+/* ========================================================================
+   🎁 RECOMPENSAS DIARIAS (ZONA HORARIA BSAS)
+   ======================================================================== */
 app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
     try {
         const usuarioId = req.usuarioLogueado.id;
-        
-        const queryUser = "SELECT monedas, racha_login, ultimo_login_timestamp FROM usuarios WHERE id = $1";
-        const userRes = await pool.query(queryUser, [usuarioId]);
-        
+        const userRes = await pool.query("SELECT monedas, racha_login, ultimo_login_timestamp FROM usuarios WHERE id = $1", [usuarioId]);
         if (userRes.rows.length === 0) return res.status(404).json({ error: "Usuario no encontrado." });
         
-        const user = userRes.rows[0];
-        const ahora = new Date();
-        let rachaActual = user.racha_login || 0;
-        let ultimoLogin = user.ultimo_login_timestamp;
-        
+        const user = userRes.rows[0]; const ahora = new Date(); let rachaActual = user.racha_login || 0;
         const premiosOro = { 1: 100, 2: 200, 3: 350, 4: 500, 5: 750, 6: 1000, 7: 2500 };
-
-        // 🛡️ FORMATEADOR EN ESPAÑOL LATAM (Forzado a GMT-3 de Buenos Aires)
         const opcionesZona = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
         
-        // Formateamos "HOY" en base a la hora de Buenos Aires
-        const [mesH, diaH, anioH] = ahora.toLocaleDateString('en-US', opcionesZona).split('/');
-        const stringHoy = `${anioH}-${mesH}-${diaH}`; // Genera '2026-06-29' real local
+        const [mesH, diaH, anioH] = ahora.toLocaleDateString('en-US', opcionesZona).split('/'); const stringHoy = `${anioH}-${mesH}-${diaH}`;
 
-        if (ultimoLogin) {
-            const ultimaFecha = new Date(ultimoLogin);
-            
-            // Formateamos el "ÚLTIMO LOGIN" usando exactamente la misma regla GMT-3
-            const [mesU, diaU, anioU] = ultimaFecha.toLocaleDateString('en-US', opcionesZona).split('/');
+        if (user.ultimo_login_timestamp) {
+            const [mesU, diaU, anioU] = new Date(user.ultimo_login_timestamp).toLocaleDateString('en-US', opcionesZona).split('/');
             const stringUltimo = `${anioU}-${mesU}-${diaU}`;
             
-            // A. Si las strings locales coinciden, ya cobró hoy en Argentina
-            if (stringHoy === stringUltimo) {
-                return res.json({ 
-                    ok: false, 
-                    mensaje: `⏳ Ya reclamaste tu premio de hoy, crack. ¡Volvé mañana para avanzar al Día ${rachaActual === 7 ? 1 : rachaActual + 1}!`,
-                    racha: rachaActual
-                });
-            }
-
-            // B. Calculamos la distancia matemática real basada en las medianoches locales
-            const fechaBaseHoy = new Date(stringHoy + "T00:00:00");
-            const fechaBaseUltimo = new Date(stringUltimo + "T00:00:00");
-            const diferenciaDias = Math.round((fechaBaseHoy - fechaBaseUltimo) / (1000 * 60 * 60 * 24));
-
-            if (diferenciaDias === 1) {
-                rachaActual = rachaActual >= 7 ? 1 : rachaActual + 1;
-            } else {
-                rachaActual = 1; // Racha rota por colgarse más de 24 horas de calendario
-            }
-        } else {
-            rachaActual = 1; // Primer login de la cuenta
-        }
+            if (stringHoy === stringUltimo) return res.json({ ok: false, mensaje: `⏳ Ya reclamaste tu premio diario.`, racha: rachaActual });
+            rachaActual = (Math.round((new Date(stringHoy) - new Date(stringUltimo)) / 86400000) === 1) ? (rachaActual >= 7 ? 1 : rachaActual + 1) : 1;
+        } else { rachaActual = 1; }
 
         const premioOtorgado = premiosOro[rachaActual] || 100;
-        let regaloSobre = (rachaActual === 7);
+        const updateRes = await pool.query(`UPDATE usuarios SET monedas = monedas + $1, racha_login = $2, ultimo_login_timestamp = NOW() WHERE id = $3 RETURNING monedas;`, [premioOtorgado, rachaActual, usuarioId]);
 
-        // 2. Impacto atómico en Neon
-        const queryUpdate = `
-            UPDATE usuarios 
-            SET monedas = monedas + $1, racha_login = $2, ultimo_login_timestamp = NOW() 
-            WHERE id = $3 
-            RETURNING monedas;
-        `;
-        const updateRes = await pool.query(queryUpdate, [premioOtorgado, rachaActual, usuarioId]);
-        const nuevoOroTotal = updateRes.rows[0].monedas;
-
-        res.json({
-            ok: true,
-            mensaje: `🎁 ¡DÍA ${rachaActual} COMPLETO! Se te acreditaron 🪙${premioOtorgado} de Oro.`,
-            racha: rachaActual,
-            monedas: nuevoOroTotal,
-            regaloSobre: regaloSobre
-        });
-
-    } catch (err) {
-        console.error("❌ Error en /usuarios/reclamar-diario:", err.message);
-        res.status(500).json({ error: "Error interno al procesar recompensa diaria." });
-    }
+        res.json({ ok: true, mensaje: `🎁 ¡DÍA ${rachaActual} RECLAMADO! 🪙${premioOtorgado}`, racha: rachaActual, monedas: updateRes.rows[0].monedas, regaloSobre: (rachaActual === 7) });
+    } catch (err) { res.status(500).json({ error: "Error en premio diario." }); }
 });
 
-// ========================================================================
-// 🦾 BOT COMERCIANTE: POOL DE CONTRATOS EXPANDIDO Y VIGENTE (CORREGIDO)
-// ========================================================================
-const POOL_GLOBAL_SBC = [
-    // 🇦🇷 ARGENTINA
-    { id: 101, titulo: "⚔️ DESAFÍO ALBICELESTE", descripcion: "Entregá 3 jugadores COMUNES de ARGENTINA.", requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 1500 } },
-    { id: 107, titulo: "🔥 POTENCIA DE LIGA LOCAL", descripcion: "El Bot busca 2 cartas RARAS nacidas en ARGENTINA.", requisitos: { cantidad: 2, rareza: "rara", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 2500 } },
-    // 🇧🇷 BRASIL
-    { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ÉPICA de BRASIL.", requisitos: { cantidad: 2, rareza: "epica", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
-    { id: 108, titulo: "🌴 SAMBA DE INTERCAMBIO", descripcion: "Sacrificá 3 cartas COMUNES nacidas en BRASIL.", requisitos: { cantidad: 3, rareza: "comun", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 1200 } },
-    // 🇫🇷 FRANCIA
-    { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "rara", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
-    { id: 109, titulo: "🐓 GALOS DE ÉLITE", descripcion: "El Bot exige 2 estrellas de rareza ÉPICA de FRANCIA.", requisitos: { cantidad: 2, rareza: "epica", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 4200 } },
-    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 INGLATERRA
-    { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 2 cracks de rareza LEGENDARIA nacidos en INGLATERRA.", requisitos: { cantidad: 2, rareza: "legendaria", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 8000 } },
-    { id: 110, titulo: "🛡️ ACADEMIA DE LONDRES", descripcion: "Buscamos 3 cartas RARAS nacidas en INGLATERRA.", requisitos: { cantidad: 3, rareza: "rara", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 3800 } },
-    // 🇪🇸 ESPAÑA
-    { id: 105, titulo: "🇪🇸 FURIA ROJA DE INTERCAMBIO", descripcion: "El Bot exige 3 jugadores RAROS nacidos en ESPAÑA.", requisitos: { cantidad: 3, rareza: "rara", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 3000 } },
-    { id: 111, titulo: "🪄 TOQUE MEDITERRÁNEO", descripcion: "Entregá 2 jugadores COMUNES nacidos en ESPAÑA.", requisitos: { cantidad: 2, rareza: "comun", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 1000 } },
-    // 🇮🇹 ITALIA
-    { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 3 jugadores COMUNES nacidos en ITALIA.", requisitos: { cantidad: 3, rareza: "comun", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 1400 } },
-    { id: 112, titulo: "🏛️ GLADIADORES PREMIUM", descripcion: "El comerciante busca 2 cartas RARAS nacidas en ITALIA.", requisitos: { cantidad: 2, rareza: "rara", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 2800 } }
-];
-
-// 🔥 CORREGIDO: Devuelve un índice de semana estricto que muta únicamente los Lunes a las 00:00 hs de Argentina
-function obtenerNumeroSemanaActual() {
-    const ahora = new Date();
-    // Convertimos la hora actual a la zona de Buenos Aires para evitar desfases de Render
-    const stringBsAs = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
-    const fechaLocal = new Date(stringBsAs);
-
-    const principioDeAño = new Date(fechaLocal.getFullYear(), 0, 1);
-    const milisegundosPasados = fechaLocal - principioDeAño;
-    const diasPasados = Math.floor(milisegundosPasados / (1000 * 60 * 60 * 24));
-    
-    // Forzamos la alineación con el día Lunes
-    return Math.ceil((diasPasados + principioDeAño.getDay() + 1) / 7);
-}
-
-// 🔄 FUNCIÓN FILTRADORA: Entrega los contratos de la cartelera de forma circular
-function obtenerContratosDeLaSemana() {
-    const numeroSemana = obtenerNumeroSemanaActual();
-    const cantidadAExhibir = 3; // 🔥 Subido a 3 para completar estéticamente tu frontend
-    
-    const contratosRotativos = [];
-    for (let i = 0; i < cantidadAExhibir; i++) {
-        const indiceCalculado = (numeroSemana + i) % POOL_GLOBAL_SBC.length;
-        contratosRotativos.push(POOL_GLOBAL_SBC[indiceCalculado]);
-    }
-    return contratosRotativos;
-}
-
-// 2️⃣ Endpoint Actualizado: Devuelve solo los contratos que tocan esta semana
-app.get('/api/contratos/activo', verificarToken, (req, res) => {
-    const contratosActivos = obtenerContratosDeLaSemana();
-    res.json({ ok: true, contratos: contratosActivos });
-});
-
-// 3️⃣ Endpoint Atómico de Procesamiento (Blindado)
-app.post('/api/contratos/completar', verificarToken, async (req, res) => {
-    const usuarioId = req.usuarioLogueado.id;
-    const { contratoId, jugadorIds } = req.body;
-
-    const contratosPermitidosHoy = obtenerContratosDeLaSemana();
-    const contratoElegido = contratosPermitidosHoy.find(c => c.id === Number(contratoId));
-    
-    if (!contratoElegido) {
-        return res.status(404).json({ ok: false, mensaje: "❌ Este contrato no está disponible en la cartelera de esta semana." });
-    }
-
-    const reqConfig = contratoElegido.requisitos;
-
-    if (!jugadorIds || !Array.isArray(jugadorIds) || jugadorIds.length !== reqConfig.cantidad) {
-        return res.status(400).json({ ok: false, mensaje: `⚠️ Debés seleccionar exactamente ${reqConfig.cantidad} jugadores.` });
-    }
-
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-
-        for (const jId of jugadorIds) {
-            const queryJugador = "SELECT nombre, pais, rareza FROM jugadores WHERE id = $1";
-            const jugRes = await client.query(queryJugador, [jId]);
-
-            if (jugRes.rows.length === 0) {
-                await client.query('ROLLBACK');
-                return res.json({ ok: false, mensaje: "❌ Uno de los jugadores no existe en la Arena." });
-            }
-
-            const j = jugRes.rows[0];
-            if (j.rareza.toLowerCase() !== reqConfig.rareza.toLowerCase() || j.pais.toLowerCase() !== reqConfig.pais.toLowerCase()) {
-                await client.query('ROLLBACK');
-                return res.json({ ok: false, mensaje: `❌ ${j.nombre.toUpperCase()} no cumple los requisitos vigentes.` });
-            }
-
-            const queryProgreso = "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2";
-            const progRes = await client.query(queryProgreso, [usuarioId, jId]);
-            const cantidadDisponible = progRes.rows[0]?.cantidad || 0;
-
-            if (cantidadDisponible <= 1) {
-                await client.query('ROLLBACK');
-                return res.json({ ok: false, mensaje: `❌ No tenés copias REPETIDAS suficientes de ${j.nombre.toUpperCase()}.` });
-            }
-        }
-
-        for (const jId of jugadorIds) {
-            await client.query(`UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2`, [usuarioId, jId]);
-        }
-
-        const premioOro = contratoElegido.recompensa.valor;
-        const userRes = await client.query(`UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2 RETURNING monedas`, [premioOro, usuarioId]);
-        const nuevoOroTotal = userRes.rows[0].monedas;
-
-        await client.query('COMMIT');
-        res.json({ ok: true, nuevoOro: nuevoOroTotal, mensaje: `💪 ¡CONTRATO CERRADO! El Bot procesó la rotación y te acreditó 🪙 ${premioOro} de Oro.` });
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error(err);
-        res.status(500).json({ ok: false, error: "Error interno en los servidores." });
-    } finally {
-        client.release();
-    }
-});
-
+/* ========================================================================
+   ⚙️ ENDPOINT DE PERFILES DE LA ARENA (MANTENIMIENTO DE CROMOS INSIGNIA)
+   ======================================================================== */
 app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
-
     try {
-        // 🧠 CONSULTA BLINDADA: Coalesce en cada conteo para evitar bloqueos si las tablas intermedias están vacías
         const perfilQuery = `
-            SELECT 
-                u.id, 
-                u.username AS nombre_usuario,
-                u.monedas, 
-                u.puntos_ranking,
-                u.timbas_jugadas,
-                u.timbas_ganadas_exacto,
-                u.timbas_ganadas_signo,
-                u.eligio_avatar,
-                u.cromo_destacado,
-                COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil,
-                COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes,
-                COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras,
-                COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas,
-                COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias,
-                COALESCE(
-                    ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 
-                    0
-                ) AS porcentaje_album
-            FROM usuarios u
-            LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id
-            LEFT JOIN usuario_progreso up ON u.id = up.usuario_id
-            LEFT JOIN jugadores j ON up.jugador_id = j.id
-            WHERE u.id = $1
-            GROUP BY 
-                u.id, 
-                u.username, 
-                u.monedas, 
-                u.puntos_ranking, 
-                u.timbas_jugadas, 
-                u.timbas_ganadas_exacto, 
-                u.timbas_ganadas_signo, 
-                u.eligio_avatar,
-                u.cromo_destacado,
-                fp.ruta_jpg;
-        `;
+            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias, COALESCE(ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 0) AS porcentaje_album FROM usuarios u LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id LEFT JOIN usuario_progreso up ON u.id = up.usuario_id LEFT JOIN jugadores j ON up.jugador_id = j.id WHERE u.id = $1 GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, fp.ruta_jpg;`;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ ok: false, mensaje: "El competidor no existe en la Arena." });
-        }
+        if (result.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "El competidor no existe." });
 
         const datos = result.rows[0];
-
-        // 📊 Matemática de la Timba
-        const victoriasTotales = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
-        const porcentajeVictorias = datos.timbas_jugadas > 0 
-            ? Math.round((victoriasTotales / datos.timbas_jugadas) * 100) 
-            : 0;
+        const victorias = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
 
         return res.json({
             ok: true,
             perfil: {
-                id: datos.id,
-                nombre: datos.nombre_usuario,
-                monedas: datos.monedas,
-                eligio_avatar: datos.eligio_avatar,
-                foto: datos.foto_perfil,
-                cromo_destacado: datos.cromo_destacado,
-                puntosRanking: datos.puntos_ranking,
-                foto: datos.foto_perfil,
-                estadisticasAlbum: {
-                    comunes: parseInt(datos.comunes || 0),
-                    raras: parseInt(datos.raras || 0),
-                    epicas: parseInt(datos.epicas || 0),
-                    legendarias: parseInt(datos.legendarias || 0),
-                    porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0
-                },
-                estadisticasTimba: {
-                    jugadas: parseInt(datos.timbas_jugadas || 0),
-                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0),
-                    ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0),
-                    porcentajeEfectividad: porcentajeVictorias
-                }
+                id: datos.id, nombre: datos.nombre_usuario, monedas: datos.monedas, eligio_avatar: datos.eligio_avatar, puntosRanking: datos.puntos_ranking, copasMundiales: datos.copas_mundiales, foto: datos.foto_perfil, cromo_destacado: datos.cromo_destacado,
+                estadisticasAlbum: { comunes: parseInt(datos.comunes || 0), raras: parseInt(datos.raras || 0), epicas: parseInt(datos.epicas || 0), legendarias: parseInt(datos.legendarias || 0), porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 },
+                estadisticasTimba: { jugadas: parseInt(datos.timbas_jugadas || 0), ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victorias / datos.timbas_jugadas) * 100) : 0 }
             }
         });
-
-    } catch (err) {
-        console.error("❌ Error al obtener perfil:", err.message);
-        return res.status(500).json({ ok: false, mensaje: "Error interno al cargar la cartelera de perfil." });
-    }
+    } catch (err) { res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); }
 });
 
 app.get('/api/fotos-perfil/mis-avatares', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-
     try {
-        // Trae todas las fotos de la base y mete un flag "desbloqueada" (true/false) según el usuario
-        const query = `
-            SELECT fp.id, fp.nombre, fp.ruta_jpg,
-                   CASE WHEN ufp.foto_id IS NOT NULL THEN true ELSE false END AS desbloqueada
-            FROM fotos_perfil fp
-            LEFT JOIN usuario_fotos_perfil ufp ON fp.id = ufp.foto_id AND ufp.usuario_id = $1
-            ORDER BY fp.id ASC;
-        `;
-        const result = await pool.query(query, [usuario_id]);
+        const result = await pool.query(`SELECT fp.id, fp.nombre, fp.ruta_jpg, CASE WHEN ufp.foto_id IS NOT NULL THEN true ELSE false END AS desbloqueada FROM fotos_perfil fp LEFT JOIN usuario_fotos_perfil ufp ON fp.id = ufp.foto_id AND ufp.usuario_id = $1 ORDER BY fp.id ASC;`, [req.usuarioLogueado.id]);
         res.json({ ok: true, catalogo: result.rows });
-    } catch (err) {
-        res.status(500).json({ error: "Error al cargar tu catálogo de avatares." });
-    }
+    } catch (err) { res.status(500).json({ error: "Error en catálogo." }); }
 });
 
 app.put('/api/usuarios/cambiar-foto', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const { fotoId } = req.body;
-
     try {
-        // 🛡️ VALIDACIÓN CRÍTICA: ¿Este usuario realmente desbloqueó esta foto en un sobre?
-        const verificacion = await pool.query(
-            "SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2",
-            [usuario_id, fotoId]
-        );
+        const verif = await pool.query("SELECT 1 FROM usuario_fotos_perfil WHERE usuario_id = $1 AND foto_id = $2", [req.usuarioLogueado.id, req.body.fotoId]);
+        if (verif.rows.length === 0) return res.status(403).json({ ok: false, mensaje: "❌ Avatar bloqueado." });
 
-        if (verificacion.rows.length === 0) {
-            return res.status(403).json({ 
-                ok: false, 
-                mensaje: "❌ No podés equiparte este avatar. ¡Tenés que conseguirlo en un sobre de la tienda!" 
-            });
-        }
-
-        // Si pasó el control, se la equipamos tranqui
-        await pool.query("UPDATE usuarios SET foto_perfil_id = $1 WHERE id = $2", [fotoId, usuario_id]);
-        return res.json({ ok: true, mensaje: "📸 ¡Facha actualizada! Tu nuevo avatar está activo." });
-
-    } catch (err) {
-        return res.status(500).json({ error: "Fallo en la base de datos al actualizar tu foto de perfil." });
-    }
+        await pool.query("UPDATE usuarios SET foto_perfil_id = $1 WHERE id = $2", [req.body.fotoId, req.usuarioLogueado.id]);
+        return res.json({ ok: true, mensaje: "📸 ¡Avatar equipado!" });
+    } catch (err) { res.status(500).json({ error: "Error en actualización." }); }
 });
 
-
-// ========================================================================
-// 🎁 MECÁNICA: ELECCIÓN DE AVATAR INICIAL PARA USUARIOS NUEVOS
-// ========================================================================
-
-// A. Obtener 3 fotos de perfil completamente aleatorias
 app.get('/api/usuarios/opciones-avatar-inicial', verificarToken, async (req, res) => {
-    // 🛡️ Extraemos el ID real del usuario desde el token JWT verificado
-    const usuario_id = req.usuarioLogueado.id;
-
     try {
-        // 1. Verificación Crítica: ¿Este usuario ya pasó por la ruleta de bienvenida?
-        const checkUser = await pool.query(
-            "SELECT eligio_avatar FROM usuarios WHERE id = $1", 
-            [usuario_id]
-        );
+        const check = await pool.query("SELECT eligio_avatar FROM usuarios WHERE id = $1", [req.usuarioLogueado.id]);
+        if (check.rows[0].eligio_avatar) return res.status(403).json({ ok: false, mensaje: "❌ Ya elegiste avatar inicial." });
 
-        if (checkUser.rows.length === 0) {
-            return res.status(404).json({ ok: false, mensaje: "Usuario no encontrado." });
-        }
-
-        // Si ya eligió en el pasado, le cortamos el chorro acá mismo
-        if (checkUser.rows[0].eligio_avatar) {
-            return res.status(403).json({ 
-                ok: false, 
-                mensaje: "❌ Hack Attack: Ya elegiste tu avatar inicial. Los demás se consiguen en la tienda abriendo sobres." 
-            });
-        }
-
-        // 2. Si pasó el control (es nuevo de verdad), le tiramos los 3 cromos al azar de fotos_perfil
-        const query = `SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 3;`;
-        const result = await pool.query(query);
-        
+        const result = await pool.query(`SELECT id, nombre, ruta_jpg FROM fotos_perfil ORDER BY RANDOM() LIMIT 3;`);
         return res.json({ ok: true, opciones: result.rows });
-
-    } catch (err) {
-        console.error("❌ Error en filtro de seguridad de opciones iniciales:", err.message);
-        return res.status(500).json({ ok: false, mensaje: "Error interno al generar opciones." });
-    }
+    } catch (err) { return res.status(500).json({ ok: false, mensaje: "Error al generar opciones." }); }
 });
 
-// B. Procesar la elección, equiparla e insertarla en su inventario para que cuente como desbloqueada
 app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const { fotoId } = req.body;
-
-    if (!fotoId) {
-        return res.status(400).json({ ok: false, mensaje: "Falta el ID de la foto seleccionada." });
-    }
-
     try {
-        // 1. Le asignamos la foto de perfil en la tabla de usuarios y prendemos el flag eligio_avatar
-        await pool.query(
-            "UPDATE usuarios SET foto_perfil_id = $1, eligio_avatar = TRUE WHERE id = $2",
-            [fotoId, usuario_id]
-        );
-
-        // 2. 🛡️ CRÍTICO: La insertamos en su colección personal para que pase las validaciones de tus otros endpoints
-        await pool.query(
-            "INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-            [usuario_id, fotoId]
-        );
-
-        return res.json({ ok: true, mensaje: "📸 ¡Tu primer avatar fue asignado y guardado en tu colección!" });
-
-    } catch (err) {
-        console.error("❌ Error al guardar el avatar inicial:", err.message);
-        return res.status(500).json({ ok: false, mensaje: "Fallo en el servidor al asegurar tu identidad inicial." });
-    }
+        await pool.query("UPDATE usuarios SET foto_perfil_id = $1, eligio_avatar = TRUE WHERE id = $2", [req.body.fotoId, req.usuarioLogueado.id]);
+        await pool.query("INSERT INTO usuario_fotos_perfil (usuario_id, foto_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [req.usuarioLogueado.id, req.body.fotoId]);
+        return res.json({ ok: true, mensaje: "📸 Avatar inicial asignado." });
+    } catch (err) { return res.status(500).json({ ok: false, mensaje: "Error al asignar avatar." }); }
 });
 
-// 🌟 Guardar el cromo destacado en su columna correspondiente
 app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
-    const usuarioId = req.usuarioLogueado.id;
-    const { fotoUrl } = req.body; 
-
-    if (!fotoUrl) {
-        return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL de la imagen." });
-    }
-
+    if (!req.body.fotoUrl) return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL." });
     try {
-        // 🔥 CORREGIDO: Actualiza 'cromo_destacado' para no pisar la foto de perfil
-        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [fotoUrl, usuarioId]);
-        
-        res.json({ ok: true, mensaje: "🌟 ¡Cromo lucido en la vitrina del vestuario!" });
-    } catch (err) {
-        console.error("Error al destacar cromo:", err);
-        res.status(500).json({ ok: false, error: "Error interno del servidor." });
-    }
+        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [req.body.fotoUrl, req.usuarioLogueado.id]);
+        res.json({ ok: true, mensaje: "🌟 ¡Cromo lucido en la vitrina!" });
+    } catch (err) { res.status(500).json({ ok: false, error: "Error de servidor." }); }
 });
 
-// ========================================================================
-// ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL (CORREGIDO)
-// ========================================================================
-
-// 🛡️ FUNCIÓN DE SEGURIDAD ANTI-LINKS Y ANTI-XSS
+/* ========================================================================
+   ✍️ ENDPOINTS SEGUROS PARA EL LIBRO DE FIRMAS
+   ======================================================================== */
 function validarTextoFirmaSeguro(texto) {
-    const textoLimpio = (texto || '').trim();
-
-    if (!textoLimpio) return { valido: false, error: "El mensaje no puede estar vacío." };
-    if (textoLimpio.length > 140) return { valido: false, error: "El mensaje supera los 140 caracteres." };
-
-    const detectorHTML = /<[^>]*>/g;
-    if (detectorHTML.test(textoLimpio)) {
-        return { valido: false, error: "❌ Código detectado: No se permite inyectar HTML ni Scripts." };
-    }
-
-    const detectorLinks = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|net|org|io|edu|gov|co|ar)\b)/i;
-    if (detectorLinks.test(textoLimpio)) {
-        return { valido: false, error: "❌ Enlace detectado: No se permiten links en las firmas." };
-    }
-
-    return { valido: true, texto: textoLimpio };
+    const limpio = (texto || '').trim();
+    if (!limpio || limpio.length > 140) return { valido: false, error: "Firma inválida o supera los 140 caracteres." };
+    if (/<[^>]*>/g.test(limpio)) return { valido: false, error: "❌ Inyección HTML desestimada." };
+    if (/(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|net|org|io|edu|gov|co|ar)\b)/i.test(limpio)) return { valido: false, error: "❌ No se admiten enlaces." };
+    return { valido: true, texto: limpio };
 }
 
-// 1. OBTENER TODAS LAS FIRMAS DE UN PERFIL ESPECÍFICO
-// 🔥 CORREGIDO: Le sacamos 'verificarToken' para que los invitados de incógnito puedan leer las firmas sin que explote con un 401
 app.get('/api/firmas/:perfilId', async (req, res) => {
     const { perfilId } = req.params;
-
-    // Resguardo por si el frente manda un "null" u "undefined" literal en la URL
-    if (!perfilId || perfilId === 'null' || perfilId === 'undefined') {
-        return res.json({ ok: true, firmas: [] });
-    }
-
+    if (!perfilId || perfilId === 'null' || perfilId === 'undefined') return res.json({ ok: true, firmas: [] });
     try {
-        const query = `
-            SELECT f.id, f.autor_id, f.mensaje, f.creado_en, f.editado_en, u.username
-            FROM usuario_firmas f
-            JOIN usuarios u ON f.autor_id = u.id
-            WHERE f.perfil_id = $1
-            ORDER BY f.creado_en DESC;
-        `;
-        const resultado = await pool.query(query, [perfilId]);
-        return res.json({ ok: true, firmas: resultado.rows });
-    } catch (err) {
-        console.error("❌ Error al obtener firmas:", err.message);
-        return res.status(500).json({ error: "Error al cargar el libro de firmas." });
-    }
+        const result = await pool.query(`SELECT f.id, f.autor_id, f.mensaje, f.creado_en, f.editado_en, u.username FROM usuario_firmas f JOIN usuarios u ON f.autor_id = u.id WHERE f.perfil_id = $1 ORDER BY f.creado_en DESC;`, [perfilId]);
+        return res.json({ ok: true, firmas: result.rows });
+    } catch (err) { return res.status(500).json({ error: "Error al cargar libro." }); }
 });
 
-// 2. CREAR UNA NUEVA FIRMA (SE QUEDA PROTEGIDO CON TOKEN)
 app.post('/api/firmas/crear', verificarToken, async (req, res) => {
-    const autor_id = req.usuarioLogueado.id;
-    const { perfilId, mensaje } = req.body;
-
-    const validacion = validarTextoFirmaSeguro(mensaje);
-    if (!validacion.valido) {
-        return res.status(400).json({ error: validacion.error });
-    }
-
-    if (parseInt(perfilId) === autor_id) {
-        return res.status(400).json({ error: "No podés firmar tu propio perfil, che." });
-    }
+    const autor_id = req.usuarioLogueado.id; const { perfilId, mensaje } = req.body;
+    const val = validarTextoFirmaSeguro(mensaje);
+    if (!val.valido) return res.status(400).json({ error: val.error });
+    if (parseInt(perfilId) === autor_id) return res.status(400).json({ error: "No podés firmar tu perfil." });
 
     try {
-        const query = `
-            INSERT INTO usuario_firmas (perfil_id, autor_id, mensaje, creado_en)
-            VALUES ($1, $2, $3, NOW())
-            RETURNING id;
-        `;
-        await pool.query(query, [perfilId, autor_id, validacion.texto]);
-        return res.json({ ok: true, mensaje: "¡Perfil firmado correctamente!" });
-    } catch (err) {
-        if (err.code === '23505') { 
-            return res.status(400).json({ error: "Ya firmaste este perfil." });
-        }
-        return res.status(500).json({ error: "Error interno al procesar la firma." });
-    }
+        await pool.query(`INSERT INTO usuario_firmas (perfil_id, autor_id, mensaje, creado_en) VALUES ($1, $2, $3, NOW())`, [perfilId, autor_id, val.texto]);
+        return res.json({ ok: true, mensaje: "¡Perfil firmado!" });
+    } catch (err) { return res.status(500).json({ error: "Error al procesar firma." }); }
 });
 
-// 3. EDITAR FIRMA EXISTENTE (SE QUEDA PROTEGIDO CON TOKEN)
 app.put('/api/firmas/editar', verificarToken, async (req, res) => {
-    const autor_id = req.usuarioLogueado.id;
-    const { firmaId, nuevoMensaje } = req.body;
-
-    const validacion = validarTextoFirmaSeguro(nuevoMensaje);
-    if (!validacion.valido) {
-        return res.status(400).json({ error: validacion.error });
-    }
-
+    const val = validarTextoFirmaSeguro(req.body.nuevoMensaje);
+    if (!val.valido) return res.status(400).json({ error: val.error });
     try {
-        const query = `
-            UPDATE usuario_firmas 
-            SET mensaje = $1, editado_en = NOW()
-            WHERE id = $2 AND autor_id = $3
-            RETURNING id;
-        `;
-        await pool.query(query, [validacion.texto, firmaId, autor_id]);
-        return res.json({ ok: true, mensaje: "Firma modificada con éxito." });
-    } catch (err) {
-        return res.status(500).json({ error: "Error en el servidor al editar." });
-    }
+        await pool.query(`UPDATE usuario_firmas SET mensaje = $1, editado_en = NOW() WHERE id = $2 AND autor_id = $3`, [val.texto, req.body.firmaId, req.usuarioLogueado.id]);
+        return res.json({ ok: true, mensaje: "Firma modificada." });
+    } catch (err) { return res.status(500).json({ error: "Error al editar." }); }
 });
 
-// 4. BORRAR FIRMA (SE QUEDA PROTEGIDO CON TOKEN)
 app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
-    const autor_id = req.usuarioLogueado.id;
-    const { firmaId } = req.params;
-
     try {
-        const query = `
-            DELETE FROM usuario_firmas 
-            WHERE id = $1 AND autor_id = $2
-            RETURNING id;
-        `;
-        const result = await pool.query(query, [firmaId, autor_id]);
-
-        if (result.rows.length === 0) {
-            return res.status(403).json({ error: "No se pudo borrar la firma (No sos el autor)." });
-        }
-
-        return res.json({ ok: true, mensaje: "Firma eliminada de la cartelera." });
-    } catch (err) {
-        console.error("❌ Error al borrar firma:", err.message);
-        return res.status(500).json({ error: "Error en el servidor al eliminar." });
-    }
+        const result = await pool.query(`DELETE FROM usuario_firmas WHERE id = $1 AND autor_id = $2 RETURNING id;`, [req.params.firmaId, req.usuarioLogueado.id]);
+        if (result.rows.length === 0) return res.status(403).json({ error: "No sos el autor." });
+        return res.json({ ok: true, mensaje: "Firma eliminada." });
+    } catch (err) { return res.status(500).json({ error: "Error al eliminar." }); }
 });
 
-// ========================================================================
-// 🏆 MOTOR AUTOMÁTICO: RECOMPENSAS Y RESET SEMANAL DE RANKINGS
-// ========================================================================
-
+/* ========================================================================
+   🏆 MOTOR AUTOMÁTICO: RECOMPENSAS Y RESET SEMANAL DE RANKINGS (LUNES 00:00)
+   ======================================================================== */
 async function procesarResetSemanalRankings() {
     const client = await pool.connect();
     try {
-        // 1. Control del tiempo real unificado (GMT-3 Buenos Aires)
         const ahora = new Date();
-        const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
-        
-        // Formateadores para saber el día de la semana y la fecha limpia
         const formatterDia = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'short' });
         const formatterFecha = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' });
         
-        const diaSemana = formatterDia.format(ahora); // ej: "Mon", "Tue", "Wed"...
-        const [mes, dia, anio] = formatterFecha.format(ahora).split('/');
-        const fechaHoyString = `${anio}-${mes}-${dia}`;
+        const diaSemana = formatterDia.format(ahora); 
+        const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // 🛑 CONDICIÓN DE GATILLO: Solo se ejecuta los Lunes ("Mon")
         if (diaSemana !== 'Mon') return;
 
         await client.query('BEGIN');
+        const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
+        if (verificarReset.rows.length > 0) { await client.query('ROLLBACK'); return; }
 
-        // 2. Chequeamos si ya se procesó el reset de este lunes específico para evitar duplicados
-        const verificarReset = await client.query(
-            "SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1",
-            [fechaHoyString]
-        );
+        console.log(`🚧 ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
 
-        if (verificarReset.rows.length > 0) {
-            await client.query('ROLLBACK');
-            return; // Ya fue ejecutado hoy, salimos silenciosamente
-        }
-
-        console.log(`🚧 ¡Arrancando proceso de Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
-
-        // ========================================================================
-        // 📋 PROCESAMIENTO RECOMPENSAS RANKING MUNDIAL (Por copas_mundiales)
-        // ========================================================================
-        const topMundial = await client.query(
-            "SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3"
-        );
-        
+        const topMundial = await client.query("SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3");
         if (topMundial.rows.length > 0) {
-            if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]); // 🥇
-            if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]); // 🥈
-            if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);  // 🥉
+            if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]);
+            if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]);
+            if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);
         }
 
-        // ========================================================================
-        // 🧤 PROCESAMIENTO RECOMPENSAS RANKING PENALES (Por puntos_ranking)
-        // ========================================================================
-        const topPenales = await client.query(
-            "SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3"
-        );
-
+        const topPenales = await client.query("SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3");
         if (topPenales.rows.length > 0) {
-            if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]); // 🥇
-            if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]); // 🥈
-            if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);  // 🥉
+            if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]);
+            if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]);
+            if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);
         }
 
-        // ========================================================================
-        // ♻️ RESET TOTAL A CERO DE LAS TABLAS
-        // ========================================================================
         await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
-
-        // 3. Dejamos el sello en el calendario para que no vuelva a correr hasta el próximo lunes
-        await client.query(
-            "INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)",
-            [fechaHoyString]
-        );
+        await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
 
         await client.query('COMMIT');
         console.log("🏆 ¡Reset completado con éxito! Monedas depositadas al Top 3 y marcadores vueltos a cero.");
-
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error("❌ Error crítico en el proceso de reset semanal:", err.message);
-    } finally {
-        client.release();
-    }
+    } catch (err) { await client.query('ROLLBACK'); console.error("❌ Error crítico en reset semanal:", err.message); } finally { client.release(); }
 }
 
 /* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
    ======================================================================== */
 const CONFIG_ANUNCIO_SERVIDOR = {
-    activo: true,       
-    tipo: "video",      
-    titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
+    activo: true, tipo: "video", titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
     texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo, lanzamos el Mercado P2P y habilitamos la cartelera de objetivos diarios. ¡Mirá el video, crack!",
-    urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
-    urlVideo: "https://www.youtube.com/embed/Nl_tZ2StsSs",
-    
+    urlImagen: "https://albumpe.onrender.com/assets/novedad.png", urlVideo: "https://www.youtube.com/embed/Nl_tZ2StsSs",
     informe: {
-        version: "v2.5.0-Arena",
-        fecha: "Junio 2026",
+        version: "v2.5.0-Arena", fecha: "Julio 2026",
         cambios: [
-            "🏆 **Mini-Mundial Atómico:** Inscripciones gratuitas en el Draft. El Oro o cartas repetidas se debitan en Neon recién al presionar 'Iniciar', con cronogramas y líneas de tiempo precalculadas por el servidor.",
+            "🏆 **Mini-Mundial Atómico:** Formato Single Player optimizado contra bots de IA calibrados con penalizaciones justas según vayas trepando fases, con enfriamientos resguardados en Neon.",
             "💸 **Mercado de Pases P2P:** Vitrina internacional activa. Las ofertas duran 24 horas y devuelven el cromo automáticamente si nadie compra.",
-            "🎯 **Objetivos Diarios:** Añadida cartelera de misiones diarias con reinicio atómico sincronizado a la medianoche (GMT-3) y función estética para colapsar/ocultar el panel cuando quieras.",
-            "🛡️ **Control de Rachas & Servidor:** Corregido el desfase ISO en el login diario forzando la hora local de Argentina para evitar bloqueos falsos al reclamar tu recompensa.",
+            "🎯 **Objetivos Diarios:** Añadida cartelera de misiones diarias con reinicio atómico sincronizado a la medianoche (GMT-3) de Buenos Aires.",
+            "🛡️ **Control de Rachas & Servidor:** Corregido el desfasaje ISO en el login diario forzando la hora local de Argentina para evitar bloqueos falsos al reclamar tu recompensa.",
             "📖 **Guía Actualizada:** Renovado el modal de reglas con las mecánicas del Bot Comerciante, contratos y el funcionamiento real de las arenas."
         ]
     }
 };
 
-app.get('/api/anuncio-actual', (req, res) => {
-    // 🟢 Sincronizado dinámicamente con la configuración multimedia completa
-    res.json(CONFIG_ANUNCIO_SERVIDOR);
-});
+app.get('/api/anuncio-actual', (req, res) => { res.json(CONFIG_ANUNCIO_SERVIDOR); });
 
-// El servidor va a chequear la fecha de forma pasiva cada 1 hora
 setInterval(procesarResetSemanalRankings, 1000 * 60 * 60);
-
-// Forzamos una ejecución inicial limpia de resguardo apenas se levanta el servicio en Render
 setTimeout(procesarResetSemanalRankings, 5000);
 
 /* ========================================================================
    🚀 INICIALIZACIÓN DEL SERVIDOR
    ======================================================================== */
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor en la Nube / Red Local activo en puerto ${PORT}`);
+    console.log(`🚀 Servidor en la Nube activo en puerto ${PORT}`);
 });
