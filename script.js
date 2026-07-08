@@ -154,8 +154,8 @@ async function autenticarUsuario(accion) {
      
      if (!username || !password) return alert("❌ Completá los datos.");
 
-     // 🛡️ SECURITY FIX: Deshabilitamos el botón correspondiente para mitigar ataques de fuerza bruta / spam
-     const btnAuth = document.getElementById(accion === 'login' ? 'btn-login' : 'btn-registro');
+     // 🛡️ SECURITY FIX: Buscamos el botón usando su clase real del HTML para evitar el crash por null
+     const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
      if (btnAuth) btnAuth.disabled = true;
 
      const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
