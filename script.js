@@ -4530,7 +4530,6 @@ function toggleVisibilidadMisiones() {
 }
 
 async function inspeccionarPerfilRival(usuarioId) {
-     // Evitamos que salte si el usuario hace clic en sí mismo
      if (usuarioActual && parseInt(usuarioId) === parseInt(usuarioActual.id)) {
           alert("¡Es tu propio perfil! Podés verlo completo en la pestaña 'MI PERFIL'.");
           return;
@@ -4539,7 +4538,6 @@ async function inspeccionarPerfilRival(usuarioId) {
      try {
           const token = localStorage.getItem("token");
 
-          // Fetch blindado para mantenimiento
           const res = await fetch(`${URL_BASE}/usuarios/perfil/${usuarioId}`, {
                method: "GET",
                headers: {
@@ -4553,12 +4551,10 @@ async function inspeccionarPerfilRival(usuarioId) {
           const data = await res.json();
           if (!data.ok || !data.perfil) return alert(data.mensaje || "Error al leer datos del rival.");
 
-          const rival = data.perfil; // 🟢 Sincronizado con la propiedad 'perfil' de tu backend
+          const rival = data.perfil; 
 
-          // 📌 ASIGNACIÓN CLAVE: Guardamos el ID del rival que estamos visitando para el botón "Firmar" del HTML
           window.usuarioVisitaId = parseInt(usuarioId);
 
-          // 🔓 CONTROL FORMULARIO: Si visito a otro, me aseguro de mostrar la caja para escribir
           const cajaFormulario = document.getElementById("caja-formulario-firma");
           if (cajaFormulario) cajaFormulario.style.display = "flex";
 
@@ -4598,28 +4594,27 @@ async function inspeccionarPerfilRival(usuarioId) {
 
           const txtMundiales = document.getElementById("rival-stat-mundiales-copas");
           if (txtMundiales) {
-               // Resguardamos por si la propiedad copas viene directo de la fila
                txtMundiales.innerText = `🏆 ${rival.copasMundiales || 0}`;
           }
 
-          // 4. Render de la foto del Rival agrandada estilo cromo
+          // 4. Render de la Foto de Perfil del Rival (Mantiene su avatar redondo intacto)
           const divAvatar = document.getElementById("rival-avatar-user");
           if (divAvatar && rival.foto) {
                divAvatar.style.borderRadius = "12px";
                divAvatar.style.backgroundImage = `url('${rival.foto}')`;
                divAvatar.style.backgroundSize = "cover";
                divAvatar.style.backgroundPosition = "center";
-               divAvatar.innerText = ""; // Limpiamos el emoji base
+               divAvatar.innerText = ""; 
           }
 
-          // 5. 🌟 RENDER DE INSIGNIA DEL RIVAL (CORREGIDO)
-          // 🔥 Muestra la carta físicamente destacada en la vitrina del rival en vez de un texto fijo
+          // 5. 🌟 RENDER DE CROMO DESTACADO DEL RIVAL CORREGIDO
+          // 🔥 Lee estrictamente la propiedad 'cromo_destacado' del rival
           const contenedorDestacado = document.getElementById("rival-contenedor-destacado");
           if (contenedorDestacado) {
-               if (rival.foto) {
+               if (rival.cromo_destacado) {
                     contenedorDestacado.innerHTML = `
                         <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                            <img src="${rival.foto}" style="width: 100%; height: 100%; object-fit: cover;">
+                            <img src="${rival.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                     `;
                } else {
@@ -4627,12 +4622,10 @@ async function inspeccionarPerfilRival(usuarioId) {
                }
           }
 
-          // ✍️ CARGA DE FIRMAS: Traemos el muro de la DB exclusivo para el rival inspeccionado
           if (typeof cargarFirmasDelPerfil === "function") {
                cargarFirmasDelPerfil(usuarioId);
           }
 
-          // Mostramos el modal dándole display block
           document.getElementById("modal-rival").style.display = "block";
 
      } catch (err) {
@@ -4708,7 +4701,7 @@ async function actualizarMiPerfilUI() {
         const txtMonedas = document.getElementById("stat-monedas");
         if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas.toLocaleString() : 0;
 
-        // 4. Render de la Carta Físicamente Agrandada
+        // 4. Render de la Foto de Perfil / Avatar Fijo
         const divAvatar = document.getElementById("perfil-avatar-user");
         if (divAvatar && perfil.foto) {
             divAvatar.style.borderRadius = "12px";
@@ -4716,6 +4709,20 @@ async function actualizarMiPerfilUI() {
             divAvatar.style.backgroundSize = "cover";
             divAvatar.style.backgroundPosition = "center";
             divAvatar.innerText = "";
+        }
+
+        // 🌟 NUEVO BLOQUE: Render del Cromo Insignia de mi Vestuario
+        const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
+        if (contenedorDestacado) {
+            if (perfil.cromo_destacado) {
+                contenedorDestacado.innerHTML = `
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
+                        <img src="${perfil.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                `;
+            } else {
+                contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>`;
+            }
         }
 
         // ✍️ CARGA DE FIRMAS: Traemos las firmas de mi propio muro para exhibirlas
