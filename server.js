@@ -2402,30 +2402,30 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
     const minutosL = generarMinutosGolesMultijugador(g1);
     const minutosV = generarMinutosGolesMultijugador(g2);
 
-    // 🖥️ DETERMINACIÓN DE EVENTOS EN EL SERVIDOR (Sincronía Absoluta)
+    // 🖥️ Esquema: Llaves de eventos sincronizados para Host vs Invitado
     const llavesAtaque = ["penal_favor", "corner_favor", "tirolibre_favor", "contrataque_favor"];
-    
-    // Si es PVP real, ambos equipos generan eventos interactivos dinámicos de ataque.
-    // Si intervienen Bots, se asignan llaves estándar ya que el front los procesará pasivamente.
     const eventosL = minutosL.map(() => llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)]);
     const eventosV = minutosV.map(() => esPvpPuro ? llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)] : "defensa_urgente");
 
     return {
         local: equipo1.seleccion,
         visitante: equipo2.seleccion,
-        creador_id: equipo1.id,       // ID del dueño de casa
-        invitado_id: equipo2.id,      // ID del visitante
+        creador_id: equipo1.id,       
+        invitado_id: equipo2.id,      
         esPvpReal: esPvpPuro, 
         golesLocal: g1,
         golesVisitante: g2,
         minutosL: minutosL,
-        eventosL: eventosL,           // Matriz fija local
+        eventosL: eventosL,           
         minutosV: minutosV,
-        eventosV: eventosV,           // Matriz fija visitante
+        eventosV: eventosV,           
         penalesLocal: fueAPenales ? penales1 : null,
         penalesVisitante: fueAPenales ? penales2 : null,
         definicionPenales: fueAPenales,
-        ganadorUsername: ganador.username
+        ganadorUsername: ganador.username,
+        // Inyectamos banderas explícitas de bots para que el front no tenga que adivinar identidades
+        localEsBot: equipo1.esBot,
+        visitanteEsBot: equipo2.esBot
     };
 }
 
