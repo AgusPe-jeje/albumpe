@@ -1213,7 +1213,8 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
         const perfilQuery = `
             SELECT 
                 u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, 
-                u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, 
+                u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales,
+                u.penales_jugados, u.penales_ganados, -- ⚽ NUEVAS COLUMNAS INCLUIDAS
                 COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, 
                 COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, 
                 COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, 
@@ -1225,13 +1226,18 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
             LEFT JOIN usuario_progreso up ON u.id = up.usuario_id 
             LEFT JOIN jugadores j ON up.jugador_id = j.id 
             WHERE u.id = $1 
-            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, fp.ruta_jpg;`;
+            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, fp.ruta_jpg;`;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
         if (result.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "El competidor no existe." });
 
         const datos = result.rows[0];
-        const victorias = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
+        const victoriasTimba = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
+        
+        // 🎯 Lógica de efectividad de penales
+        const pJugados = parseInt(datos.penales_jugados || 0);
+        const pGanados = parseInt(datos.penales_ganados || 0);
+        const efectividadPenales = pJugados > 0 ? Math.round((pGanados / pJugados) * 100) : 0;
 
         return res.json({
             ok: true,
@@ -1243,7 +1249,7 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 puntosRanking: datos.puntos_ranking, 
                 copasMundiales: datos.copas_mundiales, 
                 foto: datos.foto_perfil, 
-                cromo_destacado: datos.cromo_destacado, // 🌟 Clave limpia leída por el frontend
+                cromo_destacado: datos.cromo_destacado,
                 estadisticasAlbum: { 
                     comunes: parseInt(datos.comunes || 0), 
                     raras: parseInt(datos.raras || 0), 
@@ -1255,13 +1261,41 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                     jugadas: parseInt(datos.timbas_jugadas || 0), 
                     ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), 
                     ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), 
-                    porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victorias / datos.timbas_jugadas) * 100) : 0 
+                    porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victoriasTimba / datos.timbas_jugadas) * 100) : 0 
+                },
+                // ⚽ PASAMOS LAS ESTADÍSTICAS DE PENALES LIMPIAS AL FRONTEND
+                estadisticasPenales: {
+                    jugados: pJugados,
+                    ganados: pGanados,
+                    porcentajeEfectividad: efectividadPenales
                 }
             }
         });
     } catch (err) { 
         console.error("❌ Error en GET /api/usuarios/perfil:", err);
         res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); 
+    }
+});
+
+app.post('/api/usuarios/registrar-penal', verificarToken, async (req, res) => {
+    const { ganoPartido } = req.body; // true o false según el resultado del minijuego
+    const usuarioId = req.usuarioLogueado.id;
+
+    try {
+        const incrementoGanado = ganoPartido ? 1 : 0;
+        
+        await pool.query(
+            `UPDATE usuarios 
+             SET penales_jugados = penales_jugados + 1, 
+                 penales_ganados = penales_ganados + $1 
+             WHERE id = $2`,
+            [incrementoGanado, usuarioId]
+        );
+
+        res.json({ ok: true, mensaje: "⚽ Historial de penales actualizado." });
+    } catch (err) {
+        console.error("❌ Error al registrar penal:", err);
+        res.status(500).json({ ok: false, error: "Error de servidor." });
     }
 });
 
