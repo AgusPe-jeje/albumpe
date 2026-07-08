@@ -3848,24 +3848,18 @@ async function actualizarMiPerfilUI() {
         // 🌟 NUEVO BLOQUE CORREGIDO: Usamos la URL de la base de datos o la de memoria en tiempo real
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
-            const urlInsigniaReal = perfil.cromo_destacado || usuarioActual.cromo_destacado;
-
-            if (urlInsigniaReal) {
-                contenedorDestacado.innerHTML = `
-                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                        <img src="${urlInsigniaReal}" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>
-                `;
-            } else {
-                contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>`;
+            if (perfil.cromo_destacado) {
+                // Sincronizamos el LocalStorage si venía de la base de datos
+                const cromoMapeado = { id: 0, nombre: "Cromo Insignia", foto: perfil.cromo_destacado, rareza: "legendaria" };
+                localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromoMapeado));
             }
+            // Llamamos a la función encargada de pintar la UI
+            renderizarCromoDestacadoUI();
         }
 
-        // ✍️ CARGA DE FIRMAS: Traemos las firmas de mi propio muro para exhibirlas
         if (typeof cargarFirmasDelPerfil === "function") {
              cargarFirmasDelPerfil(usuarioActual.id);
         }
-
     } catch (err) {
         console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
     }
@@ -3876,17 +3870,16 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
 
     try {
         mostrarCarga("Actualizando tu jugador destacado...");
-
         const token = localStorage.getItem("token");
         
-        // 🚀 Forzamos a que el fetch mande exactamente la variable 'cromoRutaImagen'
+        // Conexión limpia con el Backend
         const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ fotoUrl: cromoRutaImagen }) // 🎯 Mapeado directo con el req.body.fotoUrl del backend
+            body: JSON.stringify({ fotoUrl: cromoRutaImagen })
         });
 
         const data = await res.json();
@@ -3895,20 +3888,17 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // Sincronizamos al instante la memoria global de la sesión activa
+            // Guardamos en la memoria del juego y en LocalStorage para tu diseño
             usuarioActual.cromo_destacado = cromoRutaImagen;
+            const cromoObjeto = { id, nombre, foto: cromoRutaImagen, rareza };
+            localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromoObjeto));
 
-            // Pintamos el cambio en el DOM al toque para feedback inmediato
-            const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
-            if (contenedorDestacado) {
-                contenedorDestacado.innerHTML = `
-                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 20px auto;">
-                        <img src="${cromoRutaImagen}" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>
-                `;
+            // Dibujamos la carta con su color de rareza al instante
+            if (typeof renderizarCromoDestacadoUI === "function") {
+                renderizarCromoDestacadoUI();
             }
             
-            // Refrescamos el perfil completo para sincronizar con el backend
+            // Refrescamos estadísticas del perfil
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
@@ -3921,6 +3911,7 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
         alert("❌ Error de red al intentar conectar con el vestuario.");
     }
 }
+
 
 // A. Abre el panel dinámico y renderiza tus banderas/avatares desde Neon
 async function abrirCatalogoAvataresUI() {
@@ -3998,13 +3989,6 @@ async function procesarCambioFotoPerfil(fotoId) {
     }
 }
 
-// Guarda tu carta favorita en el almacenamiento local del juego
-function marcarCromoComoDestacado(id, nombre, foto, rareza) {
-    const cromo = { id, nombre, foto, rareza };
-    localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromo));
-    alert(`🌟 ¡${nombre.toUpperCase()} fue asignado como tu cromo insignia del vestuario!`);
-}
-
 // Inyecta el cromo seleccionado dentro de la caja de tu perfil
 function renderizarCromoDestacadoUI() {
     const contenedor = document.getElementById("perfil-contenedor-destacado");
@@ -4019,7 +4003,6 @@ function renderizarCromoDestacadoUI() {
 
     const cromo = JSON.parse(cromoGuardado);
     
-    // Determinamos el color de borde según la rareza para mantener la estética limpia
     let colorBorde = "var(--celeste)";
     if (cromo.rareza.toLowerCase() === "epica") colorBorde = "#a855f7";
     if (cromo.rareza.toLowerCase() === "legendaria") colorBorde = "var(--dorado)";
