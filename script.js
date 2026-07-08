@@ -3884,10 +3884,23 @@ async function cargarMisionesDelServidor() {
         });
         const data = await res.json();
         
-        if (data.ok) {
+        if (data.ok && data.misiones) {
+            // Guardamos las filas de Postgres de manera global
             window.misionesDiariasUsuario = data.misiones;
+            
+            // 🚀 DOBLE JUGADA DE FUERZA BRUTA: Limpiamos y renderizamos en el acto
+            console.log("📊 Misiones recibidas del backend con éxito:", window.misionesDiariasUsuario);
             renderizarMisionesDiarias();
+            
+            // Iniciamos el cronómetro dinámico del HUD
             iniciarCronometroResetMisiones();
+        } else {
+            console.warn("⚠️ El servidor respondió ok pero el array de misiones vino vacío.");
+            // Resguardo visual por si la base de datos de Neon tardó en responder
+            const contenedor = document.getElementById("contenedor-lista-misiones");
+            if (contenedor) {
+                contenedor.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem;">⏳ Cartelera vacía. Generando nuevos objetivos...</p>`;
+            }
         }
     } catch (err) {
         console.error("Error al traer misiones del server:", err);
