@@ -49,7 +49,7 @@ var historialPartidosSimulados = [];
 
 function cambiarModulo(idModulo, botonPresionado) {
      // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
-     document.querySelectorAll('.modulo-contenido, #modulo-mundial-multi, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
+     document.querySelectorAll('.modulo-contenido, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
      document.querySelectorAll('.tile-modulo-fifa, .btn-modulo-match').forEach(btn => btn.classList.remove('activo'));
      
      // Muestra el módulo clickeado
@@ -1622,12 +1622,7 @@ function actualizarEstrellasVisualesDraft() {
 }
 
 async function ejecutarTorneoMundial() {
-    const faseDraftOnline = document.getElementById("multi-fase-draft");
-    if (faseDraftOnline && faseDraftOnline.style.display === "block") {
-        if (jugadoresSeleccionadosDraft.length !== 3) return alert("❌ Completá la alineación de 3 jugadores.");
-        confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft);
-        return;
-    }
+    // Si no hay 3 jugadores elegidos en el Draft local, frena
     if (jugadoresSeleccionadosDraft.length !== 3) return alert("❌ Completá la alineación de 3 jugadores.");
 
     mostrarCarga("Pidiendo autorización de planilla a la FIFA...");
