@@ -3279,51 +3279,51 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
 });
 
 // ========================================================================
-// 🦾 BOT COMERCIANTE: POOL DE CONTRATOS EXPANDIDO Y VIGENTE
+// 🦾 BOT COMERCIANTE: POOL DE CONTRATOS EXPANDIDO Y VIGENTE (CORREGIDO)
 // ========================================================================
 const POOL_GLOBAL_SBC = [
-    // 🇦🇷 ARGENTINA (Fácil de completar con duplicados comunes y raros)
+    // 🇦🇷 ARGENTINA
     { id: 101, titulo: "⚔️ DESAFÍO ALBICELESTE", descripcion: "Entregá 3 jugadores COMUNES de ARGENTINA.", requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 1500 } },
     { id: 107, titulo: "🔥 POTENCIA DE LIGA LOCAL", descripcion: "El Bot busca 2 cartas RARAS nacidas en ARGENTINA.", requisitos: { cantidad: 2, rareza: "rara", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 2500 } },
-
-    // 🇧🇷 BRASIL (Ideal para quemar esas copas épicas o armar economías)
+    // 🇧🇷 BRASIL
     { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ÉPICA de BRASIL.", requisitos: { cantidad: 2, rareza: "epica", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
     { id: 108, titulo: "🌴 SAMBA DE INTERCAMBIO", descripcion: "Sacrificá 3 cartas COMUNES nacidas en BRASIL.", requisitos: { cantidad: 3, rareza: "comun", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 1200 } },
-
-    // 🇫🇷 FRANCIA (Consistente para balancear con cartas intermedias y tops)
+    // 🇫🇷 FRANCIA
     { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "rara", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
     { id: 109, titulo: "🐓 GALOS DE ÉLITE", descripcion: "El Bot exige 2 estrellas de rareza ÉPICA de FRANCIA.", requisitos: { cantidad: 2, rareza: "epica", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 4200 } },
-
-    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 INGLATERRA (Recompensas pesadas para el end-game)
+    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 INGLATERRA
     { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 2 cracks de rareza LEGENDARIA nacidos en INGLATERRA.", requisitos: { cantidad: 2, rareza: "legendaria", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 8000 } },
     { id: 110, titulo: "🛡️ ACADEMIA DE LONDRES", descripcion: "Buscamos 3 cartas RARAS nacidas en INGLATERRA.", requisitos: { cantidad: 3, rareza: "rara", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 3800 } },
-
-    // 🇪🇸 ESPAÑA (Alineado a tus cartas reales en la Arena)
+    // 🇪🇸 ESPAÑA
     { id: 105, titulo: "🇪🇸 FURIA ROJA DE INTERCAMBIO", descripcion: "El Bot exige 3 jugadores RAROS nacidos en ESPAÑA.", requisitos: { cantidad: 3, rareza: "rara", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 3000 } },
     { id: 111, titulo: "🪄 TOQUE MEDITERRÁNEO", descripcion: "Entregá 2 jugadores COMUNES nacidos en ESPAÑA.", requisitos: { cantidad: 2, rareza: "comun", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 1000 } },
-
-    // 🇮🇹 ITALIA (Ajustado a tus bases de datos para que sea 100% posible)
+    // 🇮🇹 ITALIA
     { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 3 jugadores COMUNES nacidos en ITALIA.", requisitos: { cantidad: 3, rareza: "comun", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 1400 } },
     { id: 112, titulo: "🏛️ GLADIADORES PREMIUM", descripcion: "El comerciante busca 2 cartas RARAS nacidas en ITALIA.", requisitos: { cantidad: 2, rareza: "rara", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 2800 } }
 ];
 
-// 🔄 FUNCIÓN MATEMÁTICA: Devuelve el número de semana del año calendario actual
+// 🔥 CORREGIDO: Devuelve un índice de semana estricto que muta únicamente los Lunes a las 00:00 hs de Argentina
 function obtenerNumeroSemanaActual() {
     const ahora = new Date();
-    const principioDeAño = new Date(ahora.getFullYear(), 0, 1);
-    const milisegundosPasados = ahora - principioDeAño;
+    // Convertimos la hora actual a la zona de Buenos Aires para evitar desfases de Render
+    const stringBsAs = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+    const fechaLocal = new Date(stringBsAs);
+
+    const principioDeAño = new Date(fechaLocal.getFullYear(), 0, 1);
+    const milisegundosPasados = fechaLocal - principioDeAño;
     const diasPasados = Math.floor(milisegundosPasados / (1000 * 60 * 60 * 24));
+    
+    // Forzamos la alineación con el día Lunes
     return Math.ceil((diasPasados + principioDeAño.getDay() + 1) / 7);
 }
 
-// 🔄 FUNCIÓN FILTRADORA: Elige dinámicamente qué contratos mostrar esta semana
+// 🔄 FUNCIÓN FILTRADORA: Entrega los contratos de la cartelera de forma circular
 function obtenerContratosDeLaSemana() {
     const numeroSemana = obtenerNumeroSemanaActual();
-    const cantidadAExhibir = 2; // Cuántos contratos querés activos en simultáneo
+    const cantidadAExhibir = 3; // 🔥 Subido a 3 para completar estéticamente tu frontend
     
     const contratosRotativos = [];
     for (let i = 0; i < cantidadAExhibir; i++) {
-        // La magia del residuo (%): va recorriendo el array de forma circular semana a semana
         const indiceCalculado = (numeroSemana + i) % POOL_GLOBAL_SBC.length;
         contratosRotativos.push(POOL_GLOBAL_SBC[indiceCalculado]);
     }
@@ -3336,12 +3336,11 @@ app.get('/api/contratos/activo', verificarToken, (req, res) => {
     res.json({ ok: true, contratos: contratosActivos });
 });
 
-// 3️⃣ Endpoint Atómico de Procesamiento (Se mantiene dinámico y blindado)
+// 3️⃣ Endpoint Atómico de Procesamiento (Blindado)
 app.post('/api/contratos/completar', verificarToken, async (req, res) => {
     const usuarioId = req.usuarioLogueado.id;
     const { contratoId, jugadorIds } = req.body;
 
-    // 🛡️ IMPORTANTE: El usuario solo puede completar un contrato si está en la rotación activa actual
     const contratosPermitidosHoy = obtenerContratosDeLaSemana();
     const contratoElegido = contratosPermitidosHoy.find(c => c.id === Number(contratoId));
     
@@ -3734,6 +3733,91 @@ app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
     }
 });
 
+// ========================================================================
+// 🏆 MOTOR AUTOMÁTICO: RECOMPENSAS Y RESET SEMANAL DE RANKINGS
+// ========================================================================
+
+async function procesarResetSemanalRankings() {
+    const client = await pool.connect();
+    try {
+        // 1. Control del tiempo real unificado (GMT-3 Buenos Aires)
+        const ahora = new Date();
+        const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
+        
+        // Formateadores para saber el día de la semana y la fecha limpia
+        const formatterDia = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'short' });
+        const formatterFecha = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' });
+        
+        const diaSemana = formatterDia.format(ahora); // ej: "Mon", "Tue", "Wed"...
+        const [mes, dia, anio] = formatterFecha.format(ahora).split('/');
+        const fechaHoyString = `${anio}-${mes}-${dia}`;
+
+        // 🛑 CONDICIÓN DE GATILLO: Solo se ejecuta los Lunes ("Mon")
+        if (diaSemana !== 'Mon') return;
+
+        await client.query('BEGIN');
+
+        // 2. Chequeamos si ya se procesó el reset de este lunes específico para evitar duplicados
+        const verificarReset = await client.query(
+            "SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1",
+            [fechaHoyString]
+        );
+
+        if (verificarReset.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return; // Ya fue ejecutado hoy, salimos silenciosamente
+        }
+
+        console.log(`🚧 ¡Arrancando proceso de Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
+
+        // ========================================================================
+        // 📋 PROCESAMIENTO RECOMPENSAS RANKING MUNDIAL (Por copas_mundiales)
+        // ========================================================================
+        const topMundial = await client.query(
+            "SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3"
+        );
+        
+        if (topMundial.rows.length > 0) {
+            if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]); // 🥇
+            if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]); // 🥈
+            if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);  // 🥉
+        }
+
+        // ========================================================================
+        // 🧤 PROCESAMIENTO RECOMPENSAS RANKING PENALES (Por puntos_ranking)
+        // ========================================================================
+        const topPenales = await client.query(
+            "SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3"
+        );
+
+        if (topPenales.rows.length > 0) {
+            if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]); // 🥇
+            if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]); // 🥈
+            if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);  // 🥉
+        }
+
+        // ========================================================================
+        // ♻️ RESET TOTAL A CERO DE LAS TABLAS
+        // ========================================================================
+        await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
+
+        // 3. Dejamos el sello en el calendario para que no vuelva a correr hasta el próximo lunes
+        await client.query(
+            "INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)",
+            [fechaHoyString]
+        );
+
+        await client.query('COMMIT');
+        console.log("🏆 ¡Reset completado con éxito! Monedas depositadas al Top 3 y marcadores vueltos a cero.");
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Error crítico en el proceso de reset semanal:", err.message);
+    } finally {
+        client.release();
+    }
+}
+
 /* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
    ======================================================================== */
@@ -3762,6 +3846,70 @@ app.get('/api/anuncio-actual', (req, res) => {
     // 🟢 Sincronizado dinámicamente con la configuración multimedia completa
     res.json(CONFIG_ANUNCIO_SERVIDOR);
 });
+
+function iniciarCronometroResetRanking() {
+    if (intervaloResetRanking) clearInterval(intervaloResetRanking);
+
+    intervaloResetRanking = setInterval(() => {
+        const ahora = new Date();
+        
+        // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
+        let diasFaltantes = (1 - ahora.getDay() + 7) % 7;
+        
+        // Si ya es lunes, pero pasó la medianoche, el próximo reset es el lunes que viene
+        if (diasFaltantes === 0 && (ahora.getHours() > 0 || ahora.getMinutes() > 0 || ahora.getSeconds() > 0)) {
+            diasFaltantes = 7;
+        }
+
+        const proximoLunesReset = new Date();
+        proximoLunesReset.setDate(ahora.getDate() + diasFaltantes);
+        proximoLunesReset.setHours(0, 0, 0, 0);
+
+        const tiempoRestanteMs = proximoLunesReset - ahora;
+
+        // 🎯 CAPTURAMOS LAS TRES ETIQUETAS DE LA ARENA
+        const timerPenales = document.getElementById("timer-ranking-semanal");
+        const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
+        const timerSBC = document.getElementById("sbc-timer-rotacion");
+
+        if (tiempoRestanteMs <= 0) {
+            clearInterval(intervaloResetRanking);
+            const msgReset = "🔄 ROTANDO CARTELERA Y DISTRIBUYENDO PREMIOS...";
+            
+            if (timerPenales) timerPenales.innerText = msgReset;
+            if (timerMundial) timerMundial.innerText = msgReset;
+            if (timerSBC) timerSBC.innerText = msgReset;
+            
+            setTimeout(() => {
+                if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
+                if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
+                // 🤖 Acá podés meter la función que refresca los contratos del bot si tenés una, ej: cargarContratosSbcAlIniciar();
+                iniciarCronometroResetRanking();
+            }, 10000);
+            return;
+        }
+
+        const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
+        const dias = Math.floor(totalSegundos / 86400);
+        const horas = Math.floor((totalSegundos % 86400) / 3600);
+        const minutos = Math.floor((totalSegundos % 3600) / 60);
+        const segundos = totalSegundos % 60;
+
+        const stringDias = dias > 0 ? `${dias}d ` : "";
+        const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+        
+        // 🚀 INYECCIÓN SIMULTÁNEA SIN DESFASAJES
+        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
+    }, 1000);
+}
+
+// El servidor va a chequear la fecha de forma pasiva cada 1 hora
+setInterval(procesarResetSemanalRankings, 1000 * 60 * 60);
+
+// Forzamos una ejecución inicial limpia de resguardo apenas se levanta el servicio en Render
+setTimeout(procesarResetSemanalRankings, 5000);
 
 /* ========================================================================
    🚀 INICIALIZACIÓN DEL SERVIDOR
