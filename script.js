@@ -3884,7 +3884,6 @@ let intervaloResetMisiones = null; // Control atómico del bucle del reloj
 
 // Esta función se ejecuta al iniciar sesión (adentro de autenticarUsuario)
 async function cargarMisionesDelServidor() {
-    // 🛡️ ESCUDO: Si no hay usuario en memoria, frenamos la llamada antes del 401
     if (!usuarioActual) return;
 
     try {
@@ -3895,18 +3894,10 @@ async function cargarMisionesDelServidor() {
         const data = await res.json();
         
         if (data.ok && data.misiones) {
-            // Guardamos las filas de Postgres de manera global
             window.misionesDiariasUsuario = data.misiones;
-            
-            // 🚀 DOBLE JUGADA DE FUERZA BRUTA: Limpiamos y renderizamos en el acto
-            console.log("📊 Misiones recibidas del backend con éxito:", window.misionesDiariasUsuario);
             renderizarMisionesDiarias();
-            
-            // Iniciamos el cronómetro dinámico del HUD
             iniciarCronometroResetMisiones();
         } else {
-            console.warn("⚠️ El servidor respondió ok pero el array de misiones vino vacío.");
-            // Resguardo visual por si la base de datos de Neon tardó en responder
             const contenedor = document.getElementById("contenedor-lista-misiones");
             if (contenedor) {
                 contenedor.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem;">⏳ Cartelera vacía. Generando nuevos objetivos...</p>`;
@@ -3990,7 +3981,6 @@ async function reclamarPremioMisionServer(idMision) {
     try {
         const res = await fetch(`${URL_BASE}/misiones/reclamar`, {
             method: 'POST',
-            // 🔥 CORREGIDO: Combinamos el Content-Type junto a tus tokens de autenticación
             headers: { 
                 'Content-Type': 'application/json', 
                 ...obtenerHeadersSeguros() 
@@ -4012,8 +4002,6 @@ async function reclamarPremioMisionServer(idMision) {
             }
 
             renderizarMisionesDiarias();
-            console.log(`🪙 Recompensa cobrada con éxito. Balance actualizado a: ${data.monedas}`);
-
         } else {
             const modal = document.getElementById('modalAnuncioGlobal');
             const tituloHtml = document.getElementById('anuncioTitulo');
@@ -4117,7 +4105,7 @@ async function verificarRecompensaDiaria() {
                 }
             }
         } else {
-            console.log(`ℹ️ Control diario completado: ${data.mensaje}`);
+            //console.log(`ℹ️ Control diario completado: ${data.mensaje}`);
         }
     } catch (err) {
         console.error("Error al gestionar el bono de racha diario:", err);
