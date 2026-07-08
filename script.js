@@ -301,9 +301,30 @@ async function cerrarSesionLocal() {
      document.getElementById("input-usuario").value = "";
      document.getElementById("input-pass").value = "";
 
+     // 🛠️ REHABILITACIÓN MANUAL DE BOTONES DE ACCESO
+     // Forzamos a que recuperen su facha original y queden 100% cliqueables al volver al Login
+     const btnLogin = document.querySelector('.btn-login-match');
+     const btnRegistro = document.querySelector('.btn-registro-match');
+
+     if (btnLogin) {
+          btnLogin.disabled = false;
+          btnLogin.style.opacity = "1";
+          btnLogin.style.filter = "none";
+          btnLogin.style.cursor = "pointer";
+     }
+     if (btnRegistro) {
+          btnRegistro.disabled = false;
+          btnRegistro.style.opacity = "1";
+          btnRegistro.style.filter = "none";
+          btnRegistro.style.cursor = "pointer";
+     }
+
      const interfazJuego = document.getElementById("interfaz-juego");
-     interfazJuego.classList.remove("mostrar");
-     interfazJuego.style.display = "none";
+     if (interfazJuego) {
+          interfazJuego.classList.remove("mostrar");
+          interfazJuego.style.display = "none";
+     }
+     
      document.getElementById("seccion-login").style.display = "block";
 
      alert("🚪 Sesión cerrada correctamente. Volviste al menú local.");
