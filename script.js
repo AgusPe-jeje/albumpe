@@ -29,7 +29,9 @@ let multiCodigoSala = null;
 let multiEsCreador = false;
 let multiApuestaFijada = 0;
 window.multiTipoApuestaActual = 'amistoso'; // Opciones: 'amistoso', 'oro', 'carta'
-socketArena = io(URL_RENDER_SERVICIO); // O io() a secas si corre en el mismo origen
+
+// 💡 PRIMERO se declara la variable global con let, y al mismo tiempo se inicializa con io()
+let socketArena = io(URL_RENDER_SERVICIO);
 
 // Mapeos Estáticos de Diseño y Lógica de Puntos
 const MAPA_PUNTOS_RAREZA = { 
