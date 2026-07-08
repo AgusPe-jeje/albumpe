@@ -2806,6 +2806,70 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
     });
 };
 
+/* ========================================================================
+   🎮 MOTOR INTERACTIVO: BOTONERA PVP EN VIVO (CONEXIÓN NEON)
+   ======================================================================== */
+window.lanzarBotoneraPVPUI = function(rol, soyAtacante) {
+    // 1. Buscamos el contenedor interactivo activo usando la clase o la estructura del DOM
+    // Buscamos el último módulo interactivo visible en la pantalla
+    const modulos = document.querySelectorAll('[id^="modulo-interactivo-"]');
+    const modActivo = modulos[modulos.length - 1];
+    if (!modActivo) return;
+
+    const idUnico = modActivo.id.replace("modulo-interactivo-", "");
+    const contenedorOpciones = document.getElementById(`evento-opciones-${idUnico}`);
+    const tituloEvento = document.getElementById(`evento-titulo-${idUnico}`);
+    const textoEvento = document.getElementById(`evento-texto-${idUnico}`);
+
+    if (!contenedorOpciones) return;
+    contenedorOpciones.innerHTML = ""; // Limpiamos residuos
+
+    // 2. Cambiamos los textos según te toque atacar o defender
+    if (soyAtacante) {
+        tituloEvento.innerText = "⚡ ¡ESTÁS ATACANDO, CRACK!";
+        textoEvento.innerText = "🔟 El equipo rompió líneas. Elegí una estrategia ofensiva para burlar la marca del rival:";
+        
+        contenedorOpciones.innerHTML = `
+            <button class="btn-estadio" onclick="confirmarEleccionPVPMulti('${idUnico}', 1, true)" style="background:var(--verde-match); color:#000; font-weight:bold; margin-bottom:5px;">🎯 Remate Colocado al Segundo Palo</button>
+            <button class="btn-estadio" onclick="confirmarEleccionPVPMulti('${idUnico}', 2, true)" style="background:var(--verde-match); color:#000; font-weight:bold;">⚡ Centro Atrás al Ras del Pasto</button>
+        `;
+    } else {
+        tituloEvento.innerText = "🛡️ ¡TE ESTÁN ATACANDO, PA!";
+        textoEvento.innerText = "🟥 El rival se metió en tu área. Ordená un movimiento defensivo urgente a tus centrales:";
+        
+        contenedorOpciones.innerHTML = `
+            <button class="btn-estadio" onclick="confirmarEleccionPVPMulti('${idUnico}', 3, false)" style="background:var(--rojo); color:#fff; font-weight:bold; margin-bottom:5px;">🧤 Achique del Arquero y Cobertura</button>
+            <button class="btn-estadio" onclick="confirmarEleccionPVPMulti('${idUnico}', 4, false)" style="background:var(--rojo); color:#fff; font-weight:bold;">🧱 Barrida Limpia a la Pelota</button>
+        `;
+    }
+
+    // Mostramos el panel interactivo con una transición
+    modActivo.style.display = "block";
+    modActivo.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+// 3. Función auxiliar para mandar la respuesta a tu Endpoint de Neon
+window.confirmarEleccionPVPMulti = async function(idUnico, opcionId, esLocal) {
+    const modActivo = document.getElementById(`modulo-interactivo-${idUnico}`);
+    if (modActivo) modActivo.style.display = "none"; // Ocultamos al elegir
+
+    document.getElementById(`consola-incidencias-${idUnico}`).innerText = "⏳ Elección enviada. Esperando resolución de la banca...";
+
+    try {
+        await fetch(`${URL_BASE}/multijugador/enviar-eleccion`, {
+            method: 'POST',
+            headers: obtenerHeadersSeguros(),
+            body: JSON.stringify({
+                sala_id: multiSalaId,
+                opcion_id: opcionId,
+                esLocal: multiEsCreador // Mapea si sos el host real de la sala
+            })
+        });
+    } catch (e) {
+        console.error("❌ Error enviando táctica PVP:", e);
+    }
+};
+
 function inyectarGritoGolMulti(index, mensajeTexto) {
      const logView = document.getElementById(`multi-log-vivo-${index}`);
      if (!logView) return;
