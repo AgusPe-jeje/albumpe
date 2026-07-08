@@ -777,17 +777,38 @@ app.get('/api/mundial/estado', verificarToken, async (req, res) => {
         const userCheck = await client.query("SELECT copas_mundiales, ultimo_mundial_timestamp FROM usuarios WHERE id = $1", [usuarioId]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, error: "Usuario inexistente." });
 
-        const user = userCheck.rows[0]; const ahora = new Date(); let tiempoRestante = 0;
+        const user = userCheck.rows[0]; 
+        const ahora = new Date(); 
+        let tiempoRestante = 0;
 
+        // 🛡️ Aseguramos que la constante exista (por si acaso, definimos 4 horas por defecto si no está)
+        const cooldownLimite = typeof COOLDOWN_MUNDIAL_MS !== 'undefined' ? COOLDOWN_MUNDIAL_MS : (4 * 60 * 60 * 1000);
+
+        // 🛡️ Validación estricta de la fecha que viene de PostgreSQL
         if (user.ultimo_mundial_timestamp) {
-            const transcurrido = ahora - new Date(user.ultimo_mundial_timestamp);
-            if (transcurrido < COOLDOWN_MUNDIAL_MS) tiempoRestante = COOLDOWN_MUNDIAL_MS - transcurrido;
+            const fechaDb = new Date(user.ultimo_mundial_timestamp);
+            
+            // Verificamos que la fecha sea un objeto válido antes de operar
+            if (!isNaN(fechaDb.getTime())) {
+                const transcurrido = ahora.getTime() - fechaDb.getTime();
+                if (transcurrido < cooldownLimite) {
+                    tiempoRestante = cooldownLimite - transcurrido;
+                }
+            }
         }
 
-        return res.json({ ok: true, copas: Number(user.copas_mundiales) || 0, milisegundosRestantes: Math.floor(tiempoRestante) });
+        return res.json({ 
+            ok: true, 
+            copas: Number(user.copas_mundiales) || 0, 
+            milisegundosRestantes: Math.floor(tiempoRestante) 
+        });
     } catch (err) {
+        // Imprimimos el error real en la consola del servidor para que sepas exactamente qué falló
+        console.error("❌ Error interno en /api/mundial/estado:", err);
         return res.status(500).json({ ok: false, error: "Error de sincronización en el servidor." });
-    } finally { client.release(); }
+    } finally { 
+        client.release(); 
+    }
 });
 
 app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
