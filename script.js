@@ -3871,7 +3871,7 @@ async function actualizarMiPerfilUI() {
     }
 }
 
-async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
+async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
     if (!usuarioActual || !usuarioActual.id) return alert("⚠️ No se detectó una sesión activa.");
 
     try {
@@ -3879,14 +3879,14 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
 
         const token = localStorage.getItem("token");
         
-        // 🛠️ FIX: Agregamos el /api/ que faltaba en la URL para que no te rebote con 404
+        // 🚀 Forzamos a que el fetch mande exactamente la variable 'cromoRutaImagen'
         const res = await fetch(`${URL_BASE}/api/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ fotoUrl: fotoUrl })
+            body: JSON.stringify({ fotoUrl: cromoRutaImagen }) // 🎯 Mapeado directo con el req.body.fotoUrl del backend
         });
 
         const data = await res.json();
@@ -3895,25 +3895,20 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // 🔄 Sincronizamos la memoria de inmediato
-            usuarioActual.cromo_destacado = fotoUrl;
+            // Sincronizamos al instante la memoria global de la sesión activa
+            usuarioActual.cromo_destacado = cromoRutaImagen;
 
-            // 🎯 Forzamos el redibujado usando la función global que lee el estado
-            if (typeof renderizarCromoDestacadoUI === "function") {
-                renderizarCromoDestacadoUI();
-            } else {
-                // Resguardo manual si la función no está al alcance
-                const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
-                if (contenedorDestacado) {
-                    contenedorDestacado.innerHTML = `
-                        <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 20px auto;">
-                            <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
-                        </div>
-                    `;
-                }
+            // Pintamos el cambio en el DOM al toque para feedback inmediato
+            const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
+            if (contenedorDestacado) {
+                contenedorDestacado.innerHTML = `
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 20px auto;">
+                        <img src="${cromoRutaImagen}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                `;
             }
             
-            // 🔄 Si recargás el perfil, asegurate de que use el nuevo dato en memoria
+            // Refrescamos el perfil completo para sincronizar con el backend
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
@@ -3922,7 +3917,7 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
         }
     } catch (err) {
         if (typeof ocultarCarga === "function") ocultarCarga();
-        console.error("Error al enviar el cromo destacado:", err);
+        console.error("❌ Error al enviar el cromo destacado:", err);
         alert("❌ Error de red al intentar conectar con el vestuario.");
     }
 }
