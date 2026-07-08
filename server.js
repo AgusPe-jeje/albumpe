@@ -3605,20 +3605,20 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
     }
 });
 
-// 🌟 Guardar la carta destacada en el perfil del usuario
+// 🌟 Guardar el cromo destacado en su columna correspondiente
 app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
     const usuarioId = req.usuarioLogueado.id;
-    const { fotoUrl } = req.body; // Recibimos la URL de la foto del cromo
+    const { fotoUrl } = req.body; 
 
     if (!fotoUrl) {
         return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL de la imagen." });
     }
 
     try {
-        // Actualizamos el campo 'foto' del usuario con la imagen del jugador elegido
-        await pool.query('UPDATE usuarios SET foto = $1 WHERE id = $2', [fotoUrl, usuarioId]);
+        // 🔥 CORREGIDO: Actualiza 'cromo_destacado' para no pisar la foto de perfil
+        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [fotoUrl, usuarioId]);
         
-        res.json({ ok: true, mensaje: "🌟 ¡Perfil actualizado! Tu jugador destacado ya está en el vestuario." });
+        res.json({ ok: true, mensaje: "🌟 ¡Cromo lucido en la vitrina del vestuario!" });
     } catch (err) {
         console.error("Error al destacar cromo:", err);
         res.status(500).json({ ok: false, error: "Error interno del servidor." });
