@@ -3623,42 +3623,38 @@ let intervaloResetRanking = null; // Control atómico anti-loops
 function iniciarCronometroResetRanking() {
     if (intervaloResetRanking) clearInterval(intervaloResetRanking);
 
-    const calcularYRenderizar = () => {
+    const calcularYRenderizar = async () => {
         const ahora = new Date();
+        // Ajustamos al huso de Argentina (GMT-3)
+        const ahoraArg = new Date(ahora.toLocaleString("en-US", {timeZone: "America/Argentina/Buenos_Aires"}));
         
-        // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
-        let diasFaltantes = (1 - ahora.getDay() + 7) % 7;
-        
-        // Si ya es lunes, pero pasó la medianoche, el próximo reset es el lunes que viene
-        if (diasFaltantes === 0 && (ahora.getHours() > 0 || ahora.getMinutes() > 0 || ahora.getSeconds() > 0)) {
+        let diasFaltantes = (1 - ahoraArg.getDay() + 7) % 7;
+        if (diasFaltantes === 0 && (ahoraArg.getHours() > 0 || ahoraArg.getMinutes() > 0)) {
             diasFaltantes = 7;
         }
 
-        const proximoLunesReset = new Date();
-        proximoLunesReset.setDate(ahora.getDate() + diasFaltantes);
+        const proximoLunesReset = new Date(ahoraArg);
+        proximoLunesReset.setDate(ahoraArg.getDate() + diasFaltantes);
         proximoLunesReset.setHours(0, 0, 0, 0);
 
-        const tiempoRestanteMs = proximoLunesReset - ahora;
+        const tiempoRestanteMs = proximoLunesReset - ahoraArg;
 
-        // 🎯 CAPTURAMOS LAS TRES ETIQUETAS DE LA ARENA
         const timerPenales = document.getElementById("timer-ranking-semanal");
         const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
         const timerSBC = document.getElementById("sbc-timer-rotacion");
 
         if (tiempoRestanteMs <= 0) {
-            clearInterval(intervaloResetRanking);
-            const msgReset = "🔄 ROTANDO CARTELERA Y DISTRIBUYENDO PREMIOS...";
+            const msgReset = "🔄 CALCULANDO LIGA...";
+            [timerPenales, timerMundial, timerSBC].forEach(el => { if(el) el.innerText = msgReset; });
             
-            if (timerPenales) timerPenales.innerText = msgReset;
-            if (timerMundial) timerMundial.innerText = msgReset;
-            if (timerSBC) timerSBC.innerText = msgReset;
+            // 🚀 ESPERA ASÍNCRONA INTELIGENTE
+            await new Promise(r => setTimeout(r, 15000)); // Esperamos 15s para que el server termine el COMMIT
             
-            setTimeout(() => {
-                if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
-                if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
-                if (typeof cargarModuloSBC === 'function') cargarModuloSBC();
-                iniciarCronometroResetRanking();
-            }, 10000);
+            if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
+            if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
+            if (typeof cargarModuloSBC === 'function') cargarModuloSBC();
+            
+            iniciarCronometroResetRanking();
             return;
         }
 
@@ -3668,22 +3664,16 @@ function iniciarCronometroResetRanking() {
         const minutos = Math.floor((totalSegundos % 3600) / 60);
         const segundos = totalSegundos % 60;
 
-        const stringDias = dias > 0 ? `${dias}d ` : "";
-        const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+        const str = `${dias > 0 ? dias + 'd ' : ''}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
         
-        // 🚀 INYECCIÓN SIMULTÁNEA CONTROLADA (No rompe si el elemento no está renderizado)
-        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
-        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
-        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
+        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${str}`;
+        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${str}`;
+        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${str}`;
     };
 
-    // Executamos una vez al instante para ganarle al delay del primer segundo
     calcularYRenderizar();
-
-    // Arrancamos el bucle limpio
     intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
 }
-
 function toggleVisibilidadMisiones() {
     const wrapper = document.getElementById("wrapper-desplegable-misiones");
     const boton = document.getElementById("btn-toggle-misiones");
