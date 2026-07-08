@@ -5,32 +5,41 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg'); 
 const path = require('path');
+const jwt = require('jsonwebtoken'); 
+
 const BITACORAS_SALA_CACHE = {};
+// 🧠 Almacén en memoria del servidor para los estados vivos de los partidos online
+const SALAS_PARTIDOS_VIVOS = {}; 
 
 const app = express();
 
-// 🟢 ¡FALTABA ESTO DE ACÁ ABAJO! Inicialización real del pool de conexión para Neon
+// 🟢 Servidor HTTP nativo de Node wrapping Express (OBLIGATORIO PARA SOCKETS)
+const http = require('http').createServer(app);
+
+// ⚡ Inicialización de Socket.io vinculada al servidor HTTP y con CORS libre
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"]
+    }
+});
+
+// Pool de conexión para Neon
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL, 
   ssl: {
-    rejectUnauthorized: false // Clave obligatoria para que Render conecte con Neon de forma segura
+    rejectUnauthorized: false 
   }
 });
 
-const jwt = require('jsonwebtoken'); 
 const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_super_segura_para_la_arena';
 
-// ✨ Clave para leer la IP real del cliente detrás del proxy de Render
 app.set('trust proxy', true);
-
-// ✨ Render asigna el puerto dinámicamente; si no encuentra, usa el 3000
 const PORT = process.env.PORT || 3000;
 
-// Habilitamos CORS y JSON arriba de todo para que los middlewares lean el body sin problemas
 app.use(cors());
 app.use(express.json());
 
-// Genera un código de 6 caracteres únicos para las salas
 function generarCodigoSala() {
     const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let resultado = '';
@@ -53,7 +62,7 @@ const verificarToken = (req, res, next) => {
 
     try {
         const verificado = jwt.verify(token, JWT_SECRET);
-        req.usuarioLogueado = verificado; // Guardamos id y username descifrados en la petición
+        req.usuarioLogueado = verificado; 
         next();
     } catch (err) {
         return res.status(403).json({ ok: false, error: "❌ Sesión inválida o expirada. Volvé a loguearte." });
@@ -61,23 +70,18 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🚧 MIDDLEWARE: MODO MANTENIMIENTO INTELLIGENT-FILTER (PERMITIDOS & REBOTES)
+   🚧 MIDDLEWARE: MODO MANTENIMIENTO INTELLIGENT-FILTER
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
 
 app.use((req, res, next) => {
-    // 1. Si el mantenimiento está apagado, la Arena fluye de forma normal sin interferencias
-    if (!MODO_MANTENIMIENTO) {
-        return next();
-    }
+    if (!MODO_MANTENIMIENTO) return next();
 
-    // 2. EXCEPCIÓN A: Permitir la carga de archivos estáticos del Frontend para que se vea la pantalla de aviso
     if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
-    // 3. EXCEPCIÓN B: Rutas públicas del sistema (Anuncios, deslogueo y avatares iniciales)
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
@@ -86,7 +90,6 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // 4. FILTRO DE ACCESO EN LOGIN: Permitir el paso únicamente a Testers por Body
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
         if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
@@ -99,7 +102,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // 5. BLOQUEO ABSOLUTO: Registro de cuentas deshabilitado durante reformas
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
             ok: false,
@@ -108,27 +110,21 @@ app.use((req, res, next) => {
         });
     }
 
-    // 6. FILTRO DE PETICIONES PROTEGIDAS: Desencriptación JWT para validar Testers Oficiales en el resto de la API
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
     if (token) {
         try {
-            // Desencriptamos temporalmente el token para saber quién intenta ingresar
             const decodificado = jwt.verify(token, JWT_SECRET);
-            
             if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-                // Es un tester verificado con sesión activa, adjuntamos sus datos para que no falle el endpoint y le damos paso
                 req.usuarioLogueado = decodificado;
                 return next(); 
             }
         } catch (err) {
-            // Si el token expiró o es inválido, no hacemos nada y dejamos que caiga en el rebote 503
             console.warn("⚠️ Intento de bypass con credenciales inválidas en mantenimiento.");
         }
     }
 
-    // 7. REBOTE GENERAL: Si no cumplió ninguna condición anterior, se le deniega el acceso con la bandera activa
     return res.status(503).json({ 
         ok: false,
         mantenimiento: true, 
@@ -136,7 +132,6 @@ app.use((req, res, next) => {
     });
 });
 
-// Carpeta estática asignada después del filtro de mantenimiento
 app.use(express.static(path.join(__dirname)));
 
 /* ========================================================================
@@ -1439,7 +1434,6 @@ app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) =>
         const userCheck = await client.query("SELECT id FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
 
-        // 1. Intentamos buscar países donde el usuario tenga un plantel competitivo (mínimo 3 cartas)
         const paisesValidosQuery = await client.query(`
             SELECT j.pais 
             FROM usuario_progreso up 
@@ -1451,9 +1445,6 @@ app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) =>
 
         let countriesResult = paisesValidosQuery.rows.map(r => r.pais);
 
-        // 🎯 RETROALIMENTACIÓN / FALLBACK DE TESTEO:
-        // Si el usuario no tiene suficientes cartas, le prestamos 3 países del catálogo global 
-        // para que la interfaz NO se quede colgada en blanco y puedas probar el flujo.
         if (countriesResult.length === 0) {
             console.log(`⚠️ Usuario ${usuario_id} sin stock para Draft. Activando países de emergencia para pruebas.`);
             const paisesPrueba = ["Argentina", "Brasil", "Francia", "España", "Alemania", "Inglaterra"];
@@ -1485,7 +1476,7 @@ app.post('/api/multijugador/crear', verificarToken, async (req, res) => {
         return res.json({ ok: false, mensaje: "❌ Debés seleccionar 3 jugadores para tu plantel." });
     }
 
-    const codigo_sala = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const codigo_sala = generarCodigoSala(); // Usamos tu función prolija
     const modalidad = tipo_apuesta ? tipo_apuesta.toLowerCase() : 'amistoso';
     const montoApuesta = parseInt(apuesta_oro) || 0;
 
@@ -1575,6 +1566,9 @@ app.post('/api/multijugador/unirse', verificarToken, async (req, res) => {
             [sala.id, usuario_id, seleccion, jugador_ids]
         );
 
+        // 🔌 Notificamos al Host mediante socket que el rival ya entró al lobby
+        io.to(codigo_sala.toUpperCase()).emit('rival_unido', { mensaje: "¡Tu rival ingresó a la sala!" });
+
         return res.json({
             ok: true,
             mensaje: "⚽ ¡Te uniste con éxito! Esperando que el host inicie el fixture...",
@@ -1625,7 +1619,6 @@ app.get('/api/multijugador/sala/:codigo', async (req, res) => {
 /* ========================================================================
    💥 SIMULACIÓN Y PROCESAMIENTO CON TIMELINE EXCLUSIVO MULTIJUGADOR
    ======================================================================== */
-
 function generarMinutosGolesMultijugador(cantidad) {
     let minutos = [];
     while(minutos.length < cantidad) {
@@ -1656,11 +1649,9 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
     }
 
     const esPvpPuro = !equipo1.esBot && !equipo2.esBot;
-
     const minutosL = generarMinutosGolesMultijugador(g1);
     const minutosV = generarMinutosGolesMultijugador(g2);
 
-    // 🖥️ Esquema: Llaves de eventos sincronizados para Host vs Invitado
     const llavesAtaque = ["penal_favor", "corner_favor", "tirolibre_favor", "contrataque_favor"];
     const eventosL = minutosL.map(() => llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)]);
     const eventosV = minutosV.map(() => esPvpPuro ? llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)] : "defensa_urgente");
@@ -1681,120 +1672,10 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
         penalesVisitante: fueAPenales ? penales2 : null,
         definicionPenales: fueAPenales,
         ganadorUsername: ganador.username,
-        // Inyectamos banderas explícitas de bots para que el front no tenga que adivinar identidades
         localEsBot: equipo1.esBot,
         visitanteEsBot: equipo2.esBot
     };
 }
-
-/* ========================================================================
-   ⏱️ ENDPOINTS DE CONTROL DE SEMÁFORO Y SINCRONIZACIÓN EN VIVO
-   ======================================================================== */
-
-// 1. El Host actualiza el minuto maestro del partido
-app.post('/api/multijugador/actualizar-reloj', verificarToken, async (req, res) => {
-    const { sala_id, minuto } = req.body;
-    try {
-        await pool.query("UPDATE mundial_salas SET minuto_actual = $1 WHERE id = $2", [minuto, sala_id]);
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
-// 2. El Host clava el semáforo al detectar el minuto de un gol en su cronograma
-app.post('/api/multijugador/pausar-por-evento', verificarToken, async (req, res) => {
-    const { sala_id } = req.body;
-    try {
-        await pool.query("UPDATE mundial_salas SET estado_jugada = 'esperando_eleccion' WHERE id = $1", [sala_id]);
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
-// 3. El Jugador activo envía su elección táctica. El Servidor procesa y activa 'mostrar_contador'
-app.post('/api/multijugador/enviar-eleccion', verificarToken, async (req, res) => {
-    const { sala_id, opcion_id, esLocal } = req.body;
-    try {
-        // Determinamos el éxito (Por ejemplo, 66% de probabilidad de éxito si es atacante)
-        const exito = Math.random() <= 0.66;
-        
-        const resultadoEstructura = {
-            exito: exito,
-            esLocalGanador: esLocal ? exito : !exito
-        };
-
-        await pool.query(`
-            UPDATE mundial_salas 
-            SET estado_jugada = 'mostrar_contador', 
-                ultimo_resultado = $1
-            WHERE id = $2`, 
-            [JSON.stringify(resultadoEstructura), sala_id]
-        );
-        
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
-// 4. Variante para cuando jugás contra un BOT en el torneo (Módulo interactivo Host/Invitado vs Bot)
-app.post('/api/multijugador/enviar-eleccion-bot', verificarToken, async (req, res) => {
-    const { sala_id, exito, esLocal } = req.body;
-    try {
-        const resultadoEstructura = {
-            exito: exito,
-            esLocalGanador: esLocal ? exito : !exito
-        };
-
-        await pool.query(`
-            UPDATE mundial_salas 
-            SET estado_jugada = 'mostrar_contador', 
-                ultimo_resultado = $1
-            WHERE id = $2`, 
-            [JSON.stringify(resultadoEstructura), sala_id]
-        );
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
-// 5. El Host limpia el semáforo una vez que finalizan los 3 segundos del contador visual en el front
-app.post('/api/multijugador/reanudar-partido', verificarToken, async (req, res) => {
-    const { sala_id } = req.body;
-    try {
-        await pool.query("UPDATE mundial_salas SET estado_jugada = 'jugando', ultimo_resultado = NULL WHERE id = $1", [sala_id]);
-        return res.json({ ok: true });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
-    }
-});
-
-// 6. El Endpoint Soberano de Polling constante (Ambas pantallas le pegan acá cada 800ms)
-// Reemplazá este endpoint en tu server.js
-app.get('/api/multijugador/estado-vivo/:sala_id', async (req, res) => {
-    const { sala_id } = req.params;
-    try {
-        // Buscamos de forma flexible por ID o por Código por las dudas
-        const salaQuery = await pool.query(
-            "SELECT minuto_actual, estado_jugada, ultimo_resultado FROM mundial_salas WHERE id = $1 OR codigo_sala = $2", 
-            [isNaN(sala_id) ? 0 : parseInt(sala_id), sala_id.toUpperCase()]
-        );
-        if (salaQuery.rows.length === 0) return res.json({ ok: false });
-        
-        return res.json({
-            ok: true,
-            minuto: salaQuery.rows[0].minuto_actual,
-            estadoJugada: salaQuery.rows[0].estado_jugada,
-            resultado: salaQuery.rows[0].ultimo_resultado ? JSON.parse(salaQuery.rows[0].ultimo_resultado) : null
-        });
-    } catch (err) {
-        return res.status(500).json({ ok: false });
-    }
-});
-
 
 /* ========================================================================
    🏁 ENDPOINT PRINCIPAL: CONTROLADOR DE INICIO DE TRANSMISIÓN DEL HOST
@@ -1819,6 +1700,7 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
         
         const sala = salaQuery.rows[0];
         const sala_id_real = sala.id;
+        const codigo_sala_real = sala.codigo_sala.toUpperCase();
 
         if (parseInt(sala.creador_id) !== parseInt(usuario_id)) { 
             await client.query('ROLLBACK');
@@ -1854,7 +1736,7 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
         const modalidadSala = sala.tipo_apuesta ? sala.tipo_apuesta.toLowerCase() : 'amistoso';
         const arancelOro = sala.apuesta_oro || 0;
 
-        // Validaciones de fondos y recursos (Intacto)
+        // Validaciones de fondos
         if (modalidadSala === 'oro') {
             const chequearMonedas = await client.query("SELECT id, monedas FROM usuarios WHERE id IN ($1, $2) FOR UPDATE", [idHost, idInvitado]);
             const oroHost = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
@@ -1936,16 +1818,20 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
             }
         }
 
-        // Dejamos la sala inicializada en minuto 0 y en estado activo de juego para el polling
-        await client.query(`
-            UPDATE mundial_salas 
-            SET estado = 'jugando', minuto_actual = 0, estado_jugada = 'jugando' 
-            WHERE id = $1`, [sala_id_real]
-        );
+        await client.query(`UPDATE mundial_salas SET estado = 'jugando' WHERE id = $1`, [sala_id_real]);
         
         BITACORAS_SALA_CACHE[sala_id_real] = { bitacora: bitacoraPartidosPlana, premio: datosPremio };
 
         await client.query('COMMIT'); 
+
+        // ⚡ MULTICAST SOCKET: Avisamos a TODA la sala en tiempo real que el torneo comenzó
+        // El frontend recibirá este evento y disparará la renderización automática de las llaves
+        io.to(codigo_sala_real).emit('torneo_iniciado', { 
+            sala_id: sala_id_real, 
+            bitacora: bitacoraPartidosPlana, 
+            premio: datosPremio 
+        });
+
         return res.json({ ok: true, bitacora: bitacoraPartidosPlana, premio: datosPremio });
 
     } catch (err) {
@@ -1954,24 +1840,6 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
         return res.status(500).json({ ok: false, error: err.message });
     } finally {
         client.release();
-    }
-});
-
-// Endpoint de consulta para el Invitado (Acoplado de manera idéntica al cache soberano)
-app.get('/api/multijugador/resultado-invitado/:sala_id', async (req, res) => {
-    const { sala_id } = req.params;
-    try {
-        const datosCache = BITACORAS_SALA_CACHE[sala_id];
-        if (datosCache) {
-            return res.json({
-                ok: true,
-                bitacora: datosCache.bitacora,
-                premio: datosCache.premio
-            });
-        }
-        return res.json({ ok: false, mensaje: "⏳ Esperando el procesamiento del silbatazo inicial del host..." });
-    } catch (err) {
-        return res.status(500).json({ ok: false, error: err.message });
     }
 });
 
@@ -3122,8 +2990,9 @@ app.get('/api/anuncio-actual', (req, res) => {
 });
 
 /* ========================================================================
-   🚀 INICIALIZACIÓN DEL SERVIDOR
+   🚀 INICIALIZACIÓN DEL SERVIDOR (HTTP + SOCKETS COMPATIBLE)
    ======================================================================== */
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor en la Nube / Red Local activo en puerto ${PORT}`);
+// Usamos http.listen en lugar de app.listen para levantar toda la infraestructura junta
+http.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor en la Nube / Red Local activo en puerto ${PORT} con soporte Real-Time`);
 });
