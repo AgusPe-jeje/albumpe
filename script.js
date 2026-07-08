@@ -2738,32 +2738,37 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                          }
 
                          // Finalización limpia del encuentro
-                         if (segundoVirtual >= 90 && !enPausaDeContador) {
-                             clearInterval(timerMulti);
-                             
-                             golesTuActuales = partido.golesLocal;
-                             golesRivalActuales = partido.golesVisitante;
-                             document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                        if (segundoVirtual >= 90 && !enPausaDeContador) {
+                            clearInterval(timerMulti); // Frenamos el bucle futuro
+                            
+                            golesTuActuales = partido.golesLocal;
+                            golesRivalActuales = partido.golesVisitante;
+                            
+                            const scoreLabel = document.getElementById(`score-vivo-${idUnico}`);
+                            if (scoreLabel) scoreLabel.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
 
-                             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+                            if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
-                             if (partido.definicionPenales) {
-                                  const pBox = document.getElementById(`multi-penales-box-${idUnico}`);
-                                  if (pBox) {
-                                       pBox.style.display = "block";
-                                       pBox.innerText = `💥 TANDA DE PENALES: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
-                                  }
-                             }
-                             
-                             bloquePartido.style.borderColor = "var(--verde-match)";
-                             const finTexto = document.createElement("div"); 
-                             finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:8px; font-family:'Oswald';";
-                             finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
-                             bloquePartido.appendChild(finTexto);
-                             
-                             document.getElementById(`consola-incidencias-${idUnico}`).innerText = "🏁 Fin del partido. Planillas firmadas.";
-                             resolveCruce(); 
-                         }
+                            if (partido.definicionPenales) {
+                                const pBox = document.getElementById(`multi-penales-box-${idUnico}`);
+                                if (pBox) {
+                                    pBox.style.display = "block";
+                                    pBox.innerText = `💥 TANDA DE PENALES: (${partido.penalesLocal} - ${partido.penalesVisitante})`;
+                                }
+                            }
+                            
+                            bloquePartido.style.borderColor = "var(--verde-match)";
+                            const finTexto = document.createElement("div"); 
+                            finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:8px; font-family:'Oswald';";
+                            finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
+                            bloquePartido.appendChild(finTexto);
+                            
+                            const consolaIncidencias = document.getElementById(`consola-incidencias-${idUnico}`);
+                            if (consolaIncidencias) consolaIncidencias.innerText = "🏁 Fin del partido. Planillas firmadas.";
+                            
+                            resolveCruce(); // Habilita que empiece el siguiente partido de la lista
+                            return; // 🛡️ ¡EL PARCHE SAGRADO! Corta la función acá para que no se dupliquen los textos
+                        }
                      } catch (err) {
                          console.error("Error en loop multijugador:", err);
                      }
