@@ -2404,8 +2404,11 @@ function simularPartidoEliminatorio(equipo1, equipo2) {
 
     // 🖥️ DETERMINACIÓN DE EVENTOS EN EL SERVIDOR (Sincronía Absoluta)
     const llavesAtaque = ["penal_favor", "corner_favor", "tirolibre_favor", "contrataque_favor"];
+    
+    // Si es PVP real, ambos equipos generan eventos interactivos dinámicos de ataque.
+    // Si intervienen Bots, se asignan llaves estándar ya que el front los procesará pasivamente.
     const eventosL = minutosL.map(() => llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)]);
-    const eventosV = minutosV.map(() => "defensa_urgente");
+    const eventosV = minutosV.map(() => esPvpPuro ? llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)] : "defensa_urgente");
 
     return {
         local: equipo1.seleccion,
@@ -2483,7 +2486,7 @@ app.post('/api/multijugador/jugar', verificarToken, async (req, res) => {
 
         if (modalidadSala === 'oro') {
             const chequearMonedas = await client.query("SELECT id, monedas FROM usuarios WHERE id IN ($1, $2) FOR UPDATE", [idHost, idInvitado]);
-            const oroHost = cheedas = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
+            const oroHost = chequearMonedas.rows.find(r => r.id === idHost)?.monedas || 0;
             const oroInvitado = chequearMonedas.rows.find(r => r.id === idInvitado)?.monedas || 0;
 
             if (oroHost < arancelOro) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ El Host no tiene Oro suficiente." }); }
