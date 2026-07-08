@@ -47,6 +47,10 @@ var historialPartidosSimulados = [];
    🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
    ======================================================================== */
 
+/* ========================================================================
+   🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
+   ======================================================================== */
+
 function cambiarModulo(idModulo, botonPresionado) {
      // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
      document.querySelectorAll('.modulo-contenido, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
@@ -63,13 +67,10 @@ function cambiarModulo(idModulo, botonPresionado) {
      
      // 🔥 NUEVA LÓGICA: Al entrar al Mercado, cargamos tus repetidas y las ofertas globales
      if (idModulo === 'modulo-mercado-pases' && usuarioActual) {
-          // Si tu función cargarAlbumLocal() hace un fetch a la base de datos, 
-          // nos aseguramos de que window.albumCompleto tenga información real antes de renderizar el select
           if (typeof cargarAlbumLocal === "function") {
                cargarAlbumLocal().then(() => {
                     cargarMisRepetidasParaVenta();
                }).catch(() => {
-                    // Resguardo por si tu cargarAlbumLocal no es una Promesa async
                     cargarMisRepetidasParaVenta(); 
                });
           } else {
@@ -77,11 +78,9 @@ function cambiarModulo(idModulo, botonPresionado) {
           }
           obtenerOfertasMercado();
 
-          // 🟢 INYECCIÓN FEED RECIENTE: Refrescamos el historial dinámico al entrar a la sección
           if (typeof actualizarHistorialTransferenciasUI === "function") {
                actualizarHistorialTransferenciasUI();
           }
-          
      }
      
      // 🦾 GATILLO DE ENTRADA: Al entrar al sector de Contratos SBC, inicializamos el panel del Bot Comerciante
@@ -105,17 +104,15 @@ function cambiarModulo(idModulo, botonPresionado) {
           document.getElementById("fase-fixture-mundial").style.display = "none";
      }
      if (idModulo === 'modulo-timba') {
-        // Ejecuta la carga automática de la cartelera rotativa
         if (typeof cargarPartidosQuinielaUI === "function") {
              cargarPartidosQuinielaUI();
             }
      }   
      // 👤 GATILLO DE ENTRADA: Al entrar a Mi Perfil, traemos los datos de la base de datos en tiempo real
-     if (idModulo === 'modulo-perfil' && usuarioActual) { // 👈 Cambiá 'modulo-perfil' por el ID de tu sección
+     if (idModulo === 'modulo-perfil' && usuarioActual) {
           actualizarMiPerfilUI();
           renderizarCromoDestacadoUI();
      }
-
 }
 
 function mostrarCarga(mensaje = "Conectando con la Arena...") {
@@ -138,135 +135,111 @@ function cerrarModalAyuda() {
 }
 
 async function autenticarUsuario(accion) {
-     const username = document.getElementById("input-usuario").value.trim();
-     const password = document.getElementById("input-pass").value;
-     
-     if (!username || !password) return alert("❌ Completá los datos.");
+    const username = document.getElementById("input-usuario").value.trim();
+    const password = document.getElementById("input-pass").value;
+    
+    const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
 
-     // 🛡️ SECURITY FIX: Buscamos el botón usando su clase real del HTML para evitar el crash por null
-     const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
-     if (btnAuth) btnAuth.disabled = true;
+    if (!username || !password) {
+        if (btnAuth) btnAuth.disabled = false;
+        return alert("❌ Completá los datos.");
+    }
 
-     const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
-     const endpointFinal = accion === 'login' ? 'login' : 'registro';
+    // 🧹 REINICIO TOTAL DE SESIÓN PREVIA: Limpieza absoluta
+    usuarioActual = null;
+    localStorage.removeItem("cromo_destacado_perfil");
+    albumCompleto = [];
+    window.albumCompleto = [];
 
-     mostrarCarga(textoSpinner);
+    // Limpiamos el Scoreboard inmediatamente antes de la transición
+    if (typeof actualizarInterfazUI === "function") {
+        actualizarInterfazUI();
+    }
 
-     try {
-          const res = await fetch(`${URL_BASE}/${endpointFinal}`, {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ username, password })
-          });
-          
-          // 🛡️ SECURITY FIX: Si el servidor responde con un estado de error (401, 403, 500, 503), frenamos
-          if (!res.ok) {
-               ocultarCarga();
-               if (btnAuth) btnAuth.disabled = false;
-               
-               try {
-                    const errorData = await res.json();
-                    return alert(errorData.error || `❌ Error del servidor (Código ${res.status})`);
-               } catch {
-                    return alert(`🚧 Error inesperado en la infraestructura de la Arena (Código ${res.status}).`);
-               }
-          }
-          
-          const data = await res.json();
-          ocultarCarga();
-
-          if (data.error) {
-               alert(data.error);
-               if (btnAuth) btnAuth.disabled = false;
-          } else {
-               // 1️⃣ PRIMERO: Guardamos el token con la clave unificada "token"
-               if (data.token) {
-                    localStorage.setItem("token", data.token);
-               }
-
-               // 2️⃣ SEGUNDO: Inicializamos el estado del usuario en memoria global
-               usuarioActual = data.usuario;
-               
-               // 3️⃣ TERCERO: Transición limpia de la interfaz visual
-               document.getElementById("seccion-login").style.display = "none";
-               
-               const interfazJuego = document.getElementById("interfaz-juego");
-               if (interfazJuego) {
-                    interfazJuego.style.removeProperty("display");
-                    interfazJuego.classList.add("mostrar");
-               }
-               
-               // 4️⃣ CUARTO: Ahora que el token y el user existen, llamamos secuencialmente a las APIs
-               await cargarMisionesDelServidor();
-               
-               if (typeof iniciarCronometroResetMisiones === 'function') {
-                    iniciarCronometroResetMisiones();
-               }
-               
-               // Flujo de anuncios o racha diaria
-               if (typeof iniciarControladorAnunciosSeguro === 'function') {
-                    setTimeout(iniciarControladorAnunciosSeguro, 1000); 
-               } else if (typeof verificarRecompensaDiaria === 'function') {
-                    setTimeout(verificarRecompensaDiaria, 1000);
-               }
-               
-               filtroEstadoActual = 'todas';
-               filtroRarezaActual = 'todas';
-               
-               actualizarInterfazUI();
-               cargarAlbumLocal();
-               iniciarCronometroResetRanking();
-               if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
-               
-               if (typeof verificarAvatarInicial === 'function') {
-                    verificarAvatarInicial();
-               }
-
-               // ⏱️ CONTROL ASÍNCRO: Postergamos los alerts para permitir el repintado del DOM
-               setTimeout(() => {
-                    if (accion === 'login') {
-                         alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
-                    } else {
-                         alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
-                    }
-               }, 0);
-          }
-     } catch (err) {
-          console.error("❌ Fallo crítico de red o código en autenticación:", err);
-          ocultarCarga();
-          if (btnAuth) btnAuth.disabled = false;
-          alert("📡 Error de conexión. No se pudo establecer contacto con los servidores centrales de la Arena.");
-     }
-}
-
-function obtenerHeadersSeguros() {
-    // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
-    const token = localStorage.getItem("token");
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : ''
-    };
-}
-
-// 🔥 CAPTURA DE ENTER PARA INICIAR SESIÓN EN LA ARENA
-document.addEventListener("DOMContentLoaded", () => {
-    const inputUser = document.getElementById("input-usuario");
-    const inputPass = document.getElementById("input-pass");
-
-    const manejarEnterLogin = (event) => {
-        if (event.key === "Enter") {
-            event.preventDefault(); // Evita cualquier recarga de página molesta
-            autenticarUsuario('login');
+    try {
+        if (btnAuth) {
+            btnAuth.disabled = true;
+            btnAuth.style.opacity = "0.5";
+            btnAuth.style.cursor = "not-allowed";
         }
-    };
 
-    // Asignamos el evento a ambos campos para máxima comodidad
-    if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
-    if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
-});
+        const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta...";
+        mostrarCarga(textoSpinner);
+
+        const response = await fetch(`${URL_BASE}/usuarios/${accion === 'login' ? 'login' : 'registro'}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.error || "Error en las credenciales.");
+        }
+
+        // 🔓 Guardamos el token de la sesión entrante
+        localStorage.setItem('token', data.token);
+        
+        // Sincronizamos los datos del nuevo jugador
+        usuarioActual = data.usuario; 
+
+        // 🔄 Pintamos las monedas, copas y nombre genuinos al instante
+        if (typeof actualizarInterfazUI === "function") {
+            actualizarInterfazUI();
+        }
+
+        ocultarCarga();
+
+        // 🛍️ ¡RUMBO A LA TIENDA AUTOMÁTICAMENTE!
+        const btnTienda = document.querySelector("button[onclick*='modulo-sobres']");
+        if (typeof cambiarModulo === "function" && btnTienda) {
+            cambiarModulo('modulo-sobres', btnTienda);
+        } else {
+            document.querySelectorAll(".modulo-contenido").forEach(mod => mod.classList.remove("activo"));
+            const modSobres = document.getElementById("modulo-sobres");
+            if (modSobres) modSobres.classList.add("activo");
+        }
+
+        // 🎯 TRANSICIÓN DE PANTALLAS INTEGRADA DIRECTAMENTE ACÁ:
+        document.getElementById("seccion-login").style.display = "none";
+        const interfazJuego = document.getElementById("interfaz-juego");
+        if (interfazJuego) {
+             interfazJuego.style.display = "block";
+             interfazJuego.classList.add("mostrar");
+        }
+
+        // Precarga silenciosa del progreso del álbum en background
+        if (typeof cargarAlbumLocal === "function") {
+            cargarAlbumLocal();
+        }
+
+    } catch (error) {
+        ocultarCarga();
+        console.error("❌ Error en la autenticación:", error);
+        alert(error.message);
+    } finally {
+        if (btnAuth) {
+            btnAuth.disabled = false;
+            btnAuth.style.opacity = "1";
+            btnAuth.style.cursor = "pointer";
+        }
+    }
+}
 
 function actualizarInterfazUI() {
-     if (!usuarioActual) return;
+     // 🧹 Si no hay usuario activo, limpiamos los contadores a 0
+     if (!usuarioActual) {
+          const lblUsuario = document.getElementById("lbl-usuario");
+          if (lblUsuario) lblUsuario.innerText = "INVITADO";
+          
+          if (document.getElementById("lbl-monedas")) document.getElementById("lbl-monedas").innerText = "0";
+          if (document.getElementById("lbl-ranking")) document.getElementById("lbl-ranking").innerText = "0";
+          if (document.getElementById("lbl-copas-mundiales")) document.getElementById("lbl-copas-mundiales").innerText = "0";
+          return;
+     }
+
+     // 🦾 Si hay un usuario logueado, inyectamos sus datos reales de Neon
      document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
      document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
      document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking;
@@ -276,6 +249,29 @@ function actualizarInterfazUI() {
           lblMundiales.innerText = usuarioActual.copas_mundiales || 0;
      }
 }
+
+function obtenerHeadersSeguros() {
+    const token = localStorage.getItem("token");
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const inputUser = document.getElementById("input-usuario");
+    const inputPass = document.getElementById("input-pass");
+
+    const manejarEnterLogin = (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault(); 
+            autenticarUsuario('login');
+        }
+    };
+
+    if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
+    if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
+});
 
 async function cerrarSesionLocal() {
      if (!usuarioActual) return;
@@ -301,8 +297,6 @@ async function cerrarSesionLocal() {
      document.getElementById("input-usuario").value = "";
      document.getElementById("input-pass").value = "";
 
-     // 🛠️ REHABILITACIÓN MANUAL DE BOTONES DE ACCESO
-     // Forzamos a que recuperen su facha original y queden 100% cliqueables al volver al Login
      const btnLogin = document.querySelector('.btn-login-match');
      const btnRegistro = document.querySelector('.btn-registro-match');
 
