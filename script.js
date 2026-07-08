@@ -3880,7 +3880,7 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
         const token = localStorage.getItem("token");
         
         // 🚀 Forzamos a que el fetch mande exactamente la variable 'cromoRutaImagen'
-        const res = await fetch(`${URL_BASE}/api/usuarios/destacar-cromo`, {
+        const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
