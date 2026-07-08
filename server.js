@@ -1773,10 +1773,15 @@ app.post('/api/multijugador/reanudar-partido', verificarToken, async (req, res) 
 });
 
 // 6. El Endpoint Soberano de Polling constante (Ambas pantallas le pegan acá cada 800ms)
+// Reemplazá este endpoint en tu server.js
 app.get('/api/multijugador/estado-vivo/:sala_id', async (req, res) => {
     const { sala_id } = req.params;
     try {
-        const salaQuery = await pool.query("SELECT minuto_actual, estado_jugada, ultimo_resultado FROM mundial_salas WHERE id = $1", [sala_id]);
+        // Buscamos de forma flexible por ID o por Código por las dudas
+        const salaQuery = await pool.query(
+            "SELECT minuto_actual, estado_jugada, ultimo_resultado FROM mundial_salas WHERE id = $1 OR codigo_sala = $2", 
+            [isNaN(sala_id) ? 0 : parseInt(sala_id), sala_id.toUpperCase()]
+        );
         if (salaQuery.rows.length === 0) return res.json({ ok: false });
         
         return res.json({
