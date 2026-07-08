@@ -1659,8 +1659,9 @@ async function ejecutarTorneoMundial() {
 
         if (!data.ok) return alert(data.mensaje);
 
+        // 🎯 SECTOR MISIONES API: Corregido al tipo exacto del backend ("mundial_partidos")
         if (typeof trackearProgresoMision === 'function') {
-             await trackearProgresoMision("mundial", 1);
+             await trackearProgresoMision("mundial_partidos", 1);
         }
 
         document.getElementById("fase-draft-mundial").style.display = "none";
@@ -1715,7 +1716,6 @@ async function ejecutarTorneoMundial() {
                        
                        let huboGol = false;
 
-                       // REPRODUCCIÓN ESTRICTA DEL BACKEND: Buscamos si el minuto actual matchea con los cronogramas
                        if (fechaData.minutosL && fechaData.minutosL.includes(segV)) { g1_L++; huboGol = true; }
                        if (fechaData.minutosV && fechaData.minutosV.includes(segV)) { g1_V++; huboGol = true; }
                        if (fechaData.minutosBL && fechaData.minutosBL.includes(segV)) g2_L++;
@@ -1743,7 +1743,7 @@ async function ejecutarTorneoMundial() {
                             renderizarTablaGrupoLive(estadoTablaMundial); 
                             resolveFecha();
                        }
-                  }, 150); // Simulación dinámica fluida
+                  }, 150);
              });
         }
 
@@ -1760,7 +1760,6 @@ async function ejecutarTorneoMundial() {
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
              const partido = data.progreso.bitacoraPlayoffs[i];
              const ganoEsteCruce = partido.resultado.includes("Ganaste");
-             // 🔥 Pasamos el objeto 'partido' completo para extraer su timeline nativo
              await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, ganoEsteCruce, partido);
              if (!ganoEsteCruce) break;
         }
@@ -1770,6 +1769,11 @@ async function ejecutarTorneoMundial() {
              corona.style.cssText = "text-align:center; margin-top:20px; color:var(--dorado); font-size:1.4rem; font-weight:bold;";
              corona.innerText = "🏆 ¡CAMPEÓN DEL MUNDO! 🏆\n🎁 ¡Premio de 5.000 de Oro depositado!";
              contenedorLista.appendChild(corona); corona.scrollIntoView({ behavior: 'smooth' });
+
+             // 🎯 SECTOR MISIONES API: Impactamos las 5.000 monedas ganadas offline
+             if (typeof trackearProgresoMision === 'function') {
+                  await trackearProgresoMision("acumular_oro", 5000);
+             }
         }
 
         if (data.datosActualizados) {
