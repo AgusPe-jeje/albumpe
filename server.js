@@ -3418,6 +3418,7 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 u.timbas_ganadas_exacto,
                 u.timbas_ganadas_signo,
                 u.eligio_avatar,
+                u.cromo_destacado,
                 COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil,
                 COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes,
                 COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras,
@@ -3440,6 +3441,8 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 u.timbas_jugadas, 
                 u.timbas_ganadas_exacto, 
                 u.timbas_ganadas_signo, 
+                u.eligio_avatar,
+                u.cromo_destacado,
                 fp.ruta_jpg;
         `;
 
@@ -3464,6 +3467,8 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 nombre: datos.nombre_usuario,
                 monedas: datos.monedas,
                 eligio_avatar: datos.eligio_avatar,
+                foto: datos.foto_perfil,
+                cromo_destacado: datos.cromo_destacado,
                 puntosRanking: datos.puntos_ranking,
                 foto: datos.foto_perfil,
                 estadisticasAlbum: {
