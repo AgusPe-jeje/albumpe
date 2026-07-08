@@ -2281,7 +2281,7 @@ async function prepararInscripcionMundialMulti() {
      mostrarCarga("Conectando con la central de la Arena Online...");
 
      try {
-          const res = await fetch(`${URL_BASE}/api/multijugador/preparar-draft`, {
+          const res = await fetch(`${URL_BASE}/multijugador/preparar-draft`, {
                 method: 'POST',
                 headers: obtenerHeadersSeguros(),
                 body: JSON.stringify({})
