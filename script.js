@@ -2218,7 +2218,7 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            const res = await fetch(`${URL_BASE}/api/multijugador/consultar-sala/${cod}`, {
+            const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
             });
@@ -2251,7 +2251,7 @@ async function abrirDraftMulti(esCreador) {
                 return;
             }
 
-            const resSala = await fetch(`${URL_BASE}/api/multijugador/sala/${cod}`, {
+            const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
             });
@@ -2386,7 +2386,7 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
 
     mostrarCarga("Enviando planilla de vestuarios a la Arena Online...");
     
-    let url = `${URL_BASE}/api/multijugador/crear`;
+    let url = `${URL_BASE}/multijugador/crear`;
     let cuerpo = {
         seleccion: paisElegido, 
         jugador_ids: arrayIdsJugadores,
@@ -2395,7 +2395,7 @@ async function confirmarInscripcionMultiServidor(paisElegido, arrayIdsJugadores)
     };
 
     if (!multiEsCreador) {
-        url = `${URL_BASE}/api/multijugador/unirse`;
+        url = `${URL_BASE}/multijugador/unirse`;
         cuerpo = {
             seleccion: paisElegido, 
             jugador_ids: arrayIdsJugadores,
@@ -2431,7 +2431,7 @@ async function actualizarLobbyEnVivo() {
     if (!multiCodigoSala) return;
 
     try {
-        const res = await fetch(`${URL_BASE}/api/multijugador/sala/${multiCodigoSala}`, {
+        const res = await fetch(`${URL_BASE}/multijugador/sala/${multiCodigoSala}`, {
             method: 'GET',
             headers: obtenerHeadersSeguros()
         });
@@ -2492,7 +2492,7 @@ async function lanzarSimulacionMulti() {
     const miUsuarioId = usuarioActual ? (usuarioActual.id || usuarioActual._id) : null;
 
     try {
-        const res = await fetch(`${URL_BASE}/api/multijugador/jugar`, { 
+        const res = await fetch(`${URL_BASE}/multijugador/jugar`, { 
           method: 'POST', 
           headers: obtenerHeadersSeguros(),
           body: JSON.stringify({ 
@@ -2523,7 +2523,7 @@ async function lanzarSimulacionMulti() {
 async function consultarResultadoInvitado(intento = 1) {
      if (intento === 1) mostrarCarga("¡El Torneo comenzó! Recibiendo transmisión oficial...");
      try {
-          const res = await fetch(`${URL_BASE}/api/multijugador/resultado-invitado/${multiSalaId}`, {
+          const res = await fetch(`${URL_BASE}/multijugador/resultado-invitado/${multiSalaId}`, {
               method: 'GET',
               headers: obtenerHeadersSeguros()
           });
@@ -2626,7 +2626,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  const timerMulti = setInterval(async () => {
                      try {
                          // Solicitamos el estado real del match en el servidor
-                         const resSala = await fetch(`${URL_BASE}/api/multijugador/sala/${multiCodigoSala}`, {
+                         const resSala = await fetch(`${URL_BASE}/multijugador/sala/${multiCodigoSala}`, {
                              method: 'GET',
                              headers: obtenerHeadersSeguros()
                          });
@@ -2643,7 +2643,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                                  // Registramos el avance del Host en el servidor
                                  if (segundoVirtual !== ultimoMinutoSincronizado) {
                                      ultimoMinutoSincronizado = segundoVirtual;
-                                     await fetch(`${URL_BASE}/api/multijugador/actualizar-reloj`, {
+                                     await fetch(`${URL_BASE}/multijugador/actualizar-reloj`, {
                                          method: 'POST',
                                          headers: obtenerHeadersSeguros(),
                                          body: JSON.stringify({ sala_id: multiSalaId, minuto: segundoVirtual })
@@ -2664,7 +2664,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                          if ((tieneGolLocal || tieneGolRival) && dataSala.estado_jugada !== 'esperando_eleccion' && dataSala.estado_jugada !== 'mostrar_contador') {
                              if (multiEsCreador) {
                                  // El host es el encargado de clavar el semáforo global para congelar ambas pantallas
-                                 await fetch(`${URL_BASE}/api/multijugador/pausar-por-evento`, {
+                                 await fetch(`${URL_BASE}/multijugador/pausar-por-evento`, {
                                      method: 'POST',
                                      headers: obtenerHeadersSeguros(),
                                      body: JSON.stringify({ sala_id: multiSalaId })
@@ -2728,7 +2728,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                                      setTimeout(async () => {
                                          if (multiEsCreador) {
                                              // El host libera el semáforo del servidor para reanudar la simulación
-                                             await fetch(`${URL_BASE}/api/multijugador/reanudar-partido`, {
+                                             await fetch(`${URL_BASE}/multijugador/reanudar-partido`, {
                                                  method: 'POST',
                                                  headers: obtenerHeadersSeguros(),
                                                  body: JSON.stringify({ sala_id: multiSalaId })
@@ -2807,7 +2807,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                              document.getElementById(`consola-incidencias-${idUnico}`).innerText = "⏳ Registrando tactics en los servidores...";
 
                              // Enviamos la resolución al endpoint unificado del backend
-                             await fetch(`${URL_BASE}/api/multijugador/enviar-eleccion`, {
+                             await fetch(`${URL_BASE}/multijugador/enviar-eleccion`, {
                                  method: 'POST',
                                  headers: obtenerHeadersSeguros(),
                                  body: JSON.stringify({
@@ -2841,7 +2841,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                              contO.innerHTML = "";
                              document.getElementById(`consola-incidencias-${idUnico}`).innerText = "⏳ Procesando resultado estratégico...";
 
-                             await fetch(`${URL_BASE}/api/multijugador/enviar-eleccion-bot`, {
+                             await fetch(`${URL_BASE}/multijugador/enviar-eleccion-bot`, {
                                  method: 'POST',
                                  headers: obtenerHeadersSeguros(),
                                  body: JSON.stringify({
