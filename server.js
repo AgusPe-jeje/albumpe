@@ -3605,6 +3605,26 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
     }
 });
 
+// 🌟 Guardar la carta destacada en el perfil del usuario
+app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
+    const usuarioId = req.usuarioLogueado.id;
+    const { fotoUrl } = req.body; // Recibimos la URL de la foto del cromo
+
+    if (!fotoUrl) {
+        return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL de la imagen." });
+    }
+
+    try {
+        // Actualizamos el campo 'foto' del usuario con la imagen del jugador elegido
+        await pool.query('UPDATE usuarios SET foto = $1 WHERE id = $2', [fotoUrl, usuarioId]);
+        
+        res.json({ ok: true, mensaje: "🌟 ¡Perfil actualizado! Tu jugador destacado ya está en el vestuario." });
+    } catch (err) {
+        console.error("Error al destacar cromo:", err);
+        res.status(500).json({ ok: false, error: "Error interno del servidor." });
+    }
+});
+
 // ========================================================================
 // ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL (CORREGIDO)
 // ========================================================================
