@@ -2566,8 +2566,14 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         const vis = partido.visitante || "Rival";
         const rondaNombre = partido.ronda || `PARTIDO #${index + 1}`;
         
-        const esPvpReal = partido.esPvpReal;
-        
+        // 🔬 FILTROS DE ESQUEMA SOBERANO
+        const esPvpReal = partido.esPvpReal; // Host vs Invitado
+        const localEsBot = partido.localEsBot;
+        const visitanteEsBot = partido.visitanteEsBot;
+        const esPartidoDeBotsPuro = localEsBot && visitanteEsBot; // Bot vs Bot
+        const esHumanoVsBot = !esPvpReal && !esPartidoDeBotsPuro; // Humano vs Bot (Cualquiera de los dos)
+
+        // Identificamos quién de los dos humanos está metido en este partido vs bot
         const soyElLocalDeEsteMatch = parseInt(partido.creador_id) === parseInt(miIdFiel);
         const soyElInvitadoDeEsteMatch = parseInt(partido.invitado_id) === parseInt(miIdFiel);
         const yoJuegoEstePartido = soyElLocalDeEsteMatch || soyElInvitadoDeEsteMatch;
@@ -2596,7 +2602,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                           <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">${vis.toUpperCase()}</span>
                      </div>
                      <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px;">
-                          ⚽ Pitazo inicial... Comienzan las acciones.
+                          ⚽ Pitazo inicial... Comienzan las acciones en el Coliseo.
                      </div>
                      
                      <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center;">
@@ -2620,8 +2626,9 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  let segundoVirtual = 0;
                  let partidoPausado = false;
 
-                 // ⏱️ Si juegan bots vs bots dura ~30s reales (220ms por tick). Si no, normal (660ms).
-                 const velocidadTickReal = yoJuegoEstePartido ? 660 : 220;
+                 // 🕒 CALIBRACIÓN DE TIEMPO EXACTA SEGÚN TU ESQUEMA
+                 // Bot vs Bot = 220ms (~30 segundos totales). Host/Invitado vs Bot o PVP = 660ms (1 minuto).
+                 const velocidadTickReal = esPartidoDeBotsPuro ? 220 : 660;
 
                  const timerMulti = setInterval(() => {
                       if (partidoPausado) return;
@@ -2631,39 +2638,56 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
 
                       document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-                      // 🟢 DETECTOR DE EVENTO DEL LOCAL
+                      // 🟢 DETECTOR DE EVENTO LOCAL
                       if (cronogramaGolesTu.includes(segundoVirtual)) {
                           const idxEv = partido.minutosL.indexOf(segundoVirtual);
                           const llaveEventoFijo = partido.eventosL[idxEv] || "contrataque_favor";
 
                           if (esPvpReal) {
+                              // HOST VS INVITADO: Evento interactivo sincronizado y conector a 3 opciones
                               ejecutarDueloPVPInteractivos(true, llaveEventoFijo);
-                          } else {
-                              // Contrabot o Bot vs Bot: NO hay eventos interactivos, va directo
-                              if (yoJuegoEstePartido && Math.random() <= 0.30) {
-                                  ejecutarMomentoVAR(true, `⚽ ¡GOOOL DE ${loc.toUpperCase()}! Balonazo letal.`);
+                          } 
+                          else if (esHumanoVsBot) {
+                              // HOST/INVITADO VS BOT
+                              if (yoJuegoEstePartido) {
+                                  // El jugador que juega: Recibe evento interactivo random con momentos VAR
+                                  ejecutarPausaContraBot(llaveEventoFijo, true);
                               } else {
+                                  // El jugador que solo mira: Se le frena el marcador en silencio hasta que el otro elija
+                                  mostrarEsperaEspectadorSincronizado("El rival está disputando una jugada táctica contra el Bot...");
                                   golesTuActuales++;
-                                  dispararImpactoVisualMulti(`⚽ ¡GOOOL DE ${loc.toUpperCase()}! Definición limpia.`);
+                                  // Sincronización simulada en espejo de delay para esperar la acción
+                                  setTimeout(() => { finalizarEsperaEspectador(`⚽ Gol de ${loc.toUpperCase()}`); }, 3000);
                               }
+                          } 
+                          else {
+                              // BOT VS BOT: Nada de eventos interactivos, directo al marcador
+                              golesTuActuales++;
+                              dispararImpactoVisualMulti(`⚽ Gol de ${loc.toUpperCase()}`);
                           }
                           cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
                       }
                       
-                      // 🟢 DETECTOR DE EVENTO DEL VISITANTE
+                      // 🟢 DETECTOR DE EVENTO VISITANTE
                       else if (cronogramaGolesRival.includes(segundoVirtual)) {
                           const idxEv = partido.minutosV.indexOf(segundoVirtual);
                           const llaveEventoFijo = partido.eventosV[idxEv] || "defensa_urgente";
 
                           if (esPvpReal) {
                               ejecutarDueloPVPInteractivos(false, llaveEventoFijo);
-                          } else {
-                              if (yoJuegoEstePartido && Math.random() <= 0.30) {
-                                  ejecutarMomentoVAR(false, `💥 ¡GOL DE ${vis.toUpperCase()}! Rompe la red del Coliseo.`);
+                          } 
+                          else if (esHumanoVsBot) {
+                              if (yoJuegoEstePartido) {
+                                  ejecutarPausaContraBot(llaveEventoFijo, false);
                               } else {
+                                  mostrarEsperaEspectadorSincronizado("El rival está resolviendo un avance del Bot...");
                                   golesRivalActuales++;
-                                  dispararImpactoVisualMulti(`💥 ¡GOL DE ${vis.toUpperCase()}! Rompe la red del Coliseo.`);
+                                  setTimeout(() => { finalizarEsperaEspectador(`💥 Gol de ${vis.toUpperCase()}`); }, 3000);
                               }
+                          } 
+                          else {
+                              golesRivalActuales++;
+                              dispararImpactoVisualMulti(`💥 Gol de ${vis.toUpperCase()}`);
                           }
                           cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
                       }
@@ -2691,7 +2715,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                            finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
                            bloquePartido.appendChild(finTexto);
                            
-                           document.getElementById(`consola-incidencias-${idUnico}`).innerText = "🏁 El árbitro pita el final. Planillas firmadas.";
+                           document.getElementById(`consola-incidencias-${idUnico}`).innerText = "🏁 Fin del partido. Planillas firmadas.";
                            resolveCruce(); 
                       }
                  }, velocidadTickReal);
@@ -2705,42 +2729,52 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
                  }
 
+                 // MOMENTOS VAR (Integrados para partidos interactivos contra bots y PVP)
                  function ejecutarMomentoVAR(esLocal, relatoGol) {
-                     partidoPausado = true;
                      const consola = document.getElementById(`consola-incidencias-${idUnico}`);
                      const lbl = document.getElementById(`score-vivo-${idUnico}`);
-
-                     dispararImpactoVisualMulti(relatoGol);
-
-                     setTimeout(() => {
-                         consola.style.background = "#451a03";
-                         consola.innerHTML = `🚨 El referí detiene el juego de golpe... ¡Llaman del VAR! <span class="badge-var-live">🖥️ ANALIZANDO</span>`;
-                     }, 1500);
+                     
+                     consola.style.background = "#451a03";
+                     consola.innerHTML = `🚨 ¡Atención! El árbitro frena el partido para revisar la jugada previa en la pantalla... <span class="badge-var-live">🖥️ REVISANDO VAR</span>`;
 
                      setTimeout(() => {
-                         const seAnula = Math.random() <= 0.50;
+                         const seAnula = Math.random() <= 0.40; // 40% de probabilidad de anulación
                          if (seAnula) {
                              if (esLocal) golesTuActuales--; else golesRivalActuales--;
                              consola.style.background = "rgba(239, 68, 68, 0.15)";
                              consola.style.color = "var(--rojo)";
-                             consola.innerText = `❌ ¡ANULADO! Se detectó un offside milimétrico. El gol se descuenta.`;
+                             consola.innerText = `❌ ¡ANULADO! Se comprueba fuera de juego o falta en ataque. El gol no sube.`;
                              if (lbl) lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
                          } else {
                              consola.style.background = "rgba(34, 197, 94, 0.15)";
                              consola.style.color = "var(--verde-match)";
-                             consola.innerText = `🏁 ¡GOL CONVALIDADO! Revisión lista, el gol es 100% legal.`;
+                             consola.innerText = `🏁 ¡CONFIRMADO! La jugada fue limpia. ¡Es gol legal!`;
                          }
                          setTimeout(() => {
                              consola.style.background = "#020617";
                              consola.style.color = "#cbd5e1";
                              partidoPausado = false;
                          }, 1500);
-                     }, 3500);
+                     }, 3000);
                  }
 
-                 // ⚔️ CONTROL DE DUELOS HUMANOS SINCRÓNICOS CON PARADA TOTAL Y CONTADOR A 3
+                 function mostrarEsperaEspectadorSincronizado(mensaje) {
+                     partidoPausado = true;
+                     document.getElementById(`consola-incidencias-${idUnico}`).style.color = "var(--dorado)";
+                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = `⏳ ${mensaje}`;
+                 }
+
+                 function finalizarEsperaEspectador(relato) {
+                     const scoreElement = document.getElementById(`score-vivo-${idUnico}`);
+                     if (scoreElement) scoreElement.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                     document.getElementById(`consola-incidencias-${idUnico}`).style.color = "#cbd5e1";
+                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = relato;
+                     partidoPausado = false;
+                 }
+
+                 // ⚔️ HOST VS INVITADO: SISTEMA DE DUELOS DE ADIVINANZA CON CONTADOR A 3 Y COMPARACIÓN
                  function ejecutarDueloPVPInteractivos(esLocalAtacando, llaveEvento) {
-                     partidoPausado = true; // El tiempo se para de forma obligatoria aquí
+                     partidoPausado = true;
                      if (multiEsCreador) {
                          if (esLocalAtacando) lanzarBotoneraPVPUI("ataque", true);
                          else lanzarBotoneraPVPUI("defensa", false);
@@ -2760,7 +2794,8 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      const contO = document.getElementById(`evento-opciones-${idUnico}`);
                      contO.innerHTML = "";
 
-                     ev.opciones.forEach(opc => {
+                     // Nos aseguramos de renderizar exactamente 3 opciones de elección para la adivinanza
+                     ev.opciones.slice(0, 3).forEach(opc => {
                          const btn = document.createElement("button");
                          btn.className = "btn-estadio";
                          btn.style.cssText = "padding:8px; font-size:0.8rem; background:#1e293b; color:#fff; width:100%; text-align:left; margin-bottom: 4px; border-radius: 4px;";
@@ -2771,43 +2806,76 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                              const consola = document.getElementById(`consola-incidencias-${idUnico}`);
                              consola.style.color = "var(--dorado)";
                              
-                             // 🕒 INICIA EL CONTADOR REVERSIVO DE 3 SEGUNDOS PARA COMPARACIÓN
                              let cuentaRegresiva = 3;
-                             consola.innerText = `⏳ Táctica elegida. Procesando jugada en la máquina en... ${cuentaRegresiva}`;
+                             consola.innerText = `⏳ Elección registrada. La máquina está comparando las dos decisiones en... ${cuentaRegresiva}`;
 
                              const intervaloContador = setInterval(() => {
                                  cuentaRegresiva--;
                                  if (cuentaRegresiva > 0) {
-                                     consola.innerText = `⏳ Táctica elegida. Procesando jugada en la máquina en... ${cuentaRegresiva}`;
+                                     consola.innerText = `⏳ Elección registrada. La máquina está comparando las dos decisiones en... ${cuentaRegresiva}`;
                                  } else {
                                      clearInterval(intervaloContador);
                                      consola.style.color = "#cbd5e1";
                                      
-                                     // 🧠 LA MÁQUINA COMPARA AQUÍ (Ambas pantallas ejecutan la resolución al unísono)
+                                     // 🧠 REGLA DE RESTRICCIÓN: Si adivinan la opción = NO GOL. Si no la adivinan = GOL.
                                      const rivalAdivinoOpcion = Math.random() <= 0.33; 
 
                                      if (esAtacante) {
                                          if (!rivalAdivinoOpcion) { 
                                              golesTuActuales++; 
-                                             dispararImpactoVisualMulti(`🎉 ${opc.okTexto}`); 
+                                             dispararImpactoVisualMulti(`🎉 ${opc.okTexto}`);
+                                             // Gatilla el VAR con una ventana de probabilidad tras el gol
+                                             if (Math.random() <= 0.25) { ejecutarMomentoVAR(true, `🎉 ¡Gol validado temporalmente!`); return; }
                                          } else { 
                                              consola.style.color = "var(--rojo)";
-                                             consola.innerText = `❌ ${opc.badTexto}`; 
+                                             consola.innerText = `❌ ¡El defensor adivinó la jugada exacta! ${opc.badTexto}`; 
                                          }
                                      } else {
                                          if (rivalAdivinoOpcion) { 
                                              consola.style.color = "var(--verde-match)";
-                                             consola.innerText = `🎉 ${opc.okTexto}`; 
+                                             consola.innerText = `🎉 ¡Bloqueo perfecto! Adivinaste la opción del atacante.`; 
                                          } else { 
                                              golesRivalActuales++; 
-                                             dispararImpactoVisualMulti(`💥 ${opc.badTexto}`); 
+                                             dispararImpactoVisualMulti(`💥 No lograste adivinar la opción. ${opc.badTexto}`); 
+                                             if (Math.random() <= 0.25) { ejecutarMomentoVAR(false, `💥 ¡Gol del rival!`); return; }
                                          }
                                      }
                                      
-                                     // Recién cuando termina el contador se reanuda el cronómetro global
                                      setTimeout(() => { partidoPausado = false; }, 1200);
                                  }
                              }, 1000);
+                         };
+                         contO.appendChild(btn);
+                     });
+                 }
+
+                 // MÓDULO INTERACTIVO CONTRA EL BOT (HOST/INVITADO VS BOT)
+                 function ejecutarPausaContraBot(llave, esAtaque) {
+                     partidoPausado = true;
+                     const ev = CATALOGO_EVENTOS_MUNDIAL[llave] || CATALOGO_PVP_INTERACTIVO["ataque"];
+                     const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
+                     mod.style.display = "block";
+                     document.getElementById(`evento-titulo-${idUnico}`).innerText = ev.titulo;
+                     document.getElementById(`evento-texto-${idUnico}`).innerText = ev.relato;
+
+                     const contO = document.getElementById(`evento-opciones-${idUnico}`);
+                     contO.innerHTML = "";
+                     ev.opciones.forEach(opc => {
+                         const btn = document.createElement("button");
+                         btn.className = "btn-estadio";
+                         btn.innerText = opc.texto;
+                         btn.onclick = () => {
+                             mod.style.display = "none";
+                             
+                             if (Math.random() <= opc.exito) {
+                                 if (esAtaque) golesTuActuales++;
+                                 dispararImpactoVisualMulti(`🎉 ${opc.okTexto}`);
+                                 if (Math.random() <= 0.30) { ejecutarMomentoVAR(esAtaque, `🎉 ¡Gol contra el Bot!`); return; }
+                             } else {
+                                 if (!esAtaque) golesRivalActuales++;
+                                 dispararImpactoVisualMulti(`❌ ${opc.badTexto}`);
+                             }
+                             setTimeout(() => { partidoPausado = false; }, 1500);
                          };
                          contO.appendChild(btn);
                      });
@@ -2816,7 +2884,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         });
     });
 
-    // Bloque de premios...
+    // Bloque de premios intacto al concluir la grilla completa...
     secuenciaPromesas.then(() => {
          const bloquePremio = document.createElement("div");
          bloquePremio.style.cssText = "text-align:center; margin-top:25px; padding:20px; background:rgba(0,255,136,0.03); border:2px dashed var(--dorado); border-radius:12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);";
