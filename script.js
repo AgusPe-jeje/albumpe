@@ -1825,7 +1825,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         // 🛡️ INYECCIÓN ÚNICA DE ANIMACIONES REQUERIDAS
         if (!document.getElementById("estilos-premium-mundial")) {
             const estilos = document.createElement("style");
-            styles = "estilos-premium-mundial";
+            estilos.id = "estilos-premium-mundial";
             estilos.innerHTML = `
                 @keyframes screenShake {
                     0%, 100% { transform: translate(0, 0); }
@@ -1891,7 +1891,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         const promedioDraft = cartasElegidas.reduce((acc, c) => acc + MAPA_PUNTOS_RAREZA[c.rareza.toLowerCase()], 0) / 3;
         const esPartidoDefensivo = promedioDraft < 72;
 
-        // ⏱️ TIMER CONTROLADO: 1 Minuto de juego = 660 milisegundos reales (Total 60s netos)
+        // ⏱️ TIMER CONTROLADO (1 Minuto virtual = 660ms reales)
         const timer = setInterval(() => {
             if (partidoPausado) return;
 
@@ -1908,7 +1908,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
             } 
             else if (cronogramaGolesRival.includes(segundoVirtual)) {
-                // 🖥️ CONTROL INTEGRADO DE VAR (35% de chance de gatillar un suspenso táctico en goles del bot)
+                // 🖥️ CONTROL DE VAR DINÁMICO (35% de probabilidad)
                 if (Math.random() <= 0.35) {
                     ejecutarMomentoVAR(false);
                 } else {
@@ -1918,7 +1918,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
             }
 
-            // Frases ambientales rápidas ajustadas al nuevo ritmo
+            // Frases de ambiente
             if (segundoVirtual % 15 === 0 && !partidoPausado && segundoVirtual < 90) {
                 const ambiente = esPartidoDefensivo 
                     ? [
@@ -1952,19 +1952,16 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             }
         }, 660);
 
-        // 🔥 SUB-MOTOR DE IMPACTOS VISUALES ESTIMULANTES
-        function dispararEstimulantesImpacto(relatoFinaI) {
-            // 1. Destello flash lumínico en toda la pantalla
+        // 🔥 EFECTOS DE IMPACTO ESTIMULANTES AL EXPEDIR UN GOL CONVALIDAD
+        function dispararEstimulantesImpacto(relatoFinal) {
             const flash = document.createElement("div");
             flash.className = "efecto-flash";
             document.body.appendChild(flash);
             setTimeout(() => flash.remove(), 400);
 
-            // 2. Sacudida de la tarjeta del partido (Screen Shake)
             filaPartido.classList.add("efecto-shake");
             setTimeout(() => filaPartido.classList.remove("efecto-shake"), 350);
 
-            // 3. Animación de escala temporal en el score
             const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
             scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
             scoreLbl.style.transform = "scale(1.25)";
@@ -1974,53 +1971,67 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 scoreLbl.style.borderColor = "#1e293b";
             }, 500);
 
-            document.getElementById(`consola-incidencias-${idUnico}`).innerText = relatoFinaI;
+            document.getElementById(`consola-incidencias-${idUnico}`).innerText = relatoFinal;
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
         }
 
-        // 🖥️ SUB-MOTOR AVANZADO: REVISIÓN DE JUGADA POR EL VAR
-        function ejecutarMomentoVAR(esNuestraFirma) {
-            partidoPausado = true; // Frenamos el cronómetro
+        // 🖥️ SUB-MOTOR MEJORADO: ANIMA EL GOL AL INSTANTE Y LUEGO DECIDE EL VAR
+        function ejecutarMomentoVAR(esAtaqueFavor) {
+            partidoPausado = true; // Congelamos el reloj de inmediato
             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
             const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
 
-            // Sumamos el gol fantasma de forma provisoria
-            scoreLbl.innerText = esNuestraFirma ? `${golesTuActuales + 1} - ${golesRivalActuales}` : `${golesTuActuales} - ${golesRivalActuales + 1}`;
-            consola.style.background = "#451a03"; // Tono naranja de alerta
-            consola.innerHTML = `⚠️ ¡GOOOL RIVAL!... Esperá. El referí detiene el festejo y se lleva la mano al oído. <span class="badge-var-live">🖥️ REVISANDO VAR</span>`;
+            // 1. 🚀 ¡FESTEJO INMEDIATO! Sumamos el gol al marcador temporal y disparamos los efectos visuales
+            if (esAtaqueFavor) golesTuActuales++; else golesRivalActuales++;
+            dispararEstimulantesImpacto(`⚽ ¡GOOOL DE ${esAtaqueFavor ? tuPais.toUpperCase() : rival.toUpperCase()}! Balón al fondo de la red. ¡Estalla la hinchada!`);
 
+            // 2. A los 2 segundos, el árbitro interrumpe la locura del festejo
             setTimeout(() => {
-                consola.innerText = "🖥️ Cuarto réferi analizando el fotograma... Se trazan líneas por posible posición adelantada.";
-            }, 1500);
+                consola.style.background = "#451a03"; // Color admonitorio de alerta
+                consola.innerHTML = `🚨 El árbitro frena la reanudación del juego y se lleva la mano al oído. ¡Llaman desde la cabina! <span class="badge-var-live">🖥️ REVISANDO VAR</span>`;
+                if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+            }, 2000);
 
+            // 3. Fase intermedia de trazado de líneas
+            setTimeout(() => {
+                consola.innerText = "🖥️ Cuarto réferi analizando el fotograma... Se trazan líneas geométricas vectoriales por presunto fuera de juego.";
+            }, 3800);
+
+            // 4. Sentencia final del VAR
             setTimeout(() => {
                 const seAnulaElGol = Math.random() <= 0.50; // 50% de probabilidad de anularse
 
                 if (seAnulaElGol) {
-                    // ❌ SE ANULA
+                    // ❌ SE ANULA: Descontamos el gol fantasma del marcador de forma dramática
+                    if (esAtaqueFavor) golesTuActuales--; else golesRivalActuales--;
+
                     consola.style.background = "rgba(239, 68, 68, 0.15)";
                     consola.style.color = "var(--rojo)";
-                    consola.innerText = "❌ ¡ANULADO! El VAR confirma posición adelantada milimétrica del extremo. ¡Respiran los vestuarios!";
+                    consola.innerText = "❌ ¡ANULADO! El VAR confirma offside milimétrico en el inicio de la jugada. El gol se borra del tablero.";
                     
-                    // Reversión visual del marcador
+                    // Reversión visual del marcador con animación de achique
                     scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                    scoreLbl.style.transform = "scale(0.9)";
-                    setTimeout(() => scoreLbl.style.transform = "scale(1)", 250);
+                    scoreLbl.style.transform = "scale(0.85)";
+                    scoreLbl.style.borderColor = "var(--rojo)";
+                    setTimeout(() => {
+                        scoreLbl.style.transform = "scale(1)";
+                        scoreLbl.style.borderColor = "#1e293b";
+                    }, 400);
                 } else {
-                    // ✅ SE VALIDA
+                    // ✅ SE VALIDA: Se confirma el punto en la pantalla
                     consola.style.background = "rgba(34, 197, 94, 0.15)";
-                    if (esNuestraFirma) golesTuActuales++; else golesRivalActuales++;
-                    dispararEstimulantesImpacto(`🖥️ ¡GOL CONFIRMADO! Tras revisar la pantalla, el árbitro apunta al centro de la cancha.`);
+                    consola.style.color = "var(--verde-match)";
+                    consola.innerText = `🏁 ¡GOL CONFIRMADO! El VAR determina habilitación limpia. Se ratifica el ${golesTuActuales} - ${golesRivalActuales}.`;
                 }
 
-                // Salida controlada de la pausa dramática
+                // Cierre de la pausa y reanudación del partido
                 setTimeout(() => {
                     consola.style.background = "#020617";
                     consola.style.color = "#cbd5e1";
-                    partidoPausado = false; // Reanudamos
-                }, 2000);
+                    partidoPausado = false; // El reloj vuelve a correr
+                }, 2200);
 
-            }, 3500); // 3.5 segundos netos de puro suspenso táctico
+            }, 6200); // Timeline total extendido para cubrir la euforia inicial y el suspenso posterior
         }
 
         // 👔 ACCIÓN DE PAUSA ESTRATÉGICA INTERACTIVA
