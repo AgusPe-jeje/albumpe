@@ -3937,10 +3937,17 @@ function renderizarMisionesDiarias() {
 
 // Envía la acción al servidor en segundo plano cada vez que haces un sobre/trade/mundial
 async function trackearProgresoMision(tipo, cantidad = 1) {
+    // 🛡️ ESCUDO: Si no hay sesión iniciada en el frente, no enviamos peticiones
+    if (!usuarioActual) return;
+
     try {
         const res = await fetch(`${URL_BASE}/misiones/trackear`, {
             method: 'POST',
-            headers: obtenerHeadersSeguros(),
+            // 🔥 CORREGIDO: Sumamos el Content-Type explícito para que Express lea el req.body
+            headers: { 
+                'Content-Type': 'application/json', 
+                ...obtenerHeadersSeguros() 
+            },
             body: JSON.stringify({ tipo, cantidad })
         });
         const data = await res.json();
@@ -3955,10 +3962,16 @@ async function trackearProgresoMision(tipo, cantidad = 1) {
 
 // Reclama cobrando directo desde el saldo calculado por el backend
 async function reclamarPremioMisionServer(idMision) {
+    if (!usuarioActual) return;
+
     try {
         const res = await fetch(`${URL_BASE}/misiones/reclamar`, {
             method: 'POST',
-            headers: obtenerHeadersSeguros(),
+            // 🔥 CORREGIDO: Combinamos el Content-Type junto a tus tokens de autenticación
+            headers: { 
+                'Content-Type': 'application/json', 
+                ...obtenerHeadersSeguros() 
+            },
             body: JSON.stringify({ misionId: idMision })
         });
         const data = await res.json();
@@ -3971,7 +3984,6 @@ async function reclamarPremioMisionServer(idMision) {
                 if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
             }
             
-            // 🎵 GATILLO DE AUDIO INYECTADO: Sonido de moneditas al cobrar tu recompensa
             if (typeof AudioArena !== 'undefined' && AudioArena.play) {
                 AudioArena.play('monedas');
             }
