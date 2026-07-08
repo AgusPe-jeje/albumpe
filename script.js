@@ -4225,9 +4225,8 @@ const AudioArena = {
    🦾 ENGINE INTERACTIVO MULTI-SBC: CONTRATOS SEMANALES EN CADENA ROTATIVA
    ======================================================================== */
 let poolContratosCache = [];
-let idContratoSeleccionado = null; // ID del contrato activo en el HUD
+let idContratoSeleccionado = null; 
 let sbcJugadoresSeleccionados = []; 
-let sbcIntervaloRotacion = null; // Control del temporizador semanal de la cartelera
 
 async function cargarModuloSBC() {
     const grid = document.getElementById("grid-sbc-elegibles");
@@ -4247,12 +4246,15 @@ async function cargarModuloSBC() {
         if (!data.ok || !data.contratos || data.contratos.length === 0) {
             const elTitulo = document.getElementById("sbc-titulo-desafio");
             if (elTitulo) elTitulo.innerText = "❌ SIN CONTRATOS VIGENTES";
+            
+            // Limpiamos los selectores si la cartelera cayó a cero
+            const contenedorPestañas = document.getElementById("sbc-pestañas-navegacion");
+            if (contenedorPestañas) contenedorPestañas.innerHTML = "";
             return;
         }
 
         poolContratosCache = data.contratos;
         
-        // 🏁 Inicialización: Si no hay ninguno seleccionado en foco, tomamos el primero del pool
         if (!idContratoSeleccionado || !poolContratosCache.some(c => c.id === idContratoSeleccionado)) {
             idContratoSeleccionado = poolContratosCache[0].id;
         }
@@ -4260,8 +4262,10 @@ async function cargarModuloSBC() {
         dibujarSelectoresContratosUI();
         actualizarContratoEnFoco();
         
-        // ⏳ Activamos la cuenta regresiva que lee el tiempo real del backend
-        iniciarCronometroRotacionSBC();
+        // ⏳ Sincronizamos las etiquetas llamando al motor central unificado de la Arena
+        if (typeof iniciarCronometroResetRanking === 'function') {
+            iniciarCronometroResetRanking();
+        }
 
     } catch (err) {
         console.error("Error al cargar pool de SBC:", err);
@@ -4269,12 +4273,10 @@ async function cargarModuloSBC() {
     }
 }
 
-// Genera pestañas o botones dinámicos inline arriba del título para cambiar de contrato
 function dibujarSelectoresContratosUI() {
     const tituloHtml = document.getElementById("sbc-titulo-desafio");
     if (!tituloHtml) return;
 
-    // Buscamos o creamos un contenedor de pestañas arriba del título
     let contenedorPestañas = document.getElementById("sbc-pestañas-navegacion");
     if (!contenedorPestañas) {
         contenedorPestañas = document.createElement("div");
@@ -4288,9 +4290,8 @@ function dibujarSelectoresContratosUI() {
     poolContratosCache.forEach(c => {
         const btnTab = document.createElement("button");
         btnTab.className = "btn-estadio";
-        btnTab.innerText = c.titulo.split(" ")[1] || c.titulo; // Simplifica o muestra completo
+        btnTab.innerText = c.titulo.split(" ")[1] || c.titulo; 
         
-        // Estilo activo/inactivo premium
         if (c.id === idContratoSeleccionado) {
             btnTab.style.cssText = "background: var(--dorado); color: #000; padding: 6px 15px; font-size: 0.85rem; font-weight: bold;";
         } else {
@@ -4299,8 +4300,8 @@ function dibujarSelectoresContratosUI() {
 
         btnTab.onclick = () => {
             idContratoSeleccionado = c.id;
-            sbcJugadoresSeleccionados = []; // Reset de sacrificios al cambiar de pestaña
-            dibujarSelectoresContratosUI(); // Refresca clases de botones activo/inactivo
+            sbcJugadoresSeleccionados = []; 
+            dibujarSelectoresContratosUI(); 
             actualizarContratoEnFoco();
         };
 
@@ -4375,7 +4376,6 @@ function renderizarCartasElegiblesSBC() {
                 if (totalSeleccionadas >= req.cantidad) return alert(`⚠️ Este contrato exige ${req.cantidad} jugadores.`);
                 sbcJugadoresSeleccionados.push(carta.id);
             } else {
-                // Removemos solo una instancia del ID del pool de sacrificio
                 const index = sbcJugadoresSeleccionados.indexOf(carta.id);
                 if (index > -1) sbcJugadoresSeleccionados.splice(index, 1);
             }
@@ -4421,7 +4421,7 @@ async function enviarContratoAlBot() {
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('monedas');
             if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
             
-            cargarModuloSBC(); // Recarga y limpia la cartelera completa de forma fluida
+            cargarModuloSBC(); 
         } else {
             alert(data.mensaje || "❌ Trato rechazado.");
         }
@@ -4431,40 +4431,11 @@ async function enviarContratoAlBot() {
     }
 }
 
-// ⏱️ CUENTA REGRESIVA INTEGRADA DE ROTACIÓN DE CARTELERA
+// ⏱️ CONECTOR DE REFLEJO SEGURO PARA EL CRONÓMETRO DE CONTRATOS
 function iniciarCronometroRotacionSBC() {
-    if (sbcIntervaloRotacion) clearInterval(sbcIntervaloRotacion);
-    
-    const elTimer = document.getElementById("sbc-timer-rotacion");
-    if (!elTimer) return;
-
-    sbcIntervaloRotacion = setInterval(() => {
-        const ahora = new Date();
-        
-        // Calculamos el próximo lunes a las 00:00:00 exactas
-        const proximoLunes = new Date();
-        const diasHastaLunes = (8 - ahora.getDay()) % 7 || 7; 
-        
-        proximoLunes.setDate(ahora.getDate() + diasHastaLunes);
-        proximoLunes.setHours(0, 0, 0, 0);
-
-        const tiempoRestanteMs = proximoLunes - ahora;
-
-        if (tiempoRestanteMs <= 0) {
-            clearInterval(sbcIntervaloRotacion);
-            elTimer.innerHTML = `🔄 ROTANDO CARTELERA DEL BOT...`;
-            setTimeout(() => { cargarModuloSBC(); }, 3000); 
-            return;
-        }
-
-        const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
-        const dias = Math.floor(totalSegundos / 86400);
-        const horas = Math.floor((totalSegundos % 86400) / 3600);
-        const minutos = Math.floor((totalSegundos % 3600) / 60);
-        const segundos = totalSegundos % 60;
-
-        elTimer.innerText = `⏳ Próximos desafíos en: ${dias}d ${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
-    }, 1000);
+    // Apagamos cualquier loop heredado viejo ya que el motor unificado de la Arena
+    // controla el string de forma atómica en el script central.
+    console.log("🦾 Reloj de Contratos acoplado al master de la Arena.");
 }
 
 function toggleVisibilidadMisiones() {
