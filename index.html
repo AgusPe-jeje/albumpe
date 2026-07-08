@@ -88,7 +88,6 @@
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🎰 TIMBA</button>
                 <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">💸 MERCADO</button>
                 <button class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🏆 MUNDIAL</button>
-                <button class="btn-modulo-match" style="border-color: var(--dorado); color: var(--dorado); flex: 0 0 165px; width: 165px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box; display: none;" onclick="cambiarModulo('modulo-mundial-multi', this)">👥 MULTIJUGADOR</button>
                 <button type="button" id="btn-nav-contratos" class="btn-modulo-match" onclick="cambiarModulo('modulo-contratos-sbc', this)" style="flex: 0 0 180px; width: 180px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">
                     🦾 CONTRATOS BOT
                 </button>
@@ -515,106 +514,6 @@
                         <button type="button" onclick="cambiarModulo('modulo-minimundial')" class="btn-estadio btn-next-shot" style="width: 100%;">
                             🔄 VOLVER AL VESTUARIO
                         </button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="modulo-mundial-multi" class="modulo-contenido" style="display: none;">
-                <div class="caja-modulo-estadio">
-                    <h2 class="titulo-modulo" style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">🏆 MINI-MUNDIAL MULTIJUGADOR</h2>
-                    
-                    <div id="multi-menu-inicial" style="text-align: center; margin-top: 20px;">
-                        <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto 20px; border: 1px solid #1a2436;">
-                            <h3>🆕 CREAR NUEVA SALA</h3>
-                            
-                            <label>Modalidad del torneo:</label>
-                            <select id="multi-select-tipo-apuesta" onchange="conmutarInputsMultiUI()" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b; text-align: center;">
-                                <option value="amistoso">🤝 AMISTOSO (Gratis)</option>
-                                <option value="oro">🪙 TIMBA POR ORO</option>
-                                <option value="carta">🃏 APOSTAR FIGURITA REPETIDA</option>
-                            </select>
-
-                            <div id="multi-wrapper-oro" style="display: none;">
-                                <label>Apuesta de Oro:</label>
-                                <input type="number" id="multi-input-apuesta" value="500" min="100" step="100" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            </div>
-
-                            <div id="multi-wrapper-carta" style="display: none;">
-                                <label>Elegí el Cromo a arriesgar:</label>
-                                <select id="multi-select-carta-apuesta" style="width: 85%; padding: 8px; margin: 10px 0; border-radius: 6px; background: #0b111e; color: #fff; border: 1px solid #1e293b;"></select>
-                            </div>
-
-                            <button class="btn-estadio" style="margin-top: 10px;" onclick="abrirDraftMulti(true)">Crear Sala</button>
-                        </div>
-
-                        <div style="background: rgba(0,0,0,0.3); padding: 20px; border-radius: 12px; max-width: 400px; margin: 0 auto; border: 1px solid #1a2436;">
-                            <h3>🚪 UNIRSE A UNA SALA</h3>
-                            <input type="text" id="multi-input-codigo" placeholder="CÓDIGO DE SALA" style="width: 80%; padding: 8px; margin: 10px 0; border-radius: 6px; text-align: center; text-transform: uppercase; background: #0b111e; color: #fff; border: 1px solid #1e293b;">
-                            <button class="btn-estadio" onclick="abrirDraftMulti(false)">Ingresar Código</button>
-                        </div>
-                    </div>
-
-                    <div id="multi-fase-inscripcion" style="display: none; text-align: center; padding: 20px;">
-                        <h3 style="color: var(--celeste);">ELEGÍ TU PAÍS PARA EL TORNEO ONLINE</h3>
-                        <div id="multi-zona-eleccion-pais" style="margin: 20px 0; display: flex; justify-content: center; flex-wrap: wrap;"></div>
-                        <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); max-width: 250px; margin: 15px auto 0;">
-                            ❌ ABANDONAR INSCRIPCIÓN
-                        </button>
-                    </div>
-
-                    <div id="multi-fase-draft" style="display: none; padding: 15px;">
-                        <div class="arena-versus-scoreboard" style="margin-bottom: 20px;">
-                            <div class="bando-equipo-stadium local">
-                                <span class="bandera-flag">🛡️</span>
-                                <span id="multi-lbl-tu-seleccion" class="nombre-seleccion">-</span>
-                            </div>
-                            <div class="vs-circulo-match" style="font-size: 1.2rem;">ONLINE</div>
-                            <div class="bando-equipo-stadium visitante">
-                                <span class="bandera-flag">👥</span>
-                                <span class="nombre-seleccion">RIVALES</span>
-                            </div>
-                        </div>
-                        <div class="banca-reloj-status" id="multi-lbl-estrellas-equipo" style="text-align: center; font-size: 1.1rem; border-color: var(--celeste); color: var(--celeste); margin-bottom: 20px;">
-                            ⭐ (0/5 Estrellas)
-                        </div>
-
-                        <div class="grid-cartas-draft-mundial" id="multi-grid-cartas-draft" style="max-height: 350px; overflow-y: auto; background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px;"></div>
-                        
-                        <div id="multi-wrapper-apuesta-invitado" style="display: none; background:#131c2e; padding:15px; border-radius:8px; border:1px solid var(--dorado); margin-bottom:15px; text-align:center;">
-                            <label style="color:var(--dorado); font-weight:bold; display:block; margin-bottom:8px;">🃏 SELECCIONÁ TU CARTA PARA PONER EN JUEGO:</label>
-                            <select id="multi-select-carta-apuesta-invitado" style="width:90%; padding:8px; border-radius:6px; background:#0b111e; color:#fff; border:1px solid #1e293b Papel;"></select>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <button type="button" onclick="confirmarInscripcionMultiServidor(window.mundialSeleccionUsuario, jugadoresSeleccionadosDraft)" class="btn-estadio btn-bet-action" style="background: var(--verde-match); border-color: var(--verde-match); font-size: 1.2rem; width: 100%;">
-                                ⚔️ CONFIRMAR ALINEACIÓN Y ENTRAR AL VESTUARIO
-                            </button>
-                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">
-                                ↩️ CAMBIAR SELECCIÓN / SALIR
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="multi-lobby-espera" style="display: none; text-align: center;">
-                        <div style="background: #0b111e; padding: 15px; border-radius: 10px; display: inline-block; margin-bottom: 20px; border: 2px solid var(--dorado);">
-                            <span style="font-size: 1.1rem; color: #64748b;">CÓDIGO DE SALA:</span>
-                            <h2 id="lobby-txt-codigo" style="color: var(--dorado); margin: 5px 0; font-size: 2.2rem; font-family: 'Oswald'; letter-spacing: 2px;">------</h2>
-                            <span id="lobby-txt-pozo" style="color: var(--verde-match); font-weight: bold;">💰 Pozo Actual: 0 Oro</span>
-                        </div>
-
-                        <h4 style="color: var(--celeste); margin-bottom: 15px;">👥 JUGADORES CONECTADOS (<span id="lobby-cnt-jugadores">0</span>/8)</h4>
-                        <div id="lobby-lista-participantes" style="max-width: 500px; margin: 0 auto 20px; display: flex; flex-direction: column; gap: 8px;"></div>
-
-                        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 350px; margin: 0 auto;">
-                            <button id="multi-btn-iniciar-fixture" class="btn-estadio btn-modulo-match" style="display: none; margin: 0 auto; width: 100%;" onclick="lanzarSimulacionMulti()">🔥 ¡LARGAR MUNDIAL! 🔥</button>
-                            <button type="button" onclick="cancelarMundialMultiLobby()" class="btn-estadio" style="background: var(--rojo); border-color: var(--rojo); width: 100%;">🚪 ABANDONAR SALA ACTIVA</button>
-                        </div>
-                        <p id="multi-txt-espera-host" style="color: #64748b; font-style: italic; margin-top: 10px;">Esperando que el creador inicie el torneo...</p>
-                    </div>
-
-                    <div id="multi-pantalla-fixture" style="display: none;">
-                        <h3 style="text-align: center; color: var(--dorado); font-family: 'Oswald'; margin-bottom: 20px;">📊 TRANSMISIÓN EN VIVO MULTIJUGADOR</h3>
-                        <div id="multi-cronologia-goles" style="max-width: 600px; margin: 0 auto; min-height: 300px; padding: 10px;"></div>
                     </div>
                 </div>
             </div>
