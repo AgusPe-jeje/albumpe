@@ -231,6 +231,11 @@ async function autenticarUsuario(accion) {
             cargarAlbumLocal();
         }
 
+        // 🚀 GATILLO REAL CORREGIDO: Llamamos a tu función verdadera de la DB
+        if (typeof cargarMisionesDelServidor === "function") { 
+            cargarMisionesDelServidor(); 
+        }
+
     } catch (error) {
         ocultarCarga();
         console.error("❌ Error en la autenticación:", error);
@@ -1146,6 +1151,7 @@ async function ejecutarPenalLocal(direccionElegida) {
 
           usuarioActual.monedas = data.datos.monedas;
           usuarioActual.puntos_ranking = data.datos.puntos_ranking;
+          
           actualizarInterfazUI();
           cargarRankingLocal();
           
@@ -1159,16 +1165,27 @@ async function ejecutarPenalLocal(direccionElegida) {
           }
           arrancarCronometroVisual(data.siguienteIn);
 
-          // 🟢 SECTOR MISIONES API: Trackeo en plural sincronizado con el backend
+          // ⚽ DISPARO ESTADÍSTICAS DEL PERFIL: Mandamos la actualización a la base de datos de Neon
+          const token = localStorage.getItem("token");
+          await fetch(`${URL_BASE}/usuarios/registrar-penal`, {
+               method: "POST",
+               headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+               },
+               body: JSON.stringify({ ganoPartido: esGol }) // Registramos si fue gol (victoria) o atajada (derrota)
+          });
+
+          // 🔄 Sincronizamos las cajas de Mi Perfil en background para cuando entre a mirar
+          if (typeof actualizarMiPerfilUI === "function") {
+               actualizarMiPerfilUI();
+          }
+
+          // 🟢 SECTOR MISIONES API: Trackeo en plural
           if (typeof trackearProgresoMision === 'function') {
-               // 1. Sumamos el tiro a la tanda de penales jugada
                await trackearProgresoMision("penales", 1);
-               
-               // 2. Si terminó en gol, impactamos también el contador de goles anotados
                if (esGol) {
                     await trackearProgresoMision("goles_penales", 1);
-
-                    // 🔥 NUEVO DISPARADOR: Sumamos las 100 monedas de oro al objetivo de acumular oro
                     await trackearProgresoMision("acumular_oro", 100);
                }
           }
