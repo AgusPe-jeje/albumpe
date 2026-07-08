@@ -2564,19 +2564,20 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         const vis = partido.visitante || "Rival";
         const rondaNombre = partido.ronda || `PARTIDO #${index + 1}`;
         
-        // Verificamos si es un enfrentamiento real PVP puro
-        const esPvpReal = !loc.toLowerCase().includes("bot") && !vis.toLowerCase().includes("bot");
+        const esPvpReal = partido.esPvpReal || (!loc.toLowerCase().includes("bot") && !vis.toLowerCase().includes("bot"));
 
         secuenciaPromesas = secuenciaPromesas.then(() => {
             return new Promise(async (resolveCruce) => {
                  
-                 // 🎬 REQUISITO VERSUS ANIMATION INTERACTIVO
+                 // 🎬 Corregido: Le pasamos 'tablero' que es el contenedor real en este scope
                  if (esPvpReal) {
-                     await ejecutarAnimaciónIntroVersus(contenedor, loc, vis, rondaNombre);
+                     await ejecutarAnimaciónIntroVersus(tablero, loc, vis, rondaNombre);
                  }
 
                  const bloquePartido = document.createElement("div"); 
                  bloquePartido.className = "partido-simulado-card"; 
+                 bloquePartido.style.marginBottom = "20px";
+                 bloquePartido.style.borderLeft = "4px solid var(--dorado)";
                  const idUnico = "multi-" + index + Math.floor(Math.random() * 500);
                  
                  bloquePartido.innerHTML = `
@@ -2593,6 +2594,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                           🏁 Los capitanes firman planilla... ¡Duelo vibrante en la red!
                      </div>
                      
+                     <!-- 👔 MINI INTERACTIVO DE DUELOS DIRECTOS -->
                      <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center;">
                           <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald';">🚨 JUGADA EN TIEMPO REAL</h4>
                           <p id="evento-texto-${idUnico}" style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px; text-align:left;"></p>
@@ -2614,7 +2616,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                  let segundoVirtual = 0;
                  let partidoPausado = false;
 
-                 // ⏱️ VELOCIDAD: 1 Minuto = 660 milisegundos reales (Partido = 60 Segundos totales)
                  const timerMulti = setInterval(() => {
                       if (partidoPausado) return;
 
@@ -2623,10 +2624,9 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
 
                       document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-                      // GOL LOCAL / ATACANTE
                       if (cronogramaGolesTu.includes(segundoVirtual)) {
                           if (esPvpReal) {
-                              ejecutarDueloInteractividadPVP(true); // Abre compuerta interactiva
+                              ejecutarDueloInteractividadPVP(true);
                           } else {
                               if (Math.random() <= 0.35) ejecutarMomentoVAR(true);
                               else { golesTuActuales++; dispararImpactoVisualMulti(`⚽ ¡GOOOL DE ${loc.toUpperCase()}! Balonazo letal.`); }
@@ -2634,7 +2634,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                           cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
                       }
                       
-                      // GOL VISITANTE / RIVAL
                       else if (cronogramaGolesRival.includes(segundoVirtual)) {
                           if (esPvpReal) {
                               ejecutarDueloInteractividadPVP(false);
@@ -2648,12 +2647,9 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                       if (segundoVirtual >= 90) {
                            clearInterval(timerMulti);
                            
-                           // Sincronización final matemática nativa limpia sin saltos
-                           if (!esPvpReal) {
-                               golesTuActuales = partido.golesLocal;
-                               golesRivalActuales = partido.golesVisitante;
-                               document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                           }
+                           golesTuActuales = partido.golesLocal;
+                           golesRivalActuales = partido.golesVisitante;
+                           document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
 
                            if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
@@ -2676,21 +2672,21 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                       }
                  }, 660);
 
-                 // ⚡ DETONADOR DE IMPACTOS ESTÍMULO
                  function dispararImpactoVisualMulti(textoRelato) {
-                     filaPartido.classList.add("efecto-shake");
-                     setTimeout(() => filaPartido.classList.remove("efecto-shake"), 350);
+                     bloquePartido.classList.add("efecto-shake");
+                     setTimeout(() => bloquePartido.classList.remove("efecto-shake"), 350);
                      
                      const lbl = document.getElementById(`score-vivo-${idUnico}`);
-                     lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                     lbl.style.transform = "scale(1.2)";
-                     setTimeout(() => lbl.style.transform = "scale(1)", 400);
+                     if (lbl) {
+                         lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                         lbl.style.transform = "scale(1.2)";
+                         setTimeout(() => lbl.style.transform = "scale(1)", 400);
+                     }
 
                      document.getElementById(`consola-incidencias-${idUnico}`).innerText = textoRelato;
                      if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
                  }
 
-                 // 🖥️ SUB-MOTOR: MOMENTO VAR MULTIJUGADOR VÍA POLLING
                  function ejecutarMomentoVAR(esLocal) {
                      partidoPausado = true;
                      const consola = document.getElementById(`consola-incidencias-${idUnico}`);
@@ -2705,13 +2701,13 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      }, 1800);
 
                      setTimeout(() => {
-                         const seAnula = Math.random() <= 0.40; // 40% de probabilidad de anularse en la Arena
+                         const seAnula = Math.random() <= 0.40;
                          if (seAnula) {
                              if (esLocal) golesTuActuales--; else golesRivalActuales--;
                              consola.style.background = "rgba(239, 68, 68, 0.15)";
                              consola.style.color = "var(--rojo)";
                              consola.innerText = `❌ ¡ANULADO! El VAR detectó mano previa en la jugada. El gol se descuenta del tablero.`;
-                             lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                             if (lbl) lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
                          } else {
                              consola.style.background = "rgba(34, 197, 94, 0.15)";
                              consola.style.color = "var(--verde-match)";
@@ -2725,7 +2721,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      }, 4500);
                  }
 
-                 // ⚔️ NUEVA MECÁNICA ATÓMICA: DUELO ESTRATÉGICO ADIVINANZA PVP
                  function ejecutarClientApuestaPVP(tipoCatalogo, esAtacante) {
                      const ev = CATALOGO_PVP_INTERACTIVO[tipoCatalogo];
                      const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
@@ -2747,9 +2742,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                          btn.onclick = () => {
                              mod.style.display = "none";
                              const con = document.getElementById(`consola-incidencias-${idUnico}`);
-                             
-                             // Simulamos la adivinanza en tiempo real de forma reactiva
-                             const botAdivino = Math.random() <= 0.33; // 1 de 3 opciones
+                             const botAdivino = Math.random() <= 0.33;
 
                              if (esAtacante) {
                                  if (!botAdivino) {
@@ -2760,7 +2753,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                                      con.innerText = `❌ ${opc.badTexto}`;
                                  }
                              } else {
-                                 // Sos defensor
                                  if (botAdivino) {
                                      con.style.color = "var(--verde-match)";
                                      con.innerText = `🎉 ${opc.okTexto}`;
@@ -2769,21 +2761,18 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                                      dispararImpactoVisualMulti(`💥 ${opc.badTexto}`);
                                  }
                              }
-                             partidoPausado = false; // Reanudamos el flujo
+                             partidoPausado = false;
                          };
                          contO.appendChild(btn);
                      });
                  }
 
                  function ejecutarDueloInteractividadPVP(esLocalAtacando) {
-                     partidoPausado = true; // ⛔ CONGELAMOS EL TIEMPO PARA AMBOS JUGADORES
-                     
-                     // Si yo soy el creador y ataca el local -> juego en ataque. Si no, juego en defensa.
+                     partidoPausado = true;
                      if (multiEsCreador) {
                          if (esLocalAtacando) ejecutarClientApuestaPVP("ataque", true);
                          else ejecutarClientApuestaPVP("defensa", false);
                      } else {
-                         // Soy invitado
                          if (esLocalAtacando) ejecutarClientApuestaPVP("defensa", false);
                          else ejecutarClientApuestaPVP("ataque", true);
                      }
@@ -2792,8 +2781,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
         });
     });
 
-    // ... Tu bloque final de renderizado de premios (secuenciaPromesas.then) se mantiene igual abajo ...
-
+    // Código final del bloque de premios (se mantiene intacto de tu archivo base)
     secuenciaPromesas.then(() => {
          const bloquePremio = document.createElement("div");
          bloquePremio.style.cssText = "text-align:center; margin-top:25px; padding:20px; background:rgba(0,255,136,0.03); border:2px dashed var(--dorado); border-radius:12px; box-shadow: 0 4px 20px rgba(0,0,0,0.4);";
@@ -2802,7 +2790,6 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
          if (premio && !premio.ganoBot) {
               if (premio.tipo_apuesta === 'oro') {
                    textoPremio = `🏆 ¡FIN DEL TORNEO ONLINE! 🏆\n👑 Campeón de la Arena: ${premio.ganador_username.toUpperCase()}\n🎁 ¡Se lleva el pozo de 🪙 ${premio.pozo} de Oro!`;
-                   
                    if (usuarioActual) {
                        if (premio.ganador_username.toLowerCase() === usuarioActual.username.toLowerCase()) {
                             usuarioActual.monedas += (premio.pozo / 2); 
@@ -2812,13 +2799,11 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                        const elMonedas = document.getElementById("lbl-monedas");
                        if (elMonedas) elMonedas.innerText = usuarioActual.monedas;
                    }
-
               } else if (premio.tipo_apuesta === 'carta') {
                    textoPremio = `🏆 ¡FIN DEL TORNEO ONLINE! 🏆\n👑 Campeón de la Arena: ${premio.ganador_username.toUpperCase()}\n\n🎉 ¡Conservás tu cromo invicto y le arrebataste a:\n🌟 [ ${premio.nombreCartaPremio || 'Jugador Épico'} ]!\n\n💀 El plantel derrotado perdió su cromo de forma permanente.`;
               }
          } else if (premio && premio.ganoBot) {
               textoPremio = premio.tipo_apuesta === 'carta' ? `🤖 ¡El torneo fue conquistado por un Bot (${premio.ganador_username.toUpperCase()})!\n\n💀 Ambos jugadores perdieron sus cartas en el vestuario.` : `🤖 ¡Torneo conquistado por un Bot (${premio.ganador_username.toUpperCase()})!\n💸 El pozo de oro se disolvió.`;
-              
               if (premio.tipo_apuesta === 'oro' && usuarioActual) {
                    usuarioActual.monedas -= (premio.pozo / 2);
                    const elMonedas = document.getElementById("lbl-monedas");
@@ -2887,36 +2872,36 @@ function conmutarInputsMultiUI() {
 function ejecutarAnimaciónIntroVersus(contenedor, local, rival, ronda) {
     return new Promise((resolve) => {
         const divIntro = document.createElement("div");
-        divIntro.style.cssText = "background:radial-gradient(circle, #0f172a 0%, #020617 100%); border:2px solid var(--dorado); border-radius:12px; padding:25px; text-align:center; margin-bottom:20px; position:relative; overflow:hidden; box-shadow: 0 0 25px rgba(255,177,0,0.2); animation: screenShake 0.4s ease-out;";
+        divIntro.style.cssText = "background:radial-gradient(circle, #0f172a 0%, #020617 100%); border:2px solid var(--dorado); border-radius:12px; padding:25px; text-align:center; margin-bottom:20px; position:relative; overflow:hidden; box-shadow: 0 0 25px rgba(255,177,0,0.2);";
         
         divIntro.innerHTML = `
             <div style="font-family:'Oswald'; font-size:0.8rem; color:var(--dorado); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px;">⚡ TRANSMISIÓN EN DIRECTO REAL ⚡</div>
             <div style="color:var(--celeste); font-size:1.1rem; font-family:'Oswald'; font-weight:bold; margin-bottom:15px;">📋 ${ronda.toUpperCase()}</div>
             <div style="display:flex; justify-content:center; align-items:center; gap:20px; font-weight:bold; font-size:1.3rem; font-family:'Oswald';">
-                <span style="color:#fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); transform: translateX(-50px); transition: all 0.5s ease-out;" id="intro-loc-${idUnico}">⚽ ${local.toUpperCase()}</span>
-                <span style="color:var(--rojo); font-size:1.8rem; font-style:italic; scale: 0; transition: all 0.3s ease-in;" id="intro-vs-${idUnico}">VS</span>
-                <span style="color:#fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); transform: translateX(50px); transition: all 0.5s ease-out;" id="intro-vis-${idUnico}">${rival.toUpperCase()} 🤖</span>
+                <span style="color:#fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); transform: translateX(-30px); transition: all 0.5s ease-out;" class="intro-loc-txt">⚽ ${local.toUpperCase()}</span>
+                <span style="color:var(--rojo); font-size:1.8rem; font-style:italic; transform: scale(0); transition: all 0.3s ease-in;" class="intro-vs-txt">VS</span>
+                <span style="color:#fff; text-shadow: 0 0 10px rgba(255,255,255,0.4); transform: translateX(30px); transition: all 0.5s ease-out;" class="intro-vis-txt">${rival.toUpperCase()}</span>
             </div>
-            <div style="margin-top:15px; font-size:0.85rem; color:#64748b; font-weight:bold;" id="intro-status-${idUnico}">⚙️ SINCRONIZANDO VESTUARIOS...</div>
+            <div style="margin-top:15px; font-size:0.85rem; color:#64748b; font-weight:bold; transition: color 0.3s;" class="intro-status-txt">⚙️ SINCRONIZANDO VESTUARIOS...</div>
         `;
         
         contenedor.appendChild(divIntro);
         divIntro.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // Animación fluida de choque de nombres
+        // Activación de las transiciones CSS
         setTimeout(() => {
-            const l = divIntro.querySelector(`[id^="intro-loc-"]`);
-            const v = divIntro.querySelector(`[id^="intro-vs-"]`);
-            const r = divIntro.querySelector(`[id^="intro-vis-"]`);
-            const s = divIntro.querySelector(`[id^="intro-status-"]`);
+            const l = divIntro.querySelector(".intro-loc-txt");
+            const v = divIntro.querySelector(".intro-vs-txt");
+            const r = divIntro.querySelector(".intro-vis-txt");
+            const s = divIntro.querySelector(".intro-status-txt");
             
             if (l) l.style.transform = "translateX(0)";
             if (r) r.style.transform = "translateX(0)";
-            if (v) v.style.scale = "1.3";
-            if (s) { s.innerText = "🏁 ¡CANDADO ABIERTO! DAN EL SILBATAZO INICIAL"; s.style.color = "var(--verde-match)"; }
-        }, 150);
+            if (v) v.style.transform = "scale(1.2)";
+            if (s) { s.innerText = "🏁 ¡CONEXIÓN ESTABLECIDA! PITAZO INICIAL"; s.style.color = "var(--verde-match)"; }
+        }, 100);
 
-        // Destruimos la intro para darle paso a los 90 minutos de juego tras 3.5 segundos netos de pantalla
+        // Remoción tras 3.5 segundos netos
         setTimeout(() => {
             divIntro.style.opacity = "0";
             divIntro.style.transition = "opacity 0.4s ease-out";
