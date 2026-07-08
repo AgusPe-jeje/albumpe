@@ -3845,13 +3845,15 @@ async function actualizarMiPerfilUI() {
             divAvatar.innerText = "";
         }
 
-        // 🌟 NUEVO BLOQUE: Render del Cromo Insignia de mi Vestuario
+        // 🌟 NUEVO BLOQUE CORREGIDO: Usamos la URL de la base de datos o la de memoria en tiempo real
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
-            if (perfil.cromo_destacado) {
+            const urlInsigniaReal = perfil.cromo_destacado || usuarioActual.cromo_destacado;
+
+            if (urlInsigniaReal) {
                 contenedorDestacado.innerHTML = `
                     <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                        <img src="${perfil.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img src="${urlInsigniaReal}" style="width: 100%; height: 100%; object-fit: cover;">
                     </div>
                 `;
             } else {
@@ -3876,7 +3878,9 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
         mostrarCarga("Actualizando tu jugador destacado...");
 
         const token = localStorage.getItem("token");
-        const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
+        
+        // 🛠️ FIX: Agregamos el /api/ que faltaba en la URL para que no te rebote con 404
+        const res = await fetch(`${URL_BASE}/api/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -3891,20 +3895,25 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // 🔄 Sincronizamos la memoria local con la nueva columna separada
+            // 🔄 Sincronizamos la memoria de inmediato
             usuarioActual.cromo_destacado = fotoUrl;
 
-            // 🎯 FORZAMOS EL REDIBUJADO VISUAL INMEDIATO DEL CROMO DESTACADO (Mi Perfil)
-            const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
-            if (contenedorDestacado) {
-                contenedorDestacado.innerHTML = `
-                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                        <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
-                    </div>
-                `;
+            // 🎯 Forzamos el redibujado usando la función global que lee el estado
+            if (typeof renderizarCromoDestacadoUI === "function") {
+                renderizarCromoDestacadoUI();
+            } else {
+                // Resguardo manual si la función no está al alcance
+                const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
+                if (contenedorDestacado) {
+                    contenedorDestacado.innerHTML = `
+                        <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 20px auto;">
+                            <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                    `;
+                }
             }
             
-            // 🔄 Recargamos el perfil de fondo para actualizar estadísticas de ser necesario
+            // 🔄 Si recargás el perfil, asegurate de que use el nuevo dato en memoria
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
