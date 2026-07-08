@@ -105,26 +105,30 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // C. 🛡️ FILTRO PRESTIGIADO PARA LOGUEADOS: DESENCRIPTACIÓN Y VALIDACIÓN REAL DE TESTER
+    // C. 🛡️ FILTRO PRESTIGIADO PARA LOGUEADOS Y REQUISITOS DE LOGIN INICIAL
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (token) {
-        try {
-            // Desencriptamos el JWT usando tu Secret Key oficial
-            const decodificado = jwt.verify(token, JWT_SECRET);
-            
-            // Verificamos si el username encriptado es un tester autorizado
-            if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-                return next(); // Es un tester real y verificado, pase libre
-            }
-        } catch (err) {
-            // Si el token es inválido o expiró, lo tratamos como usuario común (va al rebote 503)
-            console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
-        }
+    // 💡 SOLUCIÓN EXTRA: Si no hay token en la petición inicial (peticiones de incógnito antes del login),
+    // dejamos pasar la solicitud para que el front no se rompa y dibuje la pantalla de acceso.
+    if (!token) {
+        return next();
     }
 
-    // D. Si no es un tester verificado o no es una ruta pública, rebote general estructurado
+    try {
+        // Desencriptamos el JWT usando tu Secret Key oficial
+        const decodificado = jwt.verify(token, JWT_SECRET);
+        
+        // Verificamos si el username encriptado es un tester autorizado
+        if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
+            return next(); // Es un tester real y verificado, pase libre
+        }
+    } catch (err) {
+        // Si el token es inválido o expiró, lo tratamos como usuario común (va al rebote 503)
+        console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
+    }
+
+    // D. Si el token pertenece a alguien que NO es tester, rebote general estructurado
     return res.status(503).json({ 
         ok: false,
         mantenimiento: true, // Flag útil para que tu front sepa qué pasa
