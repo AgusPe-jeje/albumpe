@@ -253,6 +253,9 @@ function actualizarInterfazUI() {
           if (document.getElementById("lbl-monedas")) document.getElementById("lbl-monedas").innerText = "0";
           if (document.getElementById("lbl-ranking")) document.getElementById("lbl-ranking").innerText = "0";
           if (document.getElementById("lbl-copas-mundiales")) document.getElementById("lbl-copas-mundiales").innerText = "0";
+          
+          // Si llegás a agregar contadores de penales en el header:
+          if (document.getElementById("lbl-penales-porcentaje")) document.getElementById("lbl-penales-porcentaje").innerText = "0%";
           return;
      }
 
@@ -264,6 +267,14 @@ function actualizarInterfazUI() {
      const lblMundiales = document.getElementById("lbl-copas-mundiales");
      if (lblMundiales) {
           lblMundiales.innerText = usuarioActual.copas_mundiales || 0;
+     }
+
+     // 🔄 Sincronización en memoria síncrona opcional por si manejás penales en el objeto global:
+     // Si al patear el penal actualizás 'usuarioActual.penales_jugados' y 'usuarioActual.penales_ganados':
+     const lblPenalesHeader = document.getElementById("lbl-penales-header-rapido");
+     if (lblPenalesHeader && usuarioActual.penales_jugados !== undefined) {
+          const ef = usuarioActual.penales_jugados > 0 ? Math.round((usuarioActual.penales_ganados / usuarioActual.penales_jugados) * 100) : 0;
+          lblPenalesHeader.innerText = `${ef}%`;
      }
 }
 
@@ -2843,18 +2854,14 @@ async function comprarCartaMercado(ofertaId) {
                 usuarioActual.monedas = data.nuevoOro;
             }
 
-            const elMonedas = document.getElementById("lbl-monedas");
-            if (elMonedas && data.nuevoOro !== undefined) {
-                elMonedas.innerText = data.nuevoOro;
+            // 🔄 Cambiado cargarDatosUsuario() por tu función real de la Arena
+            if (typeof actualizarInterfazUI === "function") {
+                actualizarInterfazUI();
             }
-
-            // 🎵 Gatillo de audio premium
-            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
-                AudioArena.play('monedas');
+            
+            if (typeof actualizarMiPerfilUI === "function") {
+                actualizarMiPerfilUI();
             }
-
-            if (typeof cargarDatosUsuario === "function") cargarDatosUsuario();
-            if (typeof actualizarPerfilUI === "function") actualizarPerfilUI();
 
             cargarAlbumLocal(); 
             obtenerOfertasMercado(); // 🔥 FIX: Corregido de obtenerOffersMercado() a obtenerOfertasMercado()
@@ -2862,6 +2869,11 @@ async function comprarCartaMercado(ofertaId) {
             // Refrescamos el historial dinámico si ya metiste el feed global abajo
             if (typeof actualizarHistorialTransferenciasUI === "function") {
                 actualizarHistorialTransferenciasUI();
+            }
+
+            // 🎵 Gatillo de audio premium
+            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+                AudioArena.play('monedas');
             }
 
         } else {
