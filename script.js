@@ -1452,7 +1452,8 @@ let intervaloCronometroMundial = null;
 // 🔥 UNIFICADO Y BLINDADO: Trae el estado seguro y actualiza copas + reloj
 async function chequearEstadoMundialServer() {
     try {
-        const res = await fetch(`${URL_BASE}/mundial/estado`, {
+        // 🛠️ FIX: Agregamos "/api" que faltaba para coincidir exactamente con el backend
+        const res = await fetch(`${URL_BASE}/api/mundial/estado`, {
             method: "GET",
             headers: obtenerHeadersSeguros() // ⚡ Pasa el mantenimiento usando tu token cifrado
         });
@@ -1496,7 +1497,7 @@ function arrancarCronometroMundialVisual(ms) {
 
      if (ms <= 0) {
           lblReloj.innerText = "🔋 ¡Inscripción abierta para el MiniMundial!";
-          lblReloj.style.color = "var(--verde-match)";
+          lblReloj.style.color = "var(--verde-match, #10b981)"; // 🎨 Forzamos el color verde match al habilitarse
           if (btnIniciar) btnIniciar.style.display = "inline-block";
           return;
      }
@@ -1510,6 +1511,7 @@ function arrancarCronometroMundialVisual(ms) {
           if (tiempoRestante <= 0) {
                clearInterval(intervaloCronometroMundial);
                lblReloj.innerText = "⚡ ¡Vestuarios listos! Actualizando...";
+               lblReloj.style.color = "var(--verde-match, #10b981)";
                if (btnIniciar) btnIniciar.style.display = "inline-block";
                return;
           }
