@@ -2218,7 +2218,8 @@ async function abrirDraftMulti(esCreador) {
 
         mostrarCarga("Validando credenciales de la sala...");
         try {
-            const res = await fetch(`${URL_BASE}/multijugador/consultar-sala/${cod}`, {
+            // ✅ Corregido para usar la ruta directa usando tu estructura de URL_BASE
+            const res = await fetch(`${URL_BASE}/multijugador/sala/${cod}`, {
                 method: 'GET',
                 headers: obtenerHeadersSeguros()
             });
@@ -2233,6 +2234,8 @@ async function abrirDraftMulti(esCreador) {
                 return alert("🚫 Esta sala ya cerró o el torneo ya arrancó.");
             }
 
+            // Guardamos el ID real de la sala que nos devuelve tu endpoint soberano del servidor
+            multiSalaId = data.sala_id;
             window.multiTipoApuestaActual = data.tipo_apuesta ? data.tipo_apuesta.toLowerCase() : 'amistoso';
 
             let cartelAdvertencia = "";
@@ -2251,16 +2254,10 @@ async function abrirDraftMulti(esCreador) {
                 return;
             }
 
-            const resSala = await fetch(`${URL_BASE}/multijugador/sala/${cod}`, {
-                method: 'GET',
-                headers: obtenerHeadersSeguros()
-            });
-            const dataSala = await resSala.json();
-            if (dataSala.ok) {
-                multiSalaId = dataSala.sala_id;
-            }
+            // 😉 ¡Ya no hace falta el segundo fetch! Tu endpoint /sala/:codigo ya nos dio el sala_id arriba.
 
         } catch (e) { 
+            console.error("Error detallado en la conexión:", e);
             ocultarCarga(); 
             return alert("Error de conexión con la sala."); 
         }
