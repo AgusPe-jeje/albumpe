@@ -300,6 +300,17 @@
                     </div>
 
                     <div class="panel-lateral-ranking-tv">
+                        <div style="background: rgba(2, 6, 23, 0.6); border: 1px solid var(--dorado); border-radius: 12px; padding: 12px; margin-bottom: 15px; text-align: center; font-family: 'Oswald', sans-serif; box-sizing: border-box;">
+                            <div style="color: var(--dorado); font-size: 1rem; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 3px; font-weight: bold;">
+                                 👑 PREMIOS DE TEMPORADA 👑
+                            </div>
+                            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0 0 8px 0;">🥇 2,500 Oro | 🥈 1,000 Oro | 🥉 500 Oro</p>
+                            
+                            <div id="timer-ranking-semanal" style="color: var(--celeste); font-size: 1.05rem; font-family: monospace; font-weight: bold; background: rgba(15, 23, 42, 0.8); display: inline-block; padding: 4px 12px; border-radius: 6px; border: 1px solid #1e293b; width: 100%; box-sizing: border-box;">
+                                 ⏳ CALCULANDO LIGA...
+                            </div>
+                        </div>
+
                         <h3 class="titulo-tabla-tv">🏆 TOP 10 DE LA ARENA</h3>
                         <table class="tabla-ranking-stadium">
                             <thead>
@@ -427,6 +438,9 @@
                 </div>
             </div>
 
+            <!-- ========================================================================
+               🏆 MÓDULO: EL COLISEO DEL MUNDIAL Y RANKING DE CAMPEONES (ACTUALIZADO)
+               ======================================================================== -->
             <div id="modulo-minimundial" class="modulo-contenido">
                 <div class="caja-modulo-estadio">
                     <div class="banner-modulo-imagen banner-mundial">
@@ -436,6 +450,20 @@
                     </div>
 
                     <div class="contenedor-ranking-mundiales-layout" style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid #1a2436;">
+                        
+                        <!-- 👑 BANNER TEMPORIZADOR DE LA LIGA SEMANAL INYECTADO EN EL MUNDIAL -->
+                        <div style="background: rgba(2, 6, 23, 0.6); border: 1px solid var(--dorado); border-radius: 12px; padding: 12px; margin: 0 auto 15px auto; max-width: 600px; text-align: center; font-family: 'Oswald', sans-serif; box-sizing: border-box;">
+                            <div style="color: var(--dorado); font-size: 1rem; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 3px; font-weight: bold;">
+                                 👑 PREMIOS DE TEMPORADA MUNDIAL 👑
+                            </div>
+                            <p style="color: #94a3b8; font-size: 0.8rem; margin: 0 0 8px 0;">🥇 2,500 Oro | 🥈 1,000 Oro | 🥉 500 Oro</p>
+                            
+                            <!-- ⏱️ El contador que se sincroniza por JS (Mismo ID o duplicado para reflejo dual) -->
+                            <div id="timer-ranking-semanal-mundial" class="timer-liga-compartido" style="color: var(--celeste); font-size: 1.05rem; font-family: monospace; font-weight: bold; background: rgba(15, 23, 42, 0.8); display: inline-block; padding: 4px 12px; border-radius: 6px; border: 1px solid #1e293b; width: 100%; box-sizing: border-box;">
+                                 ⏳ CALCULANDO LIGA...
+                            </div>
+                        </div>
+
                         <h3 class="titulo-tabla-tv" style="color: var(--dorado); text-align: center; font-family: 'Oswald'; font-size: 1.3rem; margin-bottom: 12px;">🌟 REYES DEL MUNDO 👑</h3>
                         <table class="tabla-ranking-stadium" style="width: 100%; margin: 0 auto; max-width: 600px;">
                             <thead>
