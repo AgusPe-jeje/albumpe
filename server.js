@@ -1430,7 +1430,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 });
 
 /* ========================================================================
-   ⚽ DRAFT MULTIJUGADOR (PREPARACIÓN SIN COMPROMISO DE COOLDOWN)
+   ⚽ DRAFT MULTIJUGADOR (PREPARACIÓN CON FALLBACK DE SEGURIDAD)
    ======================================================================== */
 app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
@@ -1439,6 +1439,7 @@ app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) =>
         const userCheck = await client.query("SELECT id FROM usuarios WHERE id = $1", [usuario_id]);
         if (userCheck.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "Usuario inválido." });
 
+        // 1. Intentamos buscar países donde el usuario tenga un plantel competitivo (mínimo 3 cartas)
         const paisesValidosQuery = await client.query(`
             SELECT j.pais 
             FROM usuario_progreso up 
@@ -1448,19 +1449,25 @@ app.post('/api/multijugador/preparar-draft', verificarToken, async (req, res) =>
             HAVING COUNT(j.id) >= 3
         `, [usuario_id]);
 
-        const paisesCandidatos = paisesValidosQuery.rows.map(r => r.pais);
+        let countriesResult = paisesValidosQuery.rows.map(r => r.pais);
 
-        if (paisesCandidatos.length === 0) {
-            return res.json({ ok: false, mensaje: "❌ Requisito insuficiente: Necesitás tener al menos 3 jugadores de un mismo país desbloqueados para participar." });
+        // 🎯 RETROALIMENTACIÓN / FALLBACK DE TESTEO:
+        // Si el usuario no tiene suficientes cartas, le prestamos 3 países del catálogo global 
+        // para que la interfaz NO se quede colgada en blanco y puedas probar el flujo.
+        if (countriesResult.length === 0) {
+            console.log(`⚠️ Usuario ${usuario_id} sin stock para Draft. Activando países de emergencia para pruebas.`);
+            const paisesPrueba = ["Argentina", "Brasil", "Francia", "España", "Alemania", "Inglaterra"];
+            countriesResult = mezclarArray([...paisesPrueba]).slice(0, 3);
         }
 
-        const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
+        const ternaFiltrada = mezclarArray([...countriesResult]).slice(0, 3);
 
         return res.json({
             ok: true,
             terna: ternaFiltrada
         });
     } catch (err) {
+        console.error("❌ Error en preparar-draft:", err.message);
         return res.status(500).json({ ok: false, error: err.message });
     } finally {
         client.release();
