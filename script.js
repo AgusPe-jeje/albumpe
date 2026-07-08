@@ -2665,19 +2665,16 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
     const tablero = document.getElementById("multi-cronologia-goles");
     if (!tablero) return; 
 
-    // 🛡️ PARCHE DE SEGURIDAD GENERAL: Evita que el polling externo re-ejecute el motor
-    if (document.getElementById("multi-partido-card-0")) {
-        console.log("⚽ Transmisión en curso. Bloqueando intento de duplicación.");
-        return;
-    }
+    // Limpiamos el tablero únicamente si no hay tarjetas dibujadas todavía
+    if (!document.getElementById("multi-partido-card-0")) {
+        tablero.innerHTML = ""; 
 
-    tablero.innerHTML = ""; 
-
-    if (apuestasTexto && Array.isArray(apuestasTexto) && apuestasTexto.length > 0) {
-        const bloqueTextoApuestas = document.createElement("div");
-        bloqueTextoApuestas.style.cssText = "background: rgba(239, 68, 68, 0.08); border: 1px dashed var(--rojo); padding: 14px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; text-align: center;";
-        bloqueTextoApuestas.innerHTML = `⚠️ <span style="color: var(--rojo); font-family: 'Oswald'; font-size: 1.1rem;">CROMOS ARRIESGADOS:</span><br>${apuestasTexto.join('<br>')}`;
-        tablero.appendChild(bloqueTextoApuestas);
+        if (apuestasTexto && Array.isArray(apuestasTexto) && apuestasTexto.length > 0) {
+            const bloqueTextoApuestas = document.createElement("div");
+            bloqueTextoApuestas.style.cssText = "background: rgba(239, 68, 68, 0.08); border: 1px dashed var(--rojo); padding: 14px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; text-align: center;";
+            bloqueTextoApuestas.innerHTML = `⚠️ <span style="color: var(--rojo); font-family: 'Oswald'; font-size: 1.1rem;">CROMOS ARRIESGADOS:</span><br>${apuestasTexto.join('<br>')}`;
+            tablero.appendChild(bloqueTextoApuestas);
+        }
     }
 
     if (!bitacora || !Array.isArray(bitacora) || bitacora.length === 0) return;
@@ -2701,182 +2698,193 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
 
         secuenciaPromesas = secuenciaPromesas.then(() => {
             return new Promise(async (resolveCruce) => {
-                 if (esPvpReal) {
-                     await ejecutarAnimaciónIntroVersus(tablero, loc, vis, rondaNombre);
+                 let bloquePartido = document.getElementById(`multi-partido-card-${index}`);
+                 
+                 // 🛡️ CONTROL ANTI-CONGELAMIENTO: Si el partido ya fue procesado y finalizado en un poll anterior, saltamos directo
+                 if (bloquePartido && bloquePartido.getAttribute("data-finalizado") === "true") {
+                     resolveCruce();
+                     return;
                  }
 
-                 const bloquePartido = document.createElement("div"); 
-                 bloquePartido.className = "partido-simulado-card"; 
-                 bloquePartido.id = `multi-partido-card-${index}`; 
-                 bloquePartido.style.marginBottom = "20px";
-                 bloquePartido.style.borderLeft = yoJuegoEstePartido ? "4px solid var(--verde-match)" : "4px solid #334155";
-                 const idUnico = "multi-" + index + Math.floor(Math.random() * 500);
+                 // Si no existe la tarjeta del encuentro, la creamos de cero
+                 if (!bloquePartido) {
+                     if (esPvpReal) {
+                         await ejecutarAnimaciónIntroVersus(tablero, loc, vis, rondaNombre);
+                     }
+
+                     bloquePartido = document.createElement("div"); 
+                     bloquePartido.className = "partido-simulado-card"; 
+                     bloquePartido.id = `multi-partido-card-${index}`; 
+                     bloquePartido.style.marginBottom = "20px";
+                     bloquePartido.style.borderLeft = yoJuegoEstePartido ? "4px solid var(--verde-match)" : "4px solid #334155";
+                     
+                     const idUnico = "multi-" + index + Math.floor(Math.random() * 500);
+                     bloquePartido.setAttribute("data-idunico", idUnico);
+                     
+                     bloquePartido.innerHTML = `
+                         <div style="display:flex; justify-content:space-between; align-items:center; color:var(--dorado); border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:12px;">
+                              <span style="font-family:'Oswald'; font-weight:bold; text-transform: uppercase; font-size: 1rem; letter-spacing: 0.5px;">📋 ${rondaNombre} ${yoJuegoEstePartido ? '⭐ TU MATCH' : '👁️ EN VIVO'}</span>
+                              <span id="reloj-vivo-${idUnico}" style="color:var(--celeste); font-weight:bold; font-family: monospace; font-size: 0.9rem;">⏱️ MINUTO 00:00</span>
+                         </div>
+                         <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px 0;">
+                              <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff;">⚽ ${loc.toUpperCase()}</span>
+                              <span id="score-vivo-${idUnico}" style="font-family:'Oswald'; font-size:1.9rem; background:#020617; padding:4px 18px; border-radius:8px; color:var(--verde-match); min-width:80px; text-align:center; border: 1px solid #1e293b;">0 - 0</span>
+                              <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">${vis.toUpperCase()}</span>
+                         </div>
+                         <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px;">
+                              ⚽ Pitazo inicial... Comienzan las acciones en la Arena.
+                         </div>
+                         <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center;">
+                              <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald';">🚨 JUGADA EN TIMELINE</h4>
+                              <p id="evento-texto-${idUnico}" style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px; text-align:left;"></p>
+                              <div id="evento-opciones-${idUnico}" style="display:flex; flex-direction:column; gap:8px;"></div>
+                         </div>
+                         <div id="multi-penales-box-${idUnico}" style="display:none; text-align:center; color:#ff3333; font-weight:bold; margin-top:12px; font-size:0.9rem; background:rgba(239,68,68,0.08); padding:8px; border-radius:6px; border: 1px solid rgba(239,68,68,0.2); font-family: 'Oswald';"></div>
+                     `;
+                     tablero.appendChild(bloquePartido); 
+                     bloquePartido.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                     if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+                 }
+
+                 const idUnico = bloquePartido.getAttribute("data-idunico");
+                 let cronogramaGolesTu = partido.minutosL ? [...partido.minutosL] : (partido.golesMinutosL ? [...partido.golesMinutosL] : []);
+                 let cronogramaGolesRival = partido.minutosV ? [...partido.minutosV] : (partido.golesMinutosV ? [...partido.golesMinutosV] : []);
                  
-                 bloquePartido.innerHTML = `
-                     <div style="display:flex; justify-content:space-between; align-items:center; color:var(--dorado); border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:12px;">
-                          <span style="font-family:'Oswald'; font-weight:bold; text-transform: uppercase; font-size: 1rem; letter-spacing: 0.5px;">📋 ${rondaNombre} ${yoJuegoEstePartido ? '⭐ TU MATCH' : '👁️ EN VIVO'}</span>
-                          <span id="reloj-vivo-${idUnico}" style="color:var(--celeste); font-weight:bold; font-family: monospace; font-size: 0.9rem;">⏱️ MINUTO 00:00</span>
-                     </div>
-                     <div style="display:flex; justify-content:space-between; align-items:center; padding: 5px 0;">
-                          <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff;">⚽ ${loc.toUpperCase()}</span>
-                          <span id="score-vivo-${idUnico}" style="font-family:'Oswald'; font-size:1.9rem; background:#020617; padding:4px 18px; border-radius:8px; color:var(--verde-match); min-width:80px; text-align:center; border: 1px solid #1e293b;">0 - 0</span>
-                          <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">${vis.toUpperCase()}</span>
-                     </div>
-                     <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px;">
-                          ⚽ Pitazo inicial... Comienzan las actions en el Coliseo.
-                     </div>
-                     <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center;">
-                          <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald';">🚨 JUGADA EN TIMELINE</h4>
-                          <p id="evento-texto-${idUnico}" style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px; text-align:left;"></p>
-                          <div id="evento-opciones-${idUnico}" style="display:flex; flex-direction:column; gap:8px;"></div>
-                     </div>
-                     <div id="multi-penales-box-${idUnico}" style="display:none; text-align:center; color:#ff3333; font-weight:bold; margin-top:12px; font-size:0.9rem; background:rgba(239,68,68,0.08); padding:8px; border-radius:6px; border: 1px solid rgba(239,68,68,0.2); font-family: 'Oswald';"></div>
-                 `;
-                 tablero.appendChild(bloquePartido); 
-                 bloquePartido.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-                 if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
-
-                 let cronogramaGolesTu = partido.minutosL ? [...partido.minutosL] : [];
-                 let cronogramaGolesRival = partido.minutosV ? [...partido.minutosV] : [];
                  let golesTuActuales = 0; 
                  let golesRivalActuales = 0;
                  let segundoVirtual = 0;
                  let enPausaDeContador = false;
                  let ultimoMinutoBotProcesado = -1;
-                 // 🔒 CANDADO ABSOLUTO: Detiene ejecuciones fantasmas del polling post-match
-                 let partidoFinalizado = false; 
 
                  const timerMulti = setInterval(async () => {
-                     if (enPausaDeContador || partidoFinalizado) return;
+                     if (enPausaDeContador) return;
+                     
+                     // Si externamente el nodo se marcó como finalizado durante el tick, salimos inmediatamente
+                     if (bloquePartido.getAttribute("data-finalizado") === "true") {
+                         clearInterval(timerMulti);
+                         return;
+                     }
 
                      try {
-                         const salaIdentificador = multiSalaId || multiCodigoSala;
-                         const resSala = await fetch(`${URL_BASE}/multijugador/estado-vivo/${salaIdentificador}`, {
-                             method: 'GET',
-                             headers: obtenerHeadersSeguros()
-                         });
-                         const dataSala = await resSala.json();
-                         if (!dataSala.ok || partidoFinalizado) return;
+                         // Para partidos de bots puros, no hacemos polling pesado de estado táctico humano
+                         let dataSala = { ok: true, estadoJugada: 'corriendo', minuto: segundoVirtual + 1 };
+                         
+                         if (!esPartidoDeBotsPuro) {
+                             const salaIdentificador = multiSalaId || multiCodigoSala;
+                             const resSala = await fetch(`${URL_BASE}/multijugador/estado-vivo/${salaIdentificador}`, {
+                                 method: 'GET',
+                                 headers: obtenerHeadersSeguros()
+                             });
+                             dataSala = await resSala.json();
+                         }
 
-                         if (multiEsCreador) {
+                         if (!dataSala.ok || bloquePartido.getAttribute("data-finalizado") === "true") return;
+
+                         if (multiEsCreador || esPartidoDeBotsPuro) {
                              if (dataSala.estadoJugada !== 'esperando_eleccion' && dataSala.estadoJugada !== 'mostrar_contador') {
                                  segundoVirtual += 1;
                                  if (segundoVirtual > 90) segundoVirtual = 90;
 
-                                 await fetch(`${URL_BASE}/multijugador/actualizar-reloj`, {
-                                     method: 'POST',
-                                     headers: obtenerHeadersSeguros(),
-                                     body: JSON.stringify({ sala_id: multiSalaId, minuto: segundoVirtual })
-                                 }).catch(() => {});
+                                 if (multiEsCreador && !esPartidoDeBotsPuro) {
+                                     await fetch(`${URL_BASE}/multijugador/actualizar-reloj`, {
+                                         method: 'POST',
+                                         headers: obtenerHeadersSeguros(),
+                                         body: JSON.stringify({ sala_id: multiSalaId, minuto: segundoVirtual })
+                                     }).catch(() => {});
+                                 }
                              }
                          } else {
                              segundoVirtual = dataSala.minuto || 0;
                          }
 
-                         document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
+                         const relojLabel = document.getElementById(`reloj-vivo-${idUnico}`);
+                         if (relojLabel) relojLabel.innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-                         // PINTADO MINUTO A MINUTO DE GOLES DURANTE LA SIMULACIÓN DE BOTS
-                         if (esPartidoDeBotsPuro) {
-                             if (cronogramaGolesTu.includes(segundoVirtual)) {
-                                 cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
-                                 golesTuActuales++;
-                                 dispararImpactoVisualMulti(`⚽ ¡GOL DE ${loc.toUpperCase()}! Remate potente de la IA bot.`);
-                             }
-                             if (cronogramaGolesRival.includes(segundoVirtual)) {
-                                 cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
-                                 golesRivalActuales++;
-                                 dispararImpactoVisualMulti(`💥 ¡GOL DE ${vis.toUpperCase()}! Contraataque preciso ejecutado por el bot.`);
-                             }
-                         } else {
-                             // Lógica nativa de interacciones para humanos
-                             const tieneGolLocal = cronogramaGolesTu.includes(segundoVirtual);
-                             const tieneGolRival = cronogramaGolesRival.includes(segundoVirtual);
+                         // ⚽ PROCESAMIENTO DINÁMICO DE GOLES MINUTO A MINUTO
+                         if (cronogramaGolesTu.includes(segundoVirtual)) {
+                             cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
+                             golesTuActuales++;
+                             dispararImpactoVisualMulti(`⚽ ¡GOL DE ${loc.toUpperCase()}! Remate tremendo que vence la valla rival.`);
+                         }
+                         if (cronogramaGolesRival.includes(segundoVirtual)) {
+                             cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
+                             golesRivalActuales++;
+                             dispararImpactoVisualMulti(`💥 ¡GOL DE ${vis.toUpperCase()}! Definición impecable al rincón del palo.`);
+                         }
 
-                             if ((tieneGolLocal || tieneGolRival) && dataSala.estadoJugada !== 'esperando_eleccion' && dataSala.estadoJugada !== 'mostrar_contador') {
-                                 if (multiEsCreador) {
-                                     await fetch(`${URL_BASE}/multijugador/pausar-por-evento`, {
-                                         method: 'POST',
-                                         headers: obtenerHeadersSeguros(),
-                                         body: JSON.stringify({ sala_id: multiSalaId })
-                                     });
+                         // Relatando el ambiente de los Bots cada 20 minutos virtuales
+                         if (esPartidoDeBotsPuro && segundoVirtual % 20 === 0 && segundoVirtual < 90) {
+                             const fragmentos = ["Los elencos robóticos miden fuerzas en mitad de campo.", "Presión asfixiante de las líneas tácticas del bot.", "El estadio ruge ante las transiciones veloces del encuentro."];
+                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                             if (consola) consola.innerText = `🏃 ${fragmentos[Math.floor(Math.random() * fragmentos.length)]}`;
+                         }
+
+                         // Flujo interactivo (Solo si hay humanos en el partido)
+                         if (!esPartidoDeBotsPuro) {
+                             if (dataSala.estadoJugada === 'esperando_eleccion') {
+                                 const idxTu = partido.minutosL ? partido.minutosL.indexOf(segundoVirtual) : -1;
+                                 const idxRiv = partido.minutosV ? partido.minutosV.indexOf(segundoVirtual) : -1;
+                                 const esLocalAtacando = idxTu !== -1;
+                                 const llaveEventoFijo = esLocalAtacando ? (partido.eventosL[idxTu] || "contrataque_favor") : (partido.eventosV[idxRiv] || "defensa_urgente");
+
+                                 if (yoJuegoEstePartido) {
+                                     const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
+                                     if (mod && mod.style.display !== "block") {
+                                         if (partido.esPvpReal) {
+                                             const soyAtacante = (esLocalAtacando && soyElLocalDeEsteMatch) || (!esLocalAtacando && soyElInvitadoDeEsteMatch);
+                                             lanzarBotoneraPVPUI(soyAtacante ? "ataque" : "defensa", soyAtacante);
+                                         } else if (esHumanoVsBot) {
+                                             ejecutarPausaContraBot(llaveEventoFijo, esLocalAtacando);
+                                         }
+                                     }
+                                 } else {
+                                     const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                                     if (consola) consola.innerText = `⏳ Jugadores decidiendo jugada interactiva...`;
                                  }
+                                 return;
+                             }
+
+                             if (dataSala.estadoJugada === 'mostrar_contador') {
+                                 enPausaDeContador = true;
+                                 let cuentaRegresiva = 3;
+                                 const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                                 
+                                 const intervaloContadorVisual = setInterval(async () => {
+                                     cuentaRegresiva--;
+                                     if (cuentaRegresiva > 0) {
+                                         if (consola) consola.innerText = `⏳ Computando jugada de vestuario en... ${cuentaRegresiva}`;
+                                     } else {
+                                         clearInterval(intervaloContadorVisual);
+                                         const resFinal = dataSala.resultado; 
+                                         if (resFinal && resFinal.exito) {
+                                             dispararImpactoVisualMulti(`🎉 ¡GOOOL! Resolución táctica impacta en las mallas.`);
+                                         } else {
+                                             if (consola) consola.innerText = "❌ Movimiento contenido de forma excelente por la zaga defensiva.";
+                                         }
+
+                                         setTimeout(async () => {
+                                             if (multiEsCreador && bloquePartido.getAttribute("data-finalizado") !== "true") {
+                                                 await fetch(`${URL_BASE}/multijugador/reanudar-partido`, {
+                                                     method: 'POST',
+                                                     headers: obtenerHeadersSeguros(),
+                                                     body: JSON.stringify({ sala_id: multiSalaId })
+                                                 });
+                                             }
+                                             enPausaDeContador = false; 
+                                         }, 2000);
+                                     }
+                                 }, 1000);
                                  return;
                              }
                          }
 
-                         if (dataSala.estadoJugada === 'esperando_eleccion' && !esPartidoDeBotsPuro) {
-                             const idxTu = partido.minutosL ? partido.minutosL.indexOf(segundoVirtual) : -1;
-                             const idxRiv = partido.minutosV ? partido.minutosV.indexOf(segundoVirtual) : -1;
-                             const esLocalAtacando = idxTu !== -1;
-                             const llaveEventoFijo = esLocalAtacando ? (partido.eventosL[idxTu] || "contrataque_favor") : (partido.eventosV[idxRiv] || "defensa_urgente");
-
-                             if (yoJuegoEstePartido) {
-                                 const mod = document.getElementById(`modulo-interactivo-${idUnico}`);
-                                 if (mod.style.display !== "block") {
-                                     if (esPvpReal) {
-                                         const soyAtacante = (esLocalAtacando && soyElLocalDeEsteMatch) || (!esLocalAtacando && soyElInvitadoDeEsteMatch);
-                                         lanzarBotoneraPVPUI(soyAtacante ? "ataque" : "defensa", soyAtacante);
-                                     } else if (esHumanoVsBot) {
-                                         ejecutarPausaContraBot(llaveEventoFijo, esLocalAtacando);
-                                     }
-                                 }
-                             } else {
-                                 document.getElementById(`consola-incidencias-${idUnico}`).innerText = `⏳ Jugadores decidiendo jugada interactiva...`;
-                             }
-                             return;
-                         }
-
-                         if (dataSala.estadoJugada === 'mostrar_contador' && !esPartidoDeBotsPuro) {
-                             enPausaDeContador = true;
-                             let cuentaRegresiva = 3;
-                             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-                             
-                             const intervaloContadorVisual = setInterval(async () => {
-                                 cuentaRegresiva--;
-                                 if (cuentaRegresiva > 0) {
-                                     consola.innerText = `⏳ Computando jugada de vestuario en... ${cuentaRegresiva}`;
-                                 } else {
-                                     clearInterval(intervaloContadorVisual);
-                                     
-                                     const resFinal = dataSala.resultado; 
-                                     if (resFinal && resFinal.exito) {
-                                         const esGolRealLocal = partido.minutosL && partido.minutosL.includes(segundoVirtual);
-                                         const esGolRealRival = partido.minutosV && partido.minutosV.includes(segundoVirtual);
-
-                                         if (esGolRealLocal) golesTuActuales++;
-                                         if (esGolRealRival) golesRivalActuales++;
-
-                                         dispararImpactoVisualMulti(`🎉 ¡GOOOL! Resolución táctica impacta en las mallas.`);
-                                     } else {
-                                         consola.innerText = "❌ Movimiento contenido de forma excelente por la zaga defensiva.";
-                                     }
-
-                                     cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
-                                     cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
-
-                                     setTimeout(async () => {
-                                         if (multiEsCreador && !partidoFinalizado) {
-                                             await fetch(`${URL_BASE}/multijugador/reanudar-partido`, {
-                                                 method: 'POST',
-                                                 headers: obtenerHeadersSeguros(),
-                                                 body: JSON.stringify({ sala_id: multiSalaId })
-                                             });
-                                         }
-                                         enPausaDeContador = false; 
-                                     }, 2000);
-                                 }
-                             }, 1000);
-                             return;
-                         }
-
-                         // FINALIZACIÓN SÓLIDA DE LOS 90 MINUTOS
-                         if (segundoVirtual >= 90 && !enPausaDeContador && !partidoFinalizado) {
-                             partidoFinalizado = true; // ⚡ CIERRE DE COMPUERTA INMEDIATO
+                         // 🏁 PITAZO FINAL: LLEGAMOS AL MINUTO 90
+                         if (segundoVirtual >= 90 && !enPausaDeContador && bloquePartido.getAttribute("data-finalizado") !== "true") {
+                             bloquePartido.setAttribute("data-finalizado", "true"); // 🔥 CIERRE DE COMPUERTA ABSOLUTO EN EL DOM
                              clearInterval(timerMulti); 
                              
-                             golesTuActuales = partido.golesLocal;
-                             golesRivalActuales = partido.golesVisitante;
+                             golesTuActuales = partido.golesLocal !== undefined ? partido.golesLocal : partido.gL;
+                             golesRivalActuales = partido.golesVisitante !== undefined ? partido.golesVisitante : partido.gV;
                              
                              const scoreLabel = document.getElementById(`score-vivo-${idUnico}`);
                              if (scoreLabel) scoreLabel.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
@@ -2894,7 +2902,7 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                              bloquePartido.style.borderColor = "var(--verde-match)";
                              const finTexto = document.createElement("div"); 
                              finTexto.style.cssText = "text-align:right; font-size:0.85rem; font-weight:bold; color:var(--verde-match); margin-top:8px; font-family:'Oswald';";
-                             finTexto.innerText = `🏆 LLEVA EL CRUCE: ${partido.ganadorUsername.toUpperCase()} ✅`;
+                             finTexto.innerText = `🏆 LLEVA EL CRUCE: ${(partido.ganadorUsername || "BOT").toUpperCase()} ✅`;
                              bloquePartido.appendChild(finTexto);
                              
                              const consolaIncidencias = document.getElementById(`consola-incidencias-${idUnico}`);
@@ -2906,14 +2914,15 @@ window.renderizarFixturePasoAPaso = function(bitacora, premio, apuestasTexto) {
                      } catch (err) {
                          console.error("Error en loop multijugador:", err);
                      }
-                 }, esPartidoDeBotsPuro ? 150 : 800); // Goles fluidos a 150ms en Bots
+                 }, esPartidoDeBotsPuro ? 100 : 800); // Velocidad supersónica para los bots (100ms)
 
                  function dispararImpactoVisualMulti(textoRelato) {
-                     bloquePartido.classList.add("efecto-shake");
-                     setTimeout(() => bloquePartido.classList.remove("efecto-shake"), 350);
+                     if (bloquePartido) bloquePartido.classList.add("efecto-shake");
+                     setTimeout(() => { if (bloquePartido) bloquePartido.classList.remove("efecto-shake"); }, 350);
                      const lbl = document.getElementById(`score-vivo-${idUnico}`);
                      if (lbl) lbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                     document.getElementById(`consola-incidencias-${idUnico}`).innerText = textoRelato;
+                     const consola = document.getElementById(`consola-incidencias-${idUnico}`);
+                     if (consola) consola.innerText = textoRelato;
                      if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
                  }
             });
