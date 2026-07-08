@@ -3034,13 +3034,13 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Control del tiempo real (GMT-3 Buenos Aires)
+        // 1. Control del tiempo real unificado (Calculamos la fecha estricta hoy en Argentina)
         const ahora = new Date();
         const opcionesFecha = { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' };
         const [mes, dia, anio] = ahora.toLocaleDateString('en-US', opcionesFecha).split('/');
         const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // 2. Chequeamos cuándo fue su último reset
+        // 2. Chequeamos al usuario
         const userCheck = await client.query(
             "SELECT TO_CHAR(ultimo_reset_misiones, 'YYYY-MM-DD') as ultimo_reset FROM usuarios WHERE id = $1",
             [usuarioId]
@@ -3059,17 +3059,18 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
             // A. Borramos las misiones viejas del usuario para hacer lugar
             await client.query("DELETE FROM usuario_misiones WHERE usuario_id = $1", [usuarioId]);
 
-            // B. Algoritmo rápido para mezclar el catálogo de misiones y agarrar 3 distintas
+            // B. Mezclamos el catálogo y agarramos 3 distintas
             const misionesMezcladas = [...POOL_MISIONES_DISPONIBLES].sort(() => 0.5 - Math.random());
-            const misionesSeleccionadas = misionesMezcladas.slice(0, 3); // Nos quedamos con las primeras 3 al azar
+            const misionesSeleccionadas = misionesMezcladas.slice(0, 3);
 
-            // C. Las inyectamos en la base de datos asignándoles un mision_id incremental (1, 2, 3)
+            // C. Las inyectamos asignándoles el mision_id incremental (1, 2, 3)
+            // 🔥 CORREGIDO: Reemplazamos NOW() por el string unificado de fechaHoyString para evitar desfasajes horariales de Render
             for (let index = 0; index < misionesSeleccionadas.length; index++) {
                 const m = misionesSeleccionadas[index];
                 await client.query(`
                     INSERT INTO usuario_misiones (usuario_id, mision_id, descripcion, tipo, progreso, meta, recompensa, reclamada, actualizado_en)
-                    VALUES ($1, $2, $3, $4, 0, $5, $6, FALSE, NOW())
-                `, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa]);
+                    VALUES ($1, $2, $3, $4, 0, $5, $6, FALSE, $7)
+                `, [usuarioId, index + 1, m.descripcion, m.tipo, m.meta, m.recompensa, fechaHoyString]);
             }
 
             // D. Actualizamos la marca del calendario en el usuario
@@ -3088,6 +3089,13 @@ app.get('/api/misiones/obtener', verificarToken, async (req, res) => {
         );
 
         await client.query('COMMIT');
+        
+        // 🛡️ CONTROL EXTRA: Si por algún motivo la grilla quedó vacía en la base de datos, mandamos un resguardo para que el front no muera
+        if (resultado.rows.length === 0) {
+            console.warn(`⚠️ Advertencia: El usuario ${usuarioId} requirió un resguardo forzado de misiones.`);
+            return res.json({ ok: true, misiones: [] });
+        }
+
         res.json({ ok: true, misiones: resultado.rows });
 
     } catch (err) {
@@ -3600,7 +3608,7 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
 });
 
 // ========================================================================
-// ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL
+// ✍️ ENDPOINTS SEGUROS PARA EL SISTEMA DE FIRMAS DE PERFIL (CORREGIDO)
 // ========================================================================
 
 // 🛡️ FUNCIÓN DE SEGURIDAD ANTI-LINKS Y ANTI-XSS
@@ -3610,14 +3618,11 @@ function validarTextoFirmaSeguro(texto) {
     if (!textoLimpio) return { valido: false, error: "El mensaje no puede estar vacío." };
     if (textoLimpio.length > 140) return { valido: false, error: "El mensaje supera los 140 caracteres." };
 
-    // 1. 🚫 DETECTOR DE SCRIPTS/HTML: Si tiene etiquetas tipo <script>, <div>, etc.
     const detectorHTML = /<[^>]*>/g;
     if (detectorHTML.test(textoLimpio)) {
         return { valido: false, error: "❌ Código detectado: No se permite inyectar HTML ni Scripts." };
     }
 
-    // 2. 🚫 DETECTOR DE LINKS: Filtra http, https, ftp, .com, .net, .org, www.
-    // Captura formatos como 'http://...', 'https://...', 'www.sitio.com' o incluso 'sitio.com' suelto
     const detectorLinks = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(com|net|org|io|edu|gov|co|ar)\b)/i;
     if (detectorLinks.test(textoLimpio)) {
         return { valido: false, error: "❌ Enlace detectado: No se permiten links en las firmas." };
@@ -3627,8 +3632,14 @@ function validarTextoFirmaSeguro(texto) {
 }
 
 // 1. OBTENER TODAS LAS FIRMAS DE UN PERFIL ESPECÍFICO
-app.get('/api/firmas/:perfilId', verificarToken, async (req, res) => {
+// 🔥 CORREGIDO: Le sacamos 'verificarToken' para que los invitados de incógnito puedan leer las firmas sin que explote con un 401
+app.get('/api/firmas/:perfilId', async (req, res) => {
     const { perfilId } = req.params;
+
+    // Resguardo por si el frente manda un "null" u "undefined" literal en la URL
+    if (!perfilId || perfilId === 'null' || perfilId === 'undefined') {
+        return res.json({ ok: true, firmas: [] });
+    }
 
     try {
         const query = `
@@ -3646,12 +3657,11 @@ app.get('/api/firmas/:perfilId', verificarToken, async (req, res) => {
     }
 });
 
-// 2. CREAR UNA NUEVA FIRMA (BLINDADO CON CONFLICT)
+// 2. CREAR UNA NUEVA FIRMA (SE QUEDA PROTEGIDO CON TOKEN)
 app.post('/api/firmas/crear', verificarToken, async (req, res) => {
     const autor_id = req.usuarioLogueado.id;
     const { perfilId, mensaje } = req.body;
 
-    // 🛡️ Pasamos el filtro de seguridad
     const validacion = validarTextoFirmaSeguro(mensaje);
     if (!validacion.valido) {
         return res.status(400).json({ error: validacion.error });
@@ -3667,7 +3677,6 @@ app.post('/api/firmas/crear', verificarToken, async (req, res) => {
             VALUES ($1, $2, $3, NOW())
             RETURNING id;
         `;
-        // Guardamos el texto validado libre de porquerías
         await pool.query(query, [perfilId, autor_id, validacion.texto]);
         return res.json({ ok: true, mensaje: "¡Perfil firmado correctamente!" });
     } catch (err) {
@@ -3678,12 +3687,11 @@ app.post('/api/firmas/crear', verificarToken, async (req, res) => {
     }
 });
 
-// 3. EDITAR FIRMA EXISTENTE (GUARDA LA FECHA DEL EDIT)
+// 3. EDITAR FIRMA EXISTENTE (SE QUEDA PROTEGIDO CON TOKEN)
 app.put('/api/firmas/editar', verificarToken, async (req, res) => {
     const autor_id = req.usuarioLogueado.id;
     const { firmaId, nuevoMensaje } = req.body;
 
-    // 🛡️ Pasamos el filtro de seguridad también al editar
     const validacion = validarTextoFirmaSeguro(nuevoMensaje);
     if (!validacion.valido) {
         return res.status(400).json({ error: validacion.error });
@@ -3703,13 +3711,12 @@ app.put('/api/firmas/editar', verificarToken, async (req, res) => {
     }
 });
 
-// 4. BORRAR FIRMA
+// 4. BORRAR FIRMA (SE QUEDA PROTEGIDO CON TOKEN)
 app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
     const autor_id = req.usuarioLogueado.id;
     const { firmaId } = req.params;
 
     try {
-        // El creador de la firma puede borrarla
         const query = `
             DELETE FROM usuario_firmas 
             WHERE id = $1 AND autor_id = $2
