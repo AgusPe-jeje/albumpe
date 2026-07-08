@@ -29,7 +29,7 @@ let multiCodigoSala = null;
 let multiEsCreador = false;
 let multiApuestaFijada = 0;
 window.multiTipoApuestaActual = 'amistoso'; // Opciones: 'amistoso', 'oro', 'carta'
-let socketArena = null; // Instancia global del socket único de comunicación
+socketArena = io(URL_RENDER_SERVICIO); // O io() a secas si corre en el mismo origen
 
 // Mapeos Estáticos de Diseño y Lógica de Puntos
 const MAPA_PUNTOS_RAREZA = { 
