@@ -45,7 +45,7 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -55,12 +55,10 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // 1. Permitir siempre archivos estáticos del frontend
     if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
-    // 2. Permitir el login si el usuario que intenta ingresar es tester
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
         if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
@@ -72,7 +70,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // 3. Bloquear registro siempre en mantenimiento
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
             ok: false,
@@ -80,7 +77,6 @@ app.use((req, res, next) => {
         });
     }
 
-    // 4. Endpoints públicos iniciales indispensables
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
@@ -89,29 +85,22 @@ app.use((req, res, next) => {
         return next();
     }
 
-    // 🚀 🔥 REGLA DE ORO DE ACCESO TOTAL PARA TESTERS:
-    // Si la petición viene de cualquier otra sección del juego (rankings, perfiles, sbc, mundiales),
-    // interceptamos el token JWT. Si es un tester oficial, ¡le damos pase libre absoluto!
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (token) {
-        try {
-            const decodificado = jwt.verify(token, JWT_SECRET);
-            if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-                
-                // 💡 ¡EL FIX AQUÍ, MOMITO!: Seteamos el usuario logueado en la request para que 
-                // todos los endpoints subsiguientes sepan qué tester está operando.
-                req.usuarioLogueado = decodificado; 
-                
-                return next(); // 😎 Es tester autorizado. Pase libre total a toda la API.
-            }
-        } catch (err) {
-            console.warn("⚠️ Token inválido o expirado en modo mantenimiento.");
-        }
+    if (!token) {
+        return next();
     }
 
-    // ❌ Si llegó acá y no es un tester verificado, rebote total
+    try {
+        const decodificado = jwt.verify(token, JWT_SECRET);
+        if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
+            return next(); 
+        }
+    } catch (err) {
+        console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
+    }
+
     return res.status(503).json({ 
         ok: false,
         mantenimiento: true, 
@@ -546,9 +535,7 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
     }
 });
 
-// Reemplazá estas dos rutas en tu servidor (Node.js):
-
-app.get('/api/ranking', verificarToken, async (req, res) => {
+app.get('/api/ranking', async (req, res) => {
     try {
         const result = await pool.query("SELECT id, username, puntos_ranking FROM usuarios ORDER BY puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
@@ -557,7 +544,7 @@ app.get('/api/ranking', verificarToken, async (req, res) => {
     }
 });
 
-app.get('/api/ranking-mundiales', verificarToken, async (req, res) => {
+app.get('/api/ranking-mundiales', async (req, res) => {
     try {
         const result = await pool.query("SELECT id, username, copas_mundiales FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
@@ -1224,92 +1211,23 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
         const perfilQuery = `
-            SELECT 
-                u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, 
-                u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales,
-                u.penales_jugados, u.penales_ganados, -- ⚽ NUEVAS COLUMNAS INCLUIDAS
-                COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, 
-                COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, 
-                COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, 
-                COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, 
-                COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias, 
-                COALESCE(ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 0) AS porcentaje_album 
-            FROM usuarios u 
-            LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id 
-            LEFT JOIN usuario_progreso up ON u.id = up.usuario_id 
-            LEFT JOIN jugadores j ON up.jugador_id = j.id 
-            WHERE u.id = $1 
-            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, fp.ruta_jpg;`;
+            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias, COALESCE(ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 0) AS porcentaje_album FROM usuarios u LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id LEFT JOIN usuario_progreso up ON u.id = up.usuario_id LEFT JOIN jugadores j ON up.jugador_id = j.id WHERE u.id = $1 GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, fp.ruta_jpg;`;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
         if (result.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "El competidor no existe." });
 
         const datos = result.rows[0];
-        const victoriasTimba = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
-        
-        // 🎯 Lógica de efectividad de penales
-        const pJugados = parseInt(datos.penales_jugados || 0);
-        const pGanados = parseInt(datos.penales_ganados || 0);
-        const efectividadPenales = pJugados > 0 ? Math.round((pGanados / pJugados) * 100) : 0;
+        const victorias = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
 
         return res.json({
             ok: true,
             perfil: {
-                id: datos.id, 
-                nombre: datos.nombre_usuario, 
-                monedas: datos.monedas, 
-                eligio_avatar: datos.eligio_avatar, 
-                puntosRanking: datos.puntos_ranking, 
-                copasMundiales: datos.copas_mundiales, 
-                foto: datos.foto_perfil, 
-                cromo_destacado: datos.cromo_destacado,
-                estadisticasAlbum: { 
-                    comunes: parseInt(datos.comunes || 0), 
-                    raras: parseInt(datos.raras || 0), 
-                    epicas: parseInt(datos.epicas || 0), 
-                    legendarias: parseInt(datos.legendarias || 0), 
-                    porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 
-                },
-                estadisticasTimba: { 
-                    jugadas: parseInt(datos.timbas_jugadas || 0), 
-                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), 
-                    ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), 
-                    porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victoriasTimba / datos.timbas_jugadas) * 100) : 0 
-                },
-                // ⚽ PASAMOS LAS ESTADÍSTICAS DE PENALES LIMPIAS AL FRONTEND
-                estadisticasPenales: {
-                    jugados: pJugados,
-                    ganados: pGanados,
-                    porcentajeEfectividad: efectividadPenales
-                }
+                id: datos.id, nombre: datos.nombre_usuario, monedas: datos.monedas, eligio_avatar: datos.eligio_avatar, puntosRanking: datos.puntos_ranking, copasMundiales: datos.copas_mundiales, foto: datos.foto_perfil, cromo_destacado: datos.cromo_destacado,
+                estadisticasAlbum: { comunes: parseInt(datos.comunes || 0), raras: parseInt(datos.raras || 0), epicas: parseInt(datos.epicas || 0), legendarias: parseInt(datos.legendarias || 0), porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 },
+                estadisticasTimba: { jugadas: parseInt(datos.timbas_jugadas || 0), ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victorias / datos.timbas_jugadas) * 100) : 0 }
             }
         });
-    } catch (err) { 
-        console.error("❌ Error en GET /api/usuarios/perfil:", err);
-        res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); 
-    }
-});
-
-app.post('/api/usuarios/registrar-penal', verificarToken, async (req, res) => {
-    const { ganoPartido } = req.body; // true o false según el resultado del minijuego
-    const usuarioId = req.usuarioLogueado.id;
-
-    try {
-        const incrementoGanado = ganoPartido ? 1 : 0;
-        
-        await pool.query(
-            `UPDATE usuarios 
-             SET penales_jugados = penales_jugados + 1, 
-                 penales_ganados = penales_ganados + $1 
-             WHERE id = $2`,
-            [incrementoGanado, usuarioId]
-        );
-
-        res.json({ ok: true, mensaje: "⚽ Historial de penales actualizado." });
-    } catch (err) {
-        console.error("❌ Error al registrar penal:", err);
-        res.status(500).json({ ok: false, error: "Error de servidor." });
-    }
+    } catch (err) { res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); }
 });
 
 app.get('/api/fotos-perfil/mis-avatares', verificarToken, async (req, res) => {
@@ -1348,27 +1266,11 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
 });
 
 app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
-    const { fotoUrl } = req.body;
-    const usuarioId = req.usuarioLogueado.id;
-
-    if (!fotoUrl) {
-        return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL del cromo." });
-    }
-
+    if (!req.body.fotoUrl) return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL." });
     try {
-        // Ejecutamos el UPDATE en tu columna real de Neon
-        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [fotoUrl, usuarioId]);
-        
-        // Devolvemos ok y la url para que el front la guarde en memoria
-        res.json({ 
-            ok: true, 
-            mensaje: "🌟 ¡Cromo lucido en la vitrina!", 
-            cromo_destacado: fotoUrl 
-        });
-    } catch (err) { 
-        console.error("Error al destacar cromo:", err);
-        res.status(500).json({ ok: false, error: "Error de servidor." }); 
-    }
+        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [req.body.fotoUrl, req.usuarioLogueado.id]);
+        res.json({ ok: true, mensaje: "🌟 ¡Cromo lucido en la vitrina!" });
+    } catch (err) { res.status(500).json({ ok: false, error: "Error de servidor." }); }
 });
 
 /* ========================================================================
@@ -1424,80 +1326,43 @@ app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
    🏆 MOTOR AUTOMÁTICO: RECOMPENSAS Y RESET SEMANAL DE RANKINGS (LUNES 00:00)
    ======================================================================== */
 async function procesarResetSemanalRankings() {
+    const client = await pool.connect();
     try {
         const ahora = new Date();
+        const formatterDia = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'short' });
+        const formatterFecha = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' });
         
-        // 🇦🇷 Forzamos la fecha exacta mapeada a la zona horaria de Buenos Aires
-        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
-        const ahoraArg = new Date(ahoraArgStr);
+        const diaSemana = formatterDia.format(ahora); 
+        const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // Obtenemos el día abreviado ('Mon', 'Tue', etc.)
-        const diaSemana = ahoraArg.toLocaleString("en-US", { weekday: "short" });
+        if (diaSemana !== 'Mon') return;
 
-        // 🎯 CONTROL DE BASE 1: Si no es lunes, salimos volando de inmediato.
-        // ¡No pedimos conexión al pool de Neon para no saturar la base de datos de gusto!
-        if (diaSemana !== 'Mon') {
-            return;
+        await client.query('BEGIN');
+        const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
+        if (verificarReset.rows.length > 0) { await client.query('ROLLBACK'); return; }
+
+        console.log(`🚧 ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
+
+        const topMundial = await client.query("SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3");
+        if (topMundial.rows.length > 0) {
+            if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]);
+            if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]);
+            if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);
         }
 
-        // Armamos la fecha limpia en formato YYYY-MM-DD
-        const anio = ahoraArg.getFullYear();
-        const mes = String(ahoraArg.getMonth() + 1).padStart(2, '0');
-        const dia = String(ahoraArg.getDate()).padStart(2, '0');
-        const fechaHoyString = `${anio}-${mes}-${dia}`;
-
-        // 🚀 Recién ahora que confirmamos que es Lunes, abrimos una única conexión
-        const client = await pool.connect();
-        
-        try {
-            await client.query('BEGIN');
-            
-            // Comprobamos si el reset de este lunes en específico ya fue impactado
-            const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
-            
-            if (verificarReset.rows.length > 0) { 
-                await client.query('ROLLBACK'); 
-                return; 
-            }
-
-            console.log(`🚧 [Neon] ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
-
-            // 1. Premiación de Copas Mundiales (Top 3)
-            const topMundial = await client.query("SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3");
-            if (topMundial.rows.length > 0) {
-                if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]);
-                if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]);
-                if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);
-            }
-
-            // 2. Premiación de Tabla de Penales / Arena (Top 3)
-            const topPenales = await client.query("SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3");
-            if (topPenales.rows.length > 0) {
-                if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]);
-                if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]);
-                if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);
-            }
-
-            // 3. Reset total de marcadores semanales
-            await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
-            
-            // 4. Firmamos el registro para evitar bucles repetitivos el mismo lunes
-            await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
-
-            await client.query('COMMIT');
-            console.log("🏆 ¡Reset completado con éxito! Marcadores limpios en Neon.");
-
-        } catch (dbErr) {
-            try { await client.query('ROLLBACK'); } catch(e) {}
-            console.error("❌ Error en transacción de reset semanal:", dbErr.message);
-        } finally {
-            // Se libera la conexión de Neon al instante pase lo que pase adentro
-            client.release();
+        const topPenales = await client.query("SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3");
+        if (topPenales.rows.length > 0) {
+            if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]);
+            if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]);
+            if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);
         }
 
-    } catch (err) { 
-        console.error("❌ Error crítico en el motor de reset semanal:", err.message); 
-    }
+        await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
+        await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
+
+        await client.query('COMMIT');
+        console.log("🏆 ¡Reset completado con éxito! Monedas depositadas al Top 3 y marcadores vueltos a cero.");
+    } catch (err) { await client.query('ROLLBACK'); console.error("❌ Error crítico en reset semanal:", err.message); } finally { client.release(); }
 }
 
 /* ========================================================================
