@@ -641,6 +641,12 @@ img.emoji { height: 1.2em; width: 1.2em; margin: 0 .05em 0 .1em; vertical-align:
     margin-left: auto; /* Tira los puntos hacia la derecha de la fila */
 }
 
+/* Forzar que cuando el botón PvP esté activo, el texto cambie a negro y no se camufle con el fondo celeste */
+.btn-modulo-match.activa#btn-nav-pvp,
+.btn-modulo-match:active#btn-nav-pvp {
+    color: #000 !important;
+}
+
 @keyframes fadinScale {
     0% { opacity: 0; transform: translateY(10px) scale(0.96); filter: blur(4px); }
     100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
