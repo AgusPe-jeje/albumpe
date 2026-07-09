@@ -99,7 +99,12 @@ app.use((req, res, next) => {
         try {
             const decodificado = jwt.verify(token, JWT_SECRET);
             if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-                return next(); // 😎 Es tester autorizado. Pase libre a toda la API.
+                
+                // 💡 ¡EL FIX AQUÍ, MOMITO!: Seteamos el usuario logueado en la request para que 
+                // todos los endpoints subsiguientes sepan qué tester está operando.
+                req.usuarioLogueado = decodificado; 
+                
+                return next(); // 😎 Es tester autorizado. Pase libre total a toda la API.
             }
         } catch (err) {
             console.warn("⚠️ Token inválido o expirado en modo mantenimiento.");
