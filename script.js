@@ -43,11 +43,6 @@ const LISTA_SELECCIONES_TIMBA = [
 
 var historialPartidosSimulados = [];
 
-// ⚔️ NUEVAS: Variables de Control de Estado para el Multijugador PvP
-let socketPvP = null;
-let miSalaTokenPvP = null;
-let soyCreadorDeSalaPvP = false
-
 /* ========================================================================
    🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
    ======================================================================== */
@@ -4538,170 +4533,235 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /* ========================================================================
-   📡 11. ENGINE MULTIJUGADOR ONLINE EN VIVO (SOCKET.IO ARENA)
+   📡 11. ENGINE MULTIJUGADOR ONLINE EN VIVO (MUNDIAL SOCKET.IO)
    ======================================================================== */
 
+// Variables de estado del torneo en el cliente
+let miSalaTokenPvP = null;
+let soyCreadorDeSalaPvP = false;
+let miSeleccionAsignada = "";
+
 function conectarYPrenderEscuchasPvP() {
-    // Si ya existe la conexión, no duplicamos instancias
     if (socketPvP) return;
 
-    // Inicializamos socket apuntando al mismo dominio de tu backend
     socketPvP = io();
 
-    const btnBuscar = document.getElementById('btn-buscar-rival-pvp');
-    const txtEstado = document.getElementById('estado-matchmaking-pvp');
-    const panelMarcador = document.getElementById('marcador-pvp-live');
-    const txtScore = document.getElementById('score-pvp-live');
-    const txtReloj = document.getElementById('reloj-pvp-live');
-    const consolaRelatos = document.getElementById('consola-pvp-live');
-
-    if (btnBuscar) {
-        btnBuscar.onclick = () => {
-            if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
-            
-            txtEstado.innerText = "Buscando un rival digno en la Arena Global...";
-            btnBuscar.disabled = true;
-            btnBuscar.style.opacity = "0.5";
-
-            // Mandamos tus datos reales de la sesión al Matchmaker de Node
-            socketPvP.emit('buscarRival', { 
-                usuarioId: usuarioActual.id, 
-                username: usuarioActual.username 
-            });
-        };
-    }
+    // Al conectarse, pedimos las salas públicas activas para llenar la lista
+    socketPvP.emit('pedirSalasPublicas');
 
     // ==========================================
-    // 📥 RECEPCIÓN DE EVENTOS DESDE EL BACKEND
+    // 📥 RECEPCIÓN DE EVENTOS (BACKEND -> CLIENTE)
     // ==========================================
 
-    socketPvP.on('salaCreada', ({ salaToken }) => {
-        miSalaTokenPvP = salaToken;
-        soyCreadorDeSalaPvP = true;
-        if (txtEstado) txtEstado.innerText = `Esperando retador... (Código Sala: ${salaToken})`;
-    });
+    // Escucha la actualización de salas públicas en tiempo real
+    socketPvP.on('listaSalasPublicas', (salas) => {
+        const contenedor = document.getElementById('lista-salas-disponibles');
+        if (!contenedor) return;
 
-    socketPvP.on('rivalEncontrado', ({ salaToken, rivalName }) => {
-        miSalaTokenPvP = salaToken;
-        if (txtEstado) txtEstado.innerText = `⚔️ ¡PARTIDO ENCONTRADO! Rival: ${rivalName.toUpperCase()}`;
-        if (panelMarcador) panelMarcador.style.display = 'block';
-        
-        // Bloqueamos la barra de navegación para que nadie abandone haciendo trampa
-        const nav = document.querySelector(".nav-modulos-estadio");
-        if (nav) nav.style.display = "none";
-
-        // Avisamos que la UI del cliente cargó y estamos listos para el pitazo
-        socketPvP.emit('jugadorListo', { 
-            salaToken: miSalaTokenPvP, 
-            esCreador: soyCreadorDeSalaPvP 
-        });
-    });
-
-    socketPvP.on('comenzarPartidoPvP', () => {
-        if (consolaRelatos) consolaRelatos.innerText = "⚽ ¡Pitazo inicial! Arranca el partido en la Arena Online.";
-        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
-        
-        // 🔥 DISPARADOR DE SIMULACIÓN PROPIA ONLINE: 
-        // Cada jugador empieza a fabricar sus jugadas de forma independiente
-        iniciarGeneradorGolesOnline();
-    });
-
-    socketPvP.on('tickRelojPvP', ({ minuto }) => {
-        if (txtReloj) txtReloj.innerText = `⏱️ MINUTO ${minuto.toString().padStart(2, '0')}:00`;
-    });
-
-    socketPvP.on('marcadorActualizadoPvP', ({ golesCreador, golesRival, relato }) => {
-        if (txtScore) {
-            // Acomodamos el marcador según quién sos vos en la sala
-            if (soyCreadorDeSalaPvP) {
-                txtScore.innerText = `${golesCreador} - ${golesRival}`;
-            } else {
-                txtScore.innerText = `${golesRival} - ${golesCreador}`;
-            }
-        }
-        if (consolaRelatos) consolaRelatos.innerText = relato;
-        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
-    });
-
-    socketPvP.on('rivalAbandono', ({ mensaje }) => {
-        if (consolaRelatos) consolaRelatos.innerText = mensaje;
-        alert("⚠️ El rival huyó del partido. ¡Te quedás con los puntos y el Oro por abandono!");
-        finalizarYLimpiarEstadoPvP();
-    });
-
-    socketPvP.on('partidoTerminadoPvP', ({ ganadorId, mensaje }) => {
-        if (consolaRelatos) consolaRelatos.innerText = mensaje;
-        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
-
-        setTimeout(async () => {
-            if (ganadorId === usuarioActual.id) {
-                alert("👑 ¡VICTORIA ONLINE! Sumaste 500 monedas de Oro a tu cuenta.");
-                // Sincronizamos las misiones de oro que ya programaste en tu script
-                if (typeof trackearProgresoMision === 'function') await trackearProgresoMision("acumular_oro", 500);
-            } else if (ganadorId === null) {
-                alert("🏁 Partido terminado en empate.");
-            } else {
-                alert("❌ Derrota en la Arena PvP. ¡A entrenar los cromos!");
-            }
-            
-            // Refrescamos tu base de datos local (Neon) con el saldo que modificó el backend
-            if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
-            finalizarYLimpiarEstadoPvP();
-        }, 1000);
-    });
-}
-
-// 🎰 SIMULADOR DE ACCIONES PROPIAS ONLINE
-let intervaloGolesPvP = null;
-
-function iniciarGeneradorGolesOnline() {
-    if (intervaloGolesPvP) clearInterval(intervaloGolesPvP);
-
-    // Cada 12 segundos reales, tu cliente tira una probabilidad de fabricar un gol
-    intervaloGolesPvP = setInterval(() => {
-        if (!miSalaTokenPvP) {
-            clearInterval(intervaloGolesPvP);
+        if (salas.length === 0) {
+            contenedor.innerHTML = `<p style="color:#64748b; font-style:italic; margin:0;">No hay salas públicas creadas en este momento...</p>`;
             return;
         }
 
-        // Calculamos tu poder promedio basado en tu pestaña de perfil/draft
-        const cartasElegidas = albumCompleto.filter(f => f.obtenido > 0).slice(0, 3);
-        const promedioPoder = cartasElegidas.length === 3 
-            ? cartasElegidas.reduce((acc, c) => acc + (MAPA_PUNTOS_RAREZA[c.rareza.toLowerCase()] || 60), 0) / 3
-            : 70; // Poder base si no tiene cartas configuradas
+        contenedor.innerHTML = "";
+        salas.forEach(sala => {
+            const div = document.createElement('div');
+            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:6px 10px; margin-bottom:5px; border-radius:4px; border-left:2px solid var(--celeste);";
+            div.innerHTML = `
+                <span><strong>${sala.creador}</strong> (💰${sala.apuesta}) [${sala.cupos}/16]</span>
+                <button type="button" onclick="unirseARoomDirecto('${sala.token}')" style="background:var(--celeste); color:#000; border:none; padding:2px 8px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.75rem;">UNIRSE</button>
+            `;
+            contenedor.appendChild(div);
+        });
+    });
 
-        // Chance de gol escalada por la calidad de tu plantel colector
-        const probabilidadGol = 0.20 + (promedioPoder / 400); 
+    // Éxito al crear la sala (Creador)
+    socketPvP.on('salaCreadaExito', ({ salaToken, seleccion, apuestaOro }) => {
+        miSalaTokenPvP = salaToken;
+        soyCreadorDeSalaPvP = true;
+        miSeleccionAsignada = seleccion;
 
-        if (Math.random() <= probabilidadGol) {
-            const frasesGolesPvP = [
-                `¡Golazo de @${usuarioActual.username}! Impresionante bombazo combado desde afuera del área.`,
-                `⚽ ¡GOL! @${usuarioActual.username} trianguló en velocidad y definió sutil abajo del arquero.`,
-                `🔥 ¡GOOOL! Error en la salida defensiva rival que capitaliza @${usuarioActual.username} con un testazo.`
-            ];
+        document.getElementById('panel-setup-torneo').style.display = 'none';
+        document.getElementById('panel-lobby-torneo').style.display = 'block';
+        document.getElementById('titulo-sala-token').innerText = `SALA DE SELECCIÓN: ${salaToken}`;
+        document.getElementById('seleccion-asignada-pills').innerText = `🌍 TU PAÍS: ${seleccion.toUpperCase()}`;
 
-            const relatoElegido = frasesGolesPvP[Math.floor(Math.random() * frasesGolesPvP.length)];
+        // Calculamos las estrellas reales de tu álbum y se las enviamos al Servidor
+        const misEstrellas = calcularEstrellasDesdeAlbum();
+        document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
+        
+        socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
+        document.getElementById('btn-start-mundial').style.display = 'block'; // Solo el host ve este botón
 
-            // Le inyectamos el gol al servidor de Sockets de inmediato
-            socketPvP.emit('registrarGolPvP', {
-                salaToken: miSalaTokenPvP,
-                esCreador: soyCreadorDeSalaPvP,
-                relato: relatoElegido
-            });
-        }
-    }, 12000);
+        if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= apuestaOro; 
+    });
+
+    // Éxito al unirse a la sala (Invitados)
+    socketPvP.on('unionExitosaTorneo', ({ salaToken, seleccion, salaInfo }) => {
+        miSalaTokenPvP = salaToken;
+        soyCreadorDeSalaPvP = false;
+        miSeleccionAsignada = seleccion;
+
+        document.getElementById('panel-setup-torneo').style.display = 'none';
+        document.getElementById('panel-lobby-torneo').style.display = 'block';
+        document.getElementById('titulo-sala-token').innerText = `SALA DE SELECCIÓN: ${salaToken}`;
+        document.getElementById('seleccion-asignada-pills').innerText = `🌍 TU PAÍS: ${seleccion.toUpperCase()}`;
+
+        const misEstrellas = calcularEstrellasDesdeAlbum();
+        document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
+        
+        socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
+        document.getElementById('btn-start-mundial').style.display = 'none'; // Invitados esperan al Host
+
+        if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= salaInfo.apuestaOro;
+    });
+
+    // Actualización de los aspirantes en el Lobby
+    socketPvP.on('jugadorSeUnioLobby', ({ jugadores }) => {
+        const listaDiv = document.getElementById('lista-participantes-lobby');
+        if (!listaDiv) return;
+
+        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste);">Participantes Confirmados (${jugadores.length}/16):</h5>`;
+        jugadores.forEach((j, idx) => {
+            listaDiv.innerHTML += `<p style="margin:3px 0; font-size:0.9rem; color:#94a3b8;">📋 ${idx + 1}. <strong>${j.username}</strong> - Selección: <span style="color:#fff;">${j.seleccion}</span></p>`;
+        });
+    });
+
+    // El mundial arrancó: se bloquea navegación y se abre el Fixture
+    socketPvP.on('mundialComenzado', ({ fixture, pozoTotal }) => {
+        document.getElementById('panel-fixture-mundial').style.display = 'block';
+        
+        const nav = document.querySelector(".nav-modulos-estadio");
+        if (nav) nav.style.display = "none"; // Bloqueo anti-escape
+
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+        renderizarArbolMundial(fixture);
+    });
+
+    // El servidor procesó minutos y goles con el peso de tus estrellas
+    socketPvP.on('actualizacionMinutoMundial', ({ fase, minuto, fixture }) => {
+        const txtReloj = document.getElementById('reloj-pvp-live'); // Asegurate de tenerlo en tu HUD
+        if (txtReloj) txtReloj.innerText = `⏱️ ${fase} - MINUTO ${minuto}:00`;
+        
+        renderizarArbolMundial(fixture);
+    });
+
+    // Finalizó una ronda (ej: terminaron los Octavos)
+    socketPvP.on('faseMundialConcluida', ({ fixture }) => {
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+        renderizarArbolMundial(fixture);
+    });
+
+    // Errores de saldo, contraseñas o salas inexistentes
+    socketPvP.on('errorPvp', ({ mensaje }) => {
+        alert(mensaje);
+        finalizarYLimpiarEstadoPvP();
+    });
+
+    // Cierre del mundial con entrega del botín
+    socketPvP.on('mundialFinalizadoCompleto', ({ ganadorId, username, mensaje, fixture }) => {
+        renderizarArbolMundial(fixture);
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
+        setTimeout(async () => {
+            alert(mensaje);
+            
+            // Recargamos el estado local/monedas reflejando lo modificado por Postgres
+            if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
+            finalizarYLimpiarEstadoPvP();
+        }, 1500);
+    });
+}
+
+// ==========================================
+// 🛠️ FUNCIONES CONTROLADORAS AUXILIARES
+// ==========================================
+
+function unirseARoomDirecto(token) {
+    document.getElementById('token-unirse-manual').value = token;
+}
+
+function unirseLobbyMundial() {
+    if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
+    const token = document.getElementById('token-unirse-manual').value.trim();
+    const pass = document.getElementById('pass-unirse-manual').value;
+
+    if (!token) return alert("Por favor ingresá o seleccioná un código de sala.");
+
+    socketPvP.emit('unirseSalaTorneo', {
+        salaToken: token,
+        contrasenia: pass,
+        usuarioId: usuarioActual.id,
+        username: usuarioActual.username
+    });
+}
+
+function lanzarEstructuraMundial() {
+    if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
+    socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
+}
+
+function renderizarArbolMundial(fixture) {
+    const contenedor = document.getElementById('contenedor-render-cruces');
+    if (!contenedor) return;
+    contenedor.innerHTML = "";
+
+    // Mapeamos las fases para agruparlas visualmente en la UI
+    const fases = ["octavos", "cuartos", "semi", "final"];
+    
+    fases.forEach(fase => {
+        if (!fixture[fase] || fixture[fase].length === 0) return;
+
+        const tituloFase = document.createElement('h5');
+        tituloFase.style.cssText = "color: var(--dorado); margin: 10px 0 5px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;";
+        tituloFase.innerText = `⚔️ ${fase}`;
+        contenedor.appendChild(tituloFase);
+
+        fixture[fase].forEach(cruce => {
+            const div = document.createElement('div');
+            
+            // Si el partido ya concluyó, resaltamos el score final
+            const estandarteColor = cruce.terminado ? "var(--verde-match)" : "var(--celeste)";
+            const scoreTexto = cruce.terminado 
+                ? `${cruce.golesLocal} - ${cruce.golesVisitante}` 
+                : `${cruce.golesLocal} - ${cruce.golesVisitante} (En vivo)`;
+
+            div.style.cssText = `background:#1e293b; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid ${estandarteColor}; margin-bottom:6px; font-size: 0.9rem;`;
+            
+            // Resaltamos con negrita al ganador de la llave
+            const localStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.local.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
+            const visitanteStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.visitante.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
+
+            div.innerHTML = `
+                <span style="${localStyle}">${cruce.local.seleccion} <small style="color:#64748b;">(${cruce.local.username})</small></span>
+                <span style="background:#020617; padding:3px 10px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem;">${scoreTexto}</span>
+                <span style="${visitanteStyle}">${cruce.visitante.seleccion} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
+            `;
+            contenedor.appendChild(div);
+        });
+    });
 }
 
 function finalizarYLimpiarEstadoPvP() {
-    if (intervaloGolesPvP) clearInterval(intervaloGolesPvP);
     miSalaTokenPvP = null;
     soyCreadorDeSalaPvP = false;
+    miSeleccionAsignada = "";
 
-    // Rehabilitamos el botón de búsqueda y la barra de navegación de la Arena
-    const btnBuscar = document.getElementById('btn-buscar-rival-pvp');
-    if (btnBuscar) {
-        btnBuscar.disabled = false;
-        btnBuscar.style.opacity = "1";
-    }
-    if (typeof liberarNavegacionArenaUI === 'function') liberarNavegacionArenaUI();
+    // Limpiamos los inputs del setup
+    const tInput = document.getElementById('token-unirse-manual');
+    if (tInput) tInput.value = "";
+    const pInput = document.getElementById('pass-unirse-manual');
+    if (pInput) pInput.value = "";
+
+    // Restablecemos las vistas principales
+    document.getElementById('panel-setup-torneo').style.display = 'grid';
+    document.getElementById('panel-lobby-torneo').style.display = 'none';
+    document.getElementById('panel-fixture-mundial').style.display = 'none';
+
+    // Reactivamos la barra de navegación del estadio
+    const nav = document.querySelector(".nav-modulos-estadio");
+    if (nav) nav.style.display = "flex";
+
+    // Pedimos refresco de las salas que quedaron libres
+    if (socketPvP) socketPvP.emit('pedirSalasPublicas');
 }
