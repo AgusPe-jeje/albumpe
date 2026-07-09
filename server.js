@@ -1418,13 +1418,24 @@ async function procesarResetSemanalRankings() {
         const formatterFecha = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' });
         
         const diaSemana = formatterDia.format(ahora); 
-        const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); const fechaHoyString = `${anio}-${mes}-${dia}`;
+        const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); 
+        const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        if (diaSemana !== 'Mon') return;
+        // 🚨 CORRECCIÓN 1: Si no es lunes, liberamos la conexión antes de salir
+        if (diaSemana !== 'Mon') {
+            client.release();
+            return;
+        }
 
         await client.query('BEGIN');
         const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
-        if (verificarReset.rows.length > 0) { await client.query('ROLLBACK'); return; }
+        
+        // 🚨 CORRECCIÓN 2: Si ya se hizo el reset hoy, hacemos ROLLBACK y liberamos
+        if (verificarReset.rows.length > 0) { 
+            await client.query('ROLLBACK'); 
+            client.release();
+            return; 
+        }
 
         console.log(`🚧 ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
 
@@ -1447,7 +1458,13 @@ async function procesarResetSemanalRankings() {
 
         await client.query('COMMIT');
         console.log("🏆 ¡Reset completado con éxito! Monedas depositadas al Top 3 y marcadores vueltos a cero.");
-    } catch (err) { await client.query('ROLLBACK'); console.error("❌ Error crítico en reset semanal:", err.message); } finally { client.release(); }
+    } catch (err) { 
+        try { await client.query('ROLLBACK'); } catch(e) {}
+        console.error("❌ Error crítico en reset semanal:", err.message); 
+    } finally { 
+        // Este bloque se encarga de liberar el cliente si la ejecución llegó hasta acá
+        client.release(); 
+    }
 }
 
 /* ========================================================================
