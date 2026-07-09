@@ -4569,12 +4569,14 @@ function conectarYPrenderEscuchasPvP() {
                 return alert("❌ Oro insuficiente. Tu saldo actual no cubre la apuesta fijada.");
             }
 
+            // 🎯 Enviamos el álbum al Backend para que calcule tu terna aleatoria libre
             socketPvP.emit('crearSalaTorneo', {
                 usuarioId: usuarioActual.id,
                 username: usuarioActual.username,
                 esPrivada,
                 contrasenia: pass,
-                apuestaOro: apuesta
+                apuestaOro: apuesta,
+                albumCompletoJugador: albumCompleto
             });
         });
     }
@@ -4594,11 +4596,13 @@ function conectarYPrenderEscuchasPvP() {
 
             if (!token) return alert("❌ Por favor ingresá o seleccioná un código de sala.");
 
+            // 🎯 Enviamos el álbum al Backend para calcular terna sin pisar las ocupadas
             socketPvP.emit('unirseSalaTorneo', {
                 salaToken: token,
                 contrasenia: pass,
                 usuarioId: usuarioActual.id,
-                username: usuarioActual.username
+                username: usuarioActual.username,
+                albumCompletoJugador: albumCompleto
             });
         });
     }
@@ -4611,7 +4615,6 @@ function conectarYPrenderEscuchasPvP() {
         });
     }
 
-    // Al conectarse, pedimos las salas públicas activas para llenar la lista
     socketPvP.emit('pedirSalasPublicas');
 
     // ==========================================
@@ -4648,17 +4651,18 @@ function conectarYPrenderEscuchasPvP() {
         });
     });
 
-    socketPvP.on('salaCreadaExito', ({ salaToken, apuestaOro }) => {
+    // Recibimos las 3 opciones aleatorias calculadas por el Servidor
+    socketPvP.on('salaCreadaExito', ({ salaToken, apuestaOro, opcionesDraft }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = true;
-        prepararFaseDraftUI();
+        prepararFaseDraftUI(opcionesDraft);
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= apuestaOro; 
     });
 
-    socketPvP.on('unionExitosaTorneo', ({ salaToken, salaInfo }) => {
+    socketPvP.on('unionExitosaTorneo', ({ salaToken, salaInfo, opcionesDraft }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = false;
-        prepararFaseDraftUI();
+        prepararFaseDraftUI(opcionesDraft);
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= salaInfo.apuestaOro;
     });
 
@@ -4681,7 +4685,7 @@ function conectarYPrenderEscuchasPvP() {
         renderizarArbolMundial(fixture);
     });
 
-    // Cambia el foco a un único partido en vivo (Simulación 1v1 Secuencial)
+    // 🛠️ CORREGIDO: partidoNumero con la "o" bien puesta para evitar congelamiento
     socketPvP.on('partidoEnFocoVivido', ({ fase, partidoNumero, totalPartidos, local, visitante }) => {
         const txtReloj = document.getElementById('reloj-pvp-live');
         if (txtReloj) txtReloj.innerText = `📺 TRANSMITIENDO: ${fase} (Partido ${partidoNumero}/${totalPartidos}) • ESPERANDO PITAZO`;
@@ -4726,9 +4730,9 @@ function conectarYPrenderEscuchasPvP() {
 }
 
 // ========================================================================
-// 🎲 LÓGICA DE DRAFT INTERACTIVO: ESCANEO DE CARTAS DESBLOQUEADAS
+// 🎲 LÓGICA DE DRAFT INTERACTIVO: JUEGA SOLO LA TERNA DEL SERVER
 // ========================================================================
-function prepararFaseDraftUI() {
+function prepararFaseDraftUI(opcionesDraft) {
     document.getElementById('panel-setup-torneo').style.display = 'none';
     document.getElementById('panel-lobby-torneo').style.display = 'block';
     document.getElementById('titulo-sala-token').innerText = `LOBBY DEL TORNEO: ${miSalaTokenPvP}`;
@@ -4743,16 +4747,15 @@ function prepararFaseDraftUI() {
         mapeoPaises[c.pais].push(c);
     });
 
-    selectPais.innerHTML = '<option value="">-- Seleccioná un país --</option>';
+    selectPais.innerHTML = '<option value="">-- Seleccioná uno de tus 3 países asignados --</option>';
     
-    // Filtro estricto: Solo aparecen países donde tengas al menos 3 cromos pegados
-    Object.keys(mapeoPaises).forEach(pais => {
-        if (mapeoPaises[pais].length >= 3) {
-            selectPais.innerHTML += `<option value="${pais}">🌍 ${pais.toUpperCase()} (${mapeoPaises[pais].length} cromos)</option>`;
-        }
+    // 🎯 Inyectamos estrictamente las 3 opciones calculadas por el Backend
+    opcionesDraft.forEach(pais => {
+        const totalCromos = mapeoPaises[pais] ? mapeoPaises[pais].length : 0;
+        selectPais.innerHTML += `<option value="${pais}">🌍 ${pais.toUpperCase()} (${totalCromos} cromos)</option>`;
     });
 
-    // Dibujar naipes dinámicamente cuando cambias el select
+    // Dibujar naipes sin checkboxes tradicionales
     selectPais.onchange = () => {
         const paisElegido = selectPais.value;
         const contenedorCartas = document.getElementById('contenedor-cartas-pais-draft');
@@ -4764,16 +4767,13 @@ function prepararFaseDraftUI() {
             return;
         }
 
-        // Grilla adaptativa bien espaciada para el tamaño de los cromos
         contenedorCartas.style.gridTemplateColumns = "repeat(auto-fill, minmax(150px, 1fr))";
         contenedorCartas.style.gap = "20px";
 
         mapeoPaises[paisElegido].forEach(c => {
             const urlImagen = c.foto || 'img/default-card.png';
-
             const label = document.createElement('label');
             
-            // Estilo de la tarjeta contenedora externa
             label.style.cssText = `
                 position: relative;
                 background: #111827; 
@@ -4791,19 +4791,15 @@ function prepararFaseDraftUI() {
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             `;
             
-            // Estructura: Ocultamos el input por completo con display:none e interactuamos con el click del label
             label.innerHTML = `
                 <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="display: none;">
-                
                 <div style="width: 100%; height: auto; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 6px; overflow: hidden; transition: transform 0.2s ease;">
                     <img src="${urlImagen}" alt="${c.nombre}" style="width: 100%; height: auto; object-fit: contain; pointer-events: none; border-radius: 4px;">
                 </div>
-                
                 <span style="font-size: 0.9rem; font-weight: bold; line-height: 1.2; display: block; margin-top: 4px; font-family: 'Oswald'; text-transform: uppercase; letter-spacing: 0.3px;">${c.nombre}</span>
                 <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold;">${c.rareza}</small>
             `;
             
-            // ⚡ EFECTO EXCLUSIVO DE SELECCIÓN EN TODA LA TARJETA
             const checkboxInterno = label.querySelector('input[type="checkbox"]');
             const imgContainer = label.querySelector('div');
 
@@ -4824,7 +4820,6 @@ function prepararFaseDraftUI() {
             contenedorCartas.appendChild(label);
         });
 
-        // Limitador estricto de 3 selecciones
         const checkboxes = document.querySelectorAll('input[name="cartas-draft-check"]');
         checkboxes.forEach(box => {
             box.addEventListener('change', () => {
@@ -4852,7 +4847,6 @@ function prepararFaseDraftUI() {
             return alert("❌ Configuración incompleta: Debés elegir la Selección y marcar exactamente 3 cartas de refuerzo.");
         }
 
-        // Ponderación de estrellas según la rareza de las 3 cartas marcadas
         let poderInmueble = 0;
         seleccionados.forEach(box => {
             const rareza = box.getAttribute('data-rareza').toLowerCase();
@@ -4861,7 +4855,6 @@ function prepararFaseDraftUI() {
             else poderInmueble += 1;
         });
 
-        // Escala matemática del Draft
         const estrellasAsignadas = poderInmueble >= 13 ? 5 : poderInmueble >= 9 ? 4 : poderInmueble >= 5 ? 3 : 2;
 
         document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ESTRELLAS DE SQUAD: ${estrellasAsignadas}`;
@@ -4902,12 +4895,10 @@ function renderizarArbolMundial(fixture) {
         fixture[fase].forEach(cruce => {
             const div = document.createElement('div');
             
-            // Verificamos si vos sos dueño de alguno de los dos equipos
             const eresLocal = (typeof usuarioActual !== 'undefined' && cruce.local.usuarioId === usuarioActual.id);
             const eresVisitante = (typeof usuarioActual !== 'undefined' && cruce.visitante.usuarioId === usuarioActual.id);
             const esTuPartido = eresLocal || eresVisitante;
 
-            // ⚡ ESTILO DISTINTIVO: Gradiente violeta/neón si jugás vos, azul opaco neutro si es partido simulado de la IA
             const backgroundFila = esTuPartido ? "linear-gradient(90deg, #1e1b4b 0%, #0f172a 100%)" : "#1e293b";
             const borderFila = esTuPartido ? "2px solid var(--verde-match)" : "1px solid #334155";
             const sombraFila = esTuPartido ? "0 0 14px rgba(34, 197, 94, 0.25)" : "none";
@@ -4920,7 +4911,6 @@ function renderizarArbolMundial(fixture) {
             const localStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.local.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
             const visitanteStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.visitante.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
 
-            // Inyección del tag fosforescente [TÚ]
             const tagLocal = eresLocal ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
             const tagVisitante = eresVisitante ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
 
