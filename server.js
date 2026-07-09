@@ -808,38 +808,6 @@ app.get('/api/mundial/estado', verificarToken, async (req, res) => {
         client.release(); 
     }
 });
-app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
-    const usuario_id = req.usuarioLogueado.id;
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        const userCheck = await client.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
-        if (userCheck.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ ok: false, mensaje: "Usuario inválido." }); }
-
-        const usuario = userCheck.rows[0];
-        if (usuario.ultima_timba_mundial && (new Date() - new Date(usuario.ultima_timba_mundial) < COOLDOWN_MUNDIAL_MS)) {
-            await client.query('ROLLBACK'); return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Cooldown activo en el vestuario.` });
-        }
-
-        if (usuario.monedas < 1500) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "🪙 Se necesitan 1.500 monedas para la inscripción." }); }
-
-        const paisesValidosQuery = await client.query(`SELECT j.pais FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.cantidad > 0 GROUP BY j.pais HAVING COUNT(j.id) >= 3`, [usuario_id]);
-        const paisesCandidatos = paisesValidosQuery.rows.map(r => r.pais);
-
-        if (paisesCandidatos.length === 0) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores del mismo país desbloqueados." }); }
-
-        const nuevoOro = usuario.monedas - 1500;
-        await client.query("UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", [nuevoOro, usuario_id]);
-
-        const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
-        let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
-        while (ternaFiltrada.includes(rivalClasificacion)) { rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)]; }
-
-        await client.query('COMMIT');
-        return res.json({ ok: true, terna: ternaFiltrada, rivalClasificacion, monedasActualizadas: nuevoOro });
-    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: err.message }); } finally { client.release(); }
-});
-
 app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const { seleccionElegida, jugadorIds } = req.body;
@@ -859,8 +827,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         const promedio = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0) / 3;
         let estrellas = (promedio >= 90) ? 5 : ((promedio >= 79) ? 4 : ((promedio >= 70) ? 3 : ((promedio >= 62) ? 2 : 1)));
 
-        // 🔥 BALANCE DE DIFICULTAD REAL PARA FASE DE GRUPOS
-        // Momito, acá ajustamos las probabilidades para que 1 y 2 estrellas sean un VERDADERO sufrimiento pasar la fase de grupos.
+        // 🔥 DIFFICULTY BALANCE: Dificultad real escalada
         let chanceVictoriaGrupo = { 1: 0.15, 2: 0.35, 3: 0.55, 4: 0.75, 5: 0.90 }[estrellas] || 0.50;
 
         let botsDisponibles = mezclarArray(SELECCIONES_BOTS.filter(s => s !== seleccionElegida));
@@ -873,28 +840,24 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 let min = Math.floor(Math.random() * 29) * 3 + 3;
                 if (!minutos.includes(min) && min !== 45 && min !== 90) minutos.push(min);
             }
-            return minutos.sort((a, b) => a - b);
+            return minutes.sort((a, b) => a - b);
         }
 
-        // ⚽ SIMULACIÓN CONFIGURABLE CON LA CHANCE ACTUALIZADA
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            let g1 = Math.floor(Math.random() * 4); // Ampliamos a un posible 3-3 para más emoción
+            let g1 = Math.floor(Math.random() * 4); 
             let g2 = Math.floor(Math.random() * 4);
             
             if (esUsuario) {
-                // Si el destino decide que gana el usuario según sus estrellas
                 if (Math.random() <= chanceVictoriaGrupo) {
                     if (g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
                 } else {
-                    // El bot le gana o le empata al usuario
                     if (g1 > g2) g2 = g1 + Math.floor(Math.random() * 2);
                 }
             }
             return { goles1: g1, goles2: g2, minutosEq1: generarMinutosGolesFútbol(g1), minutosEq2: generarMinutosGolesFútbol(g2) };
         }
 
-        // FIX FIXTURE: Sincronización milimétrica de cruces del grupo de 4
-        // Fecha 1: Usuario vs Rival 1 | Rival 2 vs Rival 3
+        // GRUPOS: Fecha 1, 2 y 3
         let f1_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo1, true);
         let f1_m2 = simularMatchCompleto(rivalGrupo2, rivalGrupo3, false);
         let bitacoraGrupo = [{ 
@@ -903,7 +866,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             botL: rivalGrupo2, botV: rivalGrupo3, gBL: f1_m2.goles1, gBV: f1_m2.goles2, minutosBL: f1_m2.minutosEq1, minutosBV: f1_m2.minutosEq2 
         }];
 
-        // Fecha 2: Usuario vs Rival 2 | Rival 1 vs Rival 3
         let f2_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo2, true);
         let f2_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo3, false);
         bitacoraGrupo.push({ 
@@ -912,7 +874,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             botL: rivalGrupo1, botV: rivalGrupo3, gBL: f2_m2.goles1, gBV: f2_m2.goles2, minutosBL: f2_m2.minutosEq1, minutosBV: f2_m2.minutosEq2 
         });
 
-        // Fecha 3: Usuario vs Rival 3 | Rival 1 vs Rival 2
         let f3_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo3, true);
         let f3_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo2, false);
         bitacoraGrupo.push({ 
@@ -942,7 +903,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             let difA = a.gf - a.gc;
             let difB = b.gf - b.gc;
             if (difB !== difA) return difB - difA;
-            return b.gf - a.gf; // Desempate por goles a favor
+            return b.gf - a.gf;
         });
 
         let posicionUsuario = tablaOrdenada.findIndex(r => r.pais === seleccionElegida) + 1;
@@ -963,13 +924,14 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 let gTu = Math.floor(Math.random() * 3); 
                 let gRiv = Math.floor(Math.random() * 3);
                 
-                if (Math.random() <= Math.max(0.10, chanceVictoria - llave.pen)) {
+                // 🛠️ FIX REPARADO: Ahora evalúa de forma correcta usando la variable activa 'chanceVictoriaGrupo'
+                if (Math.random() <= Math.max(0.10, chanceVictoriaGrupo - llave.pen)) {
                     if (gTu <= gRiv) gTu = gRiv + 1;
                     bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅", gL: gTu, gV: gRiv, ganoUsuarioReal: true, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                 } else {
                     campeon = false; 
                     if (gRiv <= gTu) gRiv = gTu + 1;
-                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
+                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutesL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                     break;
                 }
             }
@@ -977,7 +939,6 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         const ahora = new Date();
         if (campeon) {
-            // Sincroniza con las nuevas columnas competitivas
             await client.query(`
                 UPDATE usuarios 
                 SET monedas = monedas + 5000, 
