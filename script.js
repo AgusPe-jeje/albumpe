@@ -1132,6 +1132,22 @@ async function ejecutarPenalLocal(direccionElegida) {
           }
           arrancarCronometroVisual(data.siguienteIn);
 
+          // ⚽ SINCRONIZACIÓN CON NEON: Registramos el tiro en el historial de penales del usuario
+          const token = localStorage.getItem("token");
+          await fetch(`${URL_BASE}/usuarios/registrar-penal`, {
+               method: "POST",
+               headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+               },
+               body: JSON.stringify({ ganoPartido: esGol })
+          });
+
+          // 🔄 ACTUALIZACIÓN DEL PERFIL: Forzamos el renderizado inmediato con la data fresca de Neon
+          if (typeof actualizarMiPerfilUI === "function") {
+               await actualizarMiPerfilUI();
+          }
+
           // 🟢 SECTOR MISIONES API: Trackeo en plural sincronizado con el backend
           if (typeof trackearProgresoMision === 'function') {
                // 1. Sumamos el tiro a la tanda de penales jugada
