@@ -1211,7 +1211,18 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
         const perfilQuery = `
-            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias, COALESCE(ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 0) AS porcentaje_album FROM usuarios u LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id LEFT JOIN usuario_progreso up ON u.id = up.usuario_id LEFT JOIN jugadores j ON up.jugador_id = j.id WHERE u.id = $1 GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, fp.ruta_jpg;`;
+            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, 
+            COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, 
+            COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, 
+            COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, 
+            COALESCE(COUNT(CASE WHEN j.rareza = 'legendaria' AND up.cantidad > 0 THEN 1 END), 0) AS legendarias, 
+            COALESCE(ROUND((COUNT(CASE WHEN up.cantidad > 0 THEN 1 END)::NUMERIC / COALESCE((SELECT COUNT(*) FROM jugadores), 1)::NUMERIC) * 100, 2), 0) AS porcentaje_album 
+            FROM usuarios u 
+            LEFT JOIN fotos_perfil fp ON u.foto_perfil_id = fp.id 
+            LEFT JOIN usuario_progreso up ON u.id = up.usuario_id 
+            LEFT JOIN jugadores j ON up.jugador_id = j.id 
+            WHERE u.id = $1 
+            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, fp.ruta_jpg;`;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
         if (result.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "El competidor no existe." });
@@ -1219,15 +1230,46 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
         const datos = result.rows[0];
         const victorias = parseInt(datos.timbas_ganadas_exacto || 0) + parseInt(datos.timbas_ganadas_signo || 0);
 
+        // Controlamos si cromo_destacado viene como string JSON desde la base de datos para parsearlo limpiamente
+        let cromoDestacadoProcesado = datos.cromo_destacado;
+        if (typeof datos.cromo_destacado === 'string' && datos.cromo_destacado.startsWith('{')) {
+            try {
+                cromoDestacadoProcesado = JSON.parse(datos.cromo_destacado);
+            } catch (e) {
+                cromoDestacadoProcesado = datos.cromo_destacado;
+            }
+        }
+
         return res.json({
             ok: true,
             perfil: {
-                id: datos.id, nombre: datos.nombre_usuario, monedas: datos.monedas, eligio_avatar: datos.eligio_avatar, puntosRanking: datos.puntos_ranking, copasMundiales: datos.copas_mundiales, foto: datos.foto_perfil, cromo_destacado: datos.cromo_destacado,
-                estadisticasAlbum: { comunes: parseInt(datos.comunes || 0), raras: parseInt(datos.raras || 0), epicas: parseInt(datos.epicas || 0), legendarias: parseInt(datos.legendarias || 0), porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 },
-                estadisticasTimba: { jugadas: parseInt(datos.timbas_jugadas || 0), ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victorias / datos.timbas_jugadas) * 100) : 0 }
+                id: datos.id, 
+                nombre: datos.nombre_usuario, 
+                monedas: datos.monedas, 
+                eligio_avatar: datos.eligio_avatar, 
+                puntosRanking: datos.puntos_ranking, 
+                copasMundiales: datos.copas_mundiales, 
+                foto: datos.foto_perfil, 
+                cromo_destacado: cromoDestacadoProcesado, // Enviamos el cromo listo para renderizar la imagen
+                estadisticasAlbum: { 
+                    comunes: parseInt(datos.comunes || 0), 
+                    raras: parseInt(datos.raras || 0), 
+                    epicas: parseInt(datos.epicas || 0), 
+                    legendarias: parseInt(datos.legendarias || 0), 
+                    porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 
+                },
+                estadisticasTimba: { 
+                    jugadas: parseInt(datos.timbas_jugadas || 0), 
+                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0), 
+                    ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0), 
+                    porcentajeEfectividad: datos.timbas_jugadas > 0 ? Math.round((victorias / datos.timbas_jugadas) * 100) : 0 
+                }
             }
         });
-    } catch (err) { res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); }
+    } catch (err) { 
+        console.error("❌ Error al cargar perfil:", err);
+        res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); 
+    }
 });
 
 app.get('/api/fotos-perfil/mis-avatares', verificarToken, async (req, res) => {
@@ -1266,11 +1308,37 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
 });
 
 app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
-    if (!req.body.fotoUrl) return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL." });
+    const { fotoUrl, nombre, rareza } = req.body;
+
+    // Validamos que al menos venga la foto que es lo crítico
+    if (!fotoUrl) {
+        return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL de la foto del cromo." });
+    }
+
     try {
-        await pool.query('UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', [req.body.fotoUrl, req.usuarioLogueado.id]);
-        res.json({ ok: true, mensaje: "🌟 ¡Cromo lucido en la vitrina!" });
-    } catch (err) { res.status(500).json({ ok: false, error: "Error de servidor." }); }
+        // Armamos el objeto estructurado para la vitrina del perfil
+        const cromoData = {
+            foto: fotoUrl,
+            nombre: nombre || "Cromo Insignia",
+            rareza: rareza || "comun"
+        };
+
+        // Guardamos todo el paquete como JSON en Neon
+        await pool.query(
+            'UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', 
+            [JSON.stringify(cromoData), req.usuarioLogueado.id]
+        );
+
+        res.json({ 
+            ok: true, 
+            mensaje: "🌟 ¡Cromo lucido en la vitrina con toda su info!",
+            cromo_destacado: cromoData
+        });
+
+    } catch (err) { 
+        console.error("Error en servidor al destacar cromo:", err);
+        res.status(500).json({ ok: false, error: "Error de servidor al guardar en la base de datos." }); 
+    }
 });
 
 /* ========================================================================
