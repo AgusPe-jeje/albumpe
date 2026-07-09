@@ -1227,13 +1227,14 @@ function arrancarCronometroTimbaVisual(milisegundos) {
 }
 
 async function actualizarTimbasRestantesUI() {
-     if (!usuarioActual) return;
-     const lblCronometro = document.getElementById('cronometro-timba');
-     if (!lblCronometro) return;
-
-     try {
-          const res = await fetch(`${URL_BASE}/timbas-restantes/${usuarioActual.id}`);
-          const datos = await res.json();
+    if (!usuarioActual) return;
+    try {
+        // 🔥 FIX: Mandamos el token para que el server sepa qué tester pide la energía
+        const res = await fetch(`${URL_BASE}/timbas-restantes/${usuarioActual.id}`, {
+            method: "GET",
+            headers: obtenerHeadersSeguros()
+        });
+        const data = await res.json();
           
           // 🔥 CORREGIDO: Usamos la variable global correcta del loop de la timba
           if (intervaloCronometroTimba) {
@@ -1263,9 +1264,9 @@ async function actualizarTimbasRestantesUI() {
                     arrancarCronometroTimbaVisual(tiempoAjustado > 0 ? tiempoAjustado : datos.siguienteIn);
                }, TIEMPO_CONGELADO_MS);
           }
-     } catch (err) { 
-          console.error('Error al actualizar créditos de timba:', err); 
-     }
+     } catch (err) {
+        console.error("Error al traer timbas restantes:", err);
+    }
 }
 
 function rotarPartidoTimba() {
@@ -4233,20 +4234,12 @@ async function equiparAvatarDesdeTienda(fotoId) {
 // ========================================================================
 
 async function cargarFirmasDelPerfil(perfilId) {
-    // 🛡️ ESCUDO: Si no hay id válido de perfil, abortamos para evitar URLs rotas
-    if (!perfilId || perfilId === "null" || perfilId === "undefined") return;
-
-    const esMiMuro = usuarioActual && usuarioActual.id === parseInt(perfilId);
-    const idContenedor = esMiMuro ? "mi-contenedor-lista-firmas" : "contenedor-lista-firmas";
-
-    const contenedor = document.getElementById(idContenedor);
-    if (!contenedor) return;
-    contenedor.innerHTML = "<p style='color: #64748b; font-size: 0.9rem;'>Cargando dedicatorias...</p>";
-
+    if (!perfilId) return;
     try {
-        // 🔓 Petición pública limpia sin pasar por obtenerHeadersSeguros()
+        // 🔥 FIX: Le agregamos los headers para que pase el modo mantenimiento
         const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
-            method: 'GET'
+            method: "GET",
+            headers: obtenerHeadersSeguros() 
         });
         const data = await res.json();
 
@@ -4292,8 +4285,7 @@ async function cargarFirmasDelPerfil(perfilId) {
         });
 
     } catch (err) {
-        console.error("❌ Fallo de red en firmas:", err);
-        contenedor.innerHTML = "<p style='color: #ef4444; text-align: center; font-size: 0.85rem;'>📡 Error al conectar con el servidor de firmas.</p>";
+        console.error("Error al cargar firmas:", err);
     }
 }
 
