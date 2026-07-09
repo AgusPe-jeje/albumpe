@@ -551,6 +551,107 @@ input:focus, .select-estadio-custom:focus { border-color: var(--celeste); outlin
 img.emoji { height: 1.2em; width: 1.2em; margin: 0 .05em 0 .1em; vertical-align: -0.1em; display: inline-block; }
 
 /* ========================================================================
+   🏆 INTERFAZ DE PERFIL Y RANKING - STADIUM TELEVISION EDITION
+   ======================================================================== */
+
+/* 1. Contenedor del Modal del Ranking (Efecto pantalla gigante de estadio) */
+.modal-ranking-premium {
+    background: radial-gradient(circle at top, #111827 0%, #070a0f 100%) !important;
+    border: 2px solid var(--celeste) !important;
+    box-shadow: 0 0 35px rgba(0, 204, 255, 0.25), inset 0 0 20px rgba(0, 0, 0, 0.9) !important;
+    overflow: hidden;
+}
+
+/* 2. Zócalos de Estadísticas del Perfil (Estilo Graph de Transmisión) */
+.tarjeta-stat-premium {
+    position: relative;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(2, 6, 23, 0.8) 100%);
+    border-left: 4px solid var(--celeste); /* Línea de color de transmisión a la izquierda */
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tarjeta-stat-premium:hover {
+    transform: translateY(-3px);
+    border-left-color: var(--verde-match);
+    box-shadow: 0 6px 20px rgba(0, 255, 136, 0.15);
+}
+
+/* Variación de colores de zócalo según la estadística */
+.tarjeta-stat-premium.oro { border-left-color: var(--dorado); }
+.tarjeta-stat-premium.penales { border-left-color: var(--celeste); }
+.tarjeta-stat-premium.mundiales { border-left-color: #a2b4cc; }
+.tarjeta-stat-premium.seleccion { border-left-color: var(--rojo); }
+
+/* 3. Filas de la Tabla del Ranking (Leaderboard Broadcast) */
+.fila-ranking-rival {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background: rgba(30, 41, 59, 0.2);
+    border: 1px solid rgba(30, 41, 59, 0.5);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    transition: all 0.2s ease;
+}
+
+.fila-ranking-rival:hover {
+    background: rgba(0, 204, 255, 0.08);
+    border-color: rgba(0, 204, 255, 0.4);
+    transform: scale(1.01);
+}
+
+/* 4. El Podio del Ranking (Top 1, 2 y 3) */
+.fila-ranking-rival.top-1 {
+    background: linear-gradient(90deg, rgba(255, 177, 0, 0.15) 0%, rgba(15, 23, 42, 0.6) 100%);
+    border: 1px solid var(--dorado);
+    box-shadow: 0 0 15px rgba(255, 177, 0, 0.1);
+}
+.fila-ranking-rival.top-1 .numero-puesto {
+    color: var(--dorado);
+    text-shadow: 0 0 8px rgba(255, 177, 0, 0.6);
+}
+
+.fila-ranking-rival.top-2 {
+    background: linear-gradient(90deg, rgba(162, 180, 204, 0.12) 0%, rgba(15, 23, 42, 0.6) 100%);
+    border: 1px solid #a2b4cc;
+}
+
+.fila-ranking-rival.top-3 {
+    background: linear-gradient(90deg, rgba(205, 127, 50, 0.1) 0%, rgba(15, 23, 42, 0.6) 100%);
+    border: 1px solid #cd7f32; /* Bronce corporativo */
+}
+
+/* 5. Tipografías numéricas e insignias para la tabla de posiciones */
+.numero-puesto {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.3rem;
+    font-weight: bold;
+    width: 35px;
+    text-align: center;
+}
+
+.puntos-ranking-feed {
+    font-family: 'Oswald', sans-serif;
+    color: var(--verde-match);
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-left: auto; /* Tira los puntos hacia la derecha de la fila */
+}
+
+/* 6. Animación Glitch sutil al abrir el Modal de Rivales */
+@keyframes entradaEstadio {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); filter: brightness(2); }
+    to { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
+.animacion-modal-estadio {
+    animation: entradaEstadio 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ========================================================================
    🎮 ACCESIBILIDAD GAMER - SISTEMA DE FOCO AVANZADO
    ======================================================================== */
 button:focus, input:focus, select:focus { outline: none !important; }
