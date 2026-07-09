@@ -858,7 +858,10 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         const promedio = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0) / 3;
         let estrellas = (promedio >= 90) ? 5 : ((promedio >= 79) ? 4 : ((promedio >= 70) ? 3 : ((promedio >= 62) ? 2 : 1)));
-        let chanceVictoria = { 1: 0.10, 2: 0.25, 3: 0.48, 4: 0.70, 5: 0.88 }[estrellas] || 0.10;
+
+        // 🔥 BALANCE DE DIFICULTAD REAL PARA FASE DE GRUPOS
+        // Momito, acá ajustamos las probabilidades para que 1 y 2 estrellas sean un VERDADERO sufrimiento pasar la fase de grupos.
+        let chanceVictoriaGrupo = { 1: 0.15, 2: 0.35, 3: 0.55, 4: 0.75, 5: 0.90 }[estrellas] || 0.50;
 
         let botsDisponibles = mezclarArray(SELECCIONES_BOTS.filter(s => s !== seleccionElegida));
         const [rivalGrupo1, rivalGrupo2, rivalGrupo3] = botsDisponibles;
@@ -873,12 +876,19 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             return minutos.sort((a, b) => a - b);
         }
 
+        // ⚽ SIMULACIÓN CONFIGURABLE CON LA CHANCE ACTUALIZADA
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            let g1 = Math.floor(Math.random() * 3); 
-            let g2 = Math.floor(Math.random() * 3);
+            let g1 = Math.floor(Math.random() * 4); // Ampliamos a un posible 3-3 para más emoción
+            let g2 = Math.floor(Math.random() * 4);
+            
             if (esUsuario) {
-                if (Math.random() <= chanceVictoria && g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
-                else if (Math.random() > chanceVictoria && g2 <= g1) g2 = g1 + Math.floor(Math.random() * 2) + 1;
+                // Si el destino decide que gana el usuario según sus estrellas
+                if (Math.random() <= chanceVictoriaGrupo) {
+                    if (g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
+                } else {
+                    // El bot le gana o le empata al usuario
+                    if (g1 > g2) g2 = g1 + Math.floor(Math.random() * 2);
+                }
             }
             return { goles1: g1, goles2: g2, minutosEq1: generarMinutosGolesFútbol(g1), minutosEq2: generarMinutosGolesFútbol(g2) };
         }
