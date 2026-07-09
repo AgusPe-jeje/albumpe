@@ -3833,7 +3833,7 @@ async function actualizarMiPerfilUI() {
 
         const perfil = data.perfil;
 
-        // 🔒 CONTROL FORMULARIO: Al ver MI PROPIO perfil, escondemos la caja para evitar auto-firmas
+        // 🔒 CONTROL FORMULARIO
         const cajaFormulario = document.getElementById("caja-formulario-firma");
         if (cajaFormulario) cajaFormulario.style.display = "none";
 
@@ -3857,32 +3857,33 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas (Combinación Blindada de IDs antiguos y nuevos)
+        // 3. ⚽ Bloque B: Estadísticas Avanzadas Sincronizadas
         const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad") || document.getElementById("perfil-txt-timba-efectividad");
         const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas") || document.getElementById("perfil-txt-timba-jugadas");
 
-        // Captura la data de penales directo de Neon
-        const totales = perfil.estadisticasPenales?.jugadas ?? perfil.penales_jugados ?? 0;
-        const ganados = perfil.estadisticasPenales?.ganadas ?? perfil.penales_ganados ?? 0;
-        
-        // Calculamos la efectividad real en base al 11 y 10 de tu Neon
+        const totales = perfil.estadisticasPenales?.jugadas || 0;
+        const ganados = perfil.estadisticasPenales?.ganadas || 0;
         const porcentaje = totales > 0 ? Math.round((ganados / totales) * 100) : 0;
 
-        if (txtPenalesEfectividad) {
-            txtPenalesEfectividad.innerText = `${porcentaje}%`;
-        }
+        if (txtPenalesEfectividad) txtPenalesEfectividad.innerText = `${porcentaje}%`;
+        if (txtPenalesJugadas) txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
 
-        if (txtPenalesJugadas) {
-            txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
-        }
+        // 🏆 MUNDIALES GANADOS HISTÓRICOS
+        const txtMundiales = document.getElementById("stat-mundiales-copas") || document.getElementById("rival-stat-mundiales-copas");
+        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.torneosGanados || 0} Torneos Arena`;
 
-        const txtMundiales = document.getElementById("stat-mundiales-copas");
-        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.copasMundiales ?? perfil.copas_mundiales ?? 0}`;
+        // 🥇 TOP 1 SEMANALES
+        const txtTop1Semanales = document.getElementById("perfil-txt-top1-semanal");
+        if (txtTop1Semanales) txtTop1Semanales.innerText = `🥇 ${perfil.top1Semanales || 0} Veces Campeón`;
+
+        // 🌍 SELECCIÓN MÁS EFECTIVA / USADA
+        const txtSeleccionFav = document.getElementById("perfil-txt-seleccion-top");
+        if (txtSeleccionFav) txtSeleccionFav.innerText = `🇸🇻 ${perfil.seleccionTop || "NINGUNA"}`;
 
         const txtMonedas = document.getElementById("stat-monedas");
         if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas.toLocaleString() : 0;
 
-        // 4. Render de la Foto de Perfil / Avatar Fijo
+        // 4. Render de la Foto de Perfil
         const divAvatar = document.getElementById("perfil-avatar-user");
         if (divAvatar && perfil.foto) {
             divAvatar.style.borderRadius = "12px";
@@ -3892,7 +3893,7 @@ async function actualizarMiPerfilUI() {
             divAvatar.innerText = "";
         }
 
-        // 🌟 5. NUEVO BLOQUE: Render del Cromo Insignia (Ruta Plana de Neon)
+        // 🌟 5. Render del Cromo Insignia
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
             if (perfil.cromo_destacado && typeof perfil.cromo_destacado === "string" && perfil.cromo_destacado.trim() !== "") {
@@ -3906,13 +3907,12 @@ async function actualizarMiPerfilUI() {
             }
         }
 
-        // ✍️ CARGA DE FIRMAS: Traemos las firmas de mi propio muro para exhibirlas
         if (typeof cargarFirmasDelPerfil === "function") {
              cargarFirmasDelPerfil(usuarioActual.id);
         }
 
     } catch (err) {
-        console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
+        console.error("❌ Error al renderizar estadísticas extendidas:", err);
     }
 }
 
