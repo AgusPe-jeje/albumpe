@@ -4636,6 +4636,12 @@ function conectarYPrenderEscuchasPvP() {
     if (btnStart) {
         btnStart.addEventListener('click', () => {
             if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
+            
+            // 🔒 CONGELAMOS EL BOTÓN AL INSTANTE PARA EVITAR DOBLE CLICK
+            btnStart.disabled = true;
+            btnStart.style.opacity = "0.5";
+            btnStart.innerText = "⚽ GENERANDO FIXTURE...";
+            
             socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
         });
     }
