@@ -4764,13 +4764,58 @@ function prepararFaseDraftUI() {
             return;
         }
 
+        // Modificamos la grilla del contenedor para que las cartas tengan buen espacio vertical
+        contenedorCartas.style.gridTemplateColumns = "repeat(auto-fill, minmax(140px, 1fr))";
+        contenedorCartas.style.gap = "15px";
+
         mapeoPaises[paisElegido].forEach(c => {
+            // Buscamos dinámicamente la propiedad de la imagen (adaptala si se llama diferente en tu DB, ej: c.img o c.url_imagen)
+            const urlImagen = c.imagen || c.img || c.url_imagen || 'img/default-card.png';
+
             const label = document.createElement('label');
-            label.style.cssText = "background:#1e293b; padding:8px; border-radius:6px; font-size:0.8rem; display:flex; align-items:center; gap:8px; color:#fff; border:1px solid #334155; cursor:pointer; user-select:none;";
-            label.innerHTML = `
-                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="accent-color:var(--celeste); cursor:pointer;">
-                <span><strong>${c.nombre}</strong><br><small style="color:var(--dorado);">${c.rareza.toUpperCase()}</small></span>
+            
+            // Estilo base de la mini-carta
+            label.style.cssText = `
+                position: relative;
+                background: #1e293b; 
+                padding: 10px; 
+                border-radius: 10px; 
+                color: #fff; 
+                border: 1px solid #334155; 
+                cursor: pointer; 
+                user-select: none;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+                transition: all 0.2s ease;
+                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
             `;
+            
+            // Armamos la UI de la carta con su imagen y los textos abajo
+            label.innerHTML = `
+                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="position: absolute; top: 8px; left: 8px; accent-color: var(--verde-match); width: 16px; height: 16px; cursor: pointer; z-index: 2;">
+                <div style="width: 100%; height: 130px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; background: #020617; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
+                    <img src="${urlImagen}" alt="${c.nombre}" style="max-width: 100%; max-height: 100%; object-fit: contain; pointer-events: none;">
+                </div>
+                <span style="font-size: 0.85rem; font-weight: bold; line-height: 1.2; display: block; height: 32px; overflow: hidden; text-overflow: ellipsis;">${c.nombre}</span>
+                <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.7rem; text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px;">${c.rareza}</small>
+            `;
+            
+            // 🔥 EFECTO AL SELECCIONAR: Escucha el cambio del checkbox interno para prender el borde neón
+            const checkboxInterno = label.querySelector('input[type="checkbox"]');
+            checkboxInterno.addEventListener('change', () => {
+                if (checkboxInterno.checked) {
+                    label.style.border = "2px solid var(--verde-match)";
+                    label.style.boxShadow = "0 0 12px rgba(34, 197, 94, 0.4)";
+                    label.style.background = "#142236";
+                } else {
+                    label.style.border = "1px solid #334155";
+                    label.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
+                    label.style.background = "#1e293b";
+                }
+            });
+
             contenedorCartas.appendChild(label);
         });
 
@@ -4779,7 +4824,14 @@ function prepararFaseDraftUI() {
         checkboxes.forEach(box => {
             box.addEventListener('change', () => {
                 const checked = document.querySelectorAll('input[name="cartas-draft-check"]:checked');
-                if (checked.length > 3) box.checked = false;
+                if (checked.length > 3) {
+                    box.checked = false;
+                    // Si se cancela por superar el límite, forzamos a que el label no se quede prendido
+                    const labelPadre = box.parentElement;
+                    labelPadre.style.border = "1px solid #334155";
+                    labelPadre.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
+                    labelPadre.style.background = "#1e293b";
+                }
             });
         });
     };
