@@ -1693,10 +1693,9 @@ setInterval(procesarResetSemanalRankings, 1000 * 60 * 60);
 setTimeout(procesarResetSemanalRankings, 5000);
 
 // ========================================================================
-// ⚔️ MÓDULO MULTIJUGADOR ACTUALIZADO: MINI-MUNDIAL CON SALAS, APUESTAS Y CONTRASEÑAS
+// ⚔️ MÓDULO MULTIJUGADOR ACTUALIZADO: MOTOR SECUENCIAL CON SISTEMA DRAFT
 // ========================================================================
 function inicializarModuloMultijugador(io, pool) {
-    // Almacena los torneos/salas activas en memoria volatil
     const salasActivas = {}; 
 
     const LISTA_SELECCIONES = [
@@ -1707,29 +1706,25 @@ function inicializarModuloMultijugador(io, pool) {
     io.on('connection', (socket) => {
         console.log(`📡 Conexión WebSocket en el Mundial: ${socket.id}`);
 
-        // 🆕 1. ENVIAR LISTA DE SALAS PÚBLICAS AL CONECTARSE
         socket.on('pedirSalasPublicas', () => {
             socket.emit('listaSalasPublicas', obtenerSalasPublicas(salasActivas));
         });
 
-        // 🆕 2. CREAR TORNEO / SALA PERSONALIZADA
+        // CREAR SALA / TORNEO (Nace en modo LOBBY esperando confirmaciones de Draft)
         socket.on('crearSalaTorneo', async ({ usuarioId, username, esPrivada, contrasenia, apuestaOro }) => {
             try {
                 const oroApuesta = parseInt(apuestaOro) || 0;
 
-                // Validamos oro líquido del creador en Base de Datos
                 const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuarioId]);
                 if (userCheck.rows.length === 0 || userCheck.rows[0].monedas < oroApuesta) {
                     return socket.emit('errorPvp', { mensaje: "❌ Fondos insuficientes para abrir esta apuesta." });
                 }
 
-                // Descontamos el oro inmediatamente al creador
                 await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [oroApuesta, usuarioId]);
 
                 const tokenUnico = "MUNDO_" + Math.random().toString(36).substring(2, 7).toUpperCase();
                 const salaNombre = `sala_${tokenUnico}`;
                 
-                // Registramos en DB la mesa madre
                 const nuevaSalaDB = await pool.query(
                     "INSERT INTO salas_multijugador (sala_token, creador_id, estado) VALUES ($1, $2, 'ESPERANDO') RETURNING id",
                     [tokenUnico, usuarioId]
@@ -1737,35 +1732,29 @@ function inicializarModuloMultijugador(io, pool) {
 
                 socket.join(salaNombre);
 
-                // Asignación de selección al azar
-                const seleccionAsignada = LISTA_SELECCIONES[Math.floor(Math.random() * LISTA_SELECCIONES.length)];
-
                 salasActivas[salaNombre] = {
                     dbId: nuevaSalaDB.rows[0].id,
                     token: tokenUnico,
                     apuestaOro: oroApuesta,
                     esPrivada: esPrivada || false,
                     contrasenia: contrasenia || "",
-                    estado: "LOBBY", // LOBBY, JUGANDO, FINALIZADO
+                    estado: "LOBBY", 
                     pozoTotal: oroApuesta,
+                    faseActual: "octavos",
+                    partidoIndiceActual: 0, // 👈 Puntero para la transmisión individual secuencial
                     jugadores: [{
                         usuarioId,
                         username,
                         socketId: socket.id,
-                        seleccion: seleccionAsignada,
-                        estrellasPlantel: 1, // Se actualiza dinámicamente con el álbum
-                        esBot: false
+                        seleccion: null, // Se asigna en la fase interactiva de Draft
+                        estrellasPlantel: 1, 
+                        esBot: false,
+                        draftConfirmado: false
                     }],
                     fixture: null
                 };
 
-                socket.emit('salaCreadaExito', { 
-                    salaToken: tokenUnico, 
-                    seleccion: seleccionAsignada,
-                    apuestaOro: oroApuesta 
-                });
-
-                // Notificar red global si es pública
+                socket.emit('salaCreadaExito', { salaToken: tokenUnico, apuestaOro: oroApuesta });
                 if (!esPrivada) io.emit('listaSalasPublicas', obtenerSalasPublicas(salasActivas));
 
             } catch (err) {
@@ -1774,7 +1763,7 @@ function inicializarModuloMultijugador(io, pool) {
             }
         });
 
-        // 🔑 3. UNIRSE A UNA SALA EXISTENTE (CON O SIN CONTRASEÑA)
+        // UNIRSE A UNA SALA EXISTENTE
         socket.on('unirseSalaTorneo', async ({ salaToken, contrasenia, usuarioId, username }) => {
             const salaNombre = `sala_${salaToken}`;
             const sala = salasActivas[salaNombre];
@@ -1783,47 +1772,41 @@ function inicializarModuloMultijugador(io, pool) {
             if (sala.jugadores.length >= 16) return socket.emit('errorPvp', { mensaje: "El torneo mundialista ya está lleno." });
             if (sala.estado !== "LOBBY") return socket.emit('errorPvp', { mensaje: "El torneo ya inició." });
 
-            // Validación de contraseña
             if (sala.esPrivada && sala.contrasenia !== contrasenia) {
                 return socket.emit('errorPvp', { mensaje: "🔐 Contraseña incorrecta." });
             }
 
             try {
-                // Verificar si tiene el oro para cubrir la apuesta fijada por la sala
                 const userCheck = await pool.query("SELECT monedas FROM usuarios WHERE id = $1", [usuarioId]);
                 if (userCheck.rows.length === 0 || userCheck.rows[0].monedas < sala.apuestaOro) {
                     return socket.emit('errorPvp', { mensaje: "❌ No tenés suficiente Oro para abonar la inscripción a este torneo." });
                 }
 
-                // Descontamos oro de inscripción
                 await pool.query("UPDATE usuarios SET monedas = monedas - $1 WHERE id = $2", [sala.apuestaOro, usuarioId]);
                 sala.pozoTotal += sala.apuestaOro;
 
                 socket.join(salaNombre);
 
-                // Filtrar selecciones para que no se repitan mientras sea posible
-                const usadas = sala.jugadores.map(j => j.seleccion);
-                const disponibles = LISTA_SELECCIONES.filter(s => !usadas.includes(s));
-                const seleccionAsignada = disponibles.length > 0 ? disponibles[0] : LISTA_SELECCIONES[Math.floor(Math.random() * LISTA_SELECCIONES.length)];
-
                 const nuevoJugador = {
                     usuarioId,
                     username,
                     socketId: socket.id,
-                    seleccion: seleccionAsignada,
+                    seleccion: null,
                     estrellasPlantel: 1,
-                    esBot: false
+                    esBot: false,
+                    draftConfirmado: false
                 };
 
                 sala.jugadores.push(nuevoJugador);
 
                 socket.emit('unionExitosaTorneo', { 
                     salaToken, 
-                    seleccion: seleccionAsignada,
                     salaInfo: { apuestaOro: sala.apuestaOro, pozoTotal: sala.pozoTotal }
                 });
 
-                io.to(salaNombre).emit('jugadorSeUnioLobby', { jugadores: sala.jugadores.map(j => ({username: j.username, seleccion: j.seleccion})) });
+                io.to(salaNombre).emit('jugadorSeUnioLobby', { 
+                    jugadores: sala.jugadores.map(j => ({ username: j.username, seleccion: j.seleccion || "Eligiendo..." })) 
+                });
 
             } catch (err) {
                 console.error("❌ Error al unirse al Torneo:", err.message);
@@ -1831,29 +1814,36 @@ function inicializarModuloMultijugador(io, pool) {
             }
         });
 
-        // 📊 4. ACTUALIZAR ESTRELLAS SEGÚN EL ÁLBUM ACTUAL DEL JUGADOR
-        socket.on('enviarEstrellasPoder', ({ salaToken, estrellas }) => {
+        // 🎲 RECEPCIÓN DEL DRAFT INTERACTIVO DEL CLIENTE
+        socket.on('confirmarDraftJugador', ({ salaToken, seleccionElegida, estrellas }) => {
             const salaNombre = `sala_${salaToken}`;
             const sala = salasActivas[salaNombre];
             if (!sala) return;
 
             const jugador = sala.jugadores.find(j => j.socketId === socket.id);
             if (jugador) {
+                jugador.seleccion = seleccionElegida;
                 jugador.estrellasPlantel = parseInt(estrellas) || 1;
-                console.log(`⭐ Jugador ${jugador.username} cargó ${jugador.estrellasPlantel} estrellas desde su álbum.`);
+                jugador.draftConfirmado = true;
+                console.log(`🎮 Draft Confirmado por ${jugador.username}: ${seleccionElegida} (⭐${jugador.estrellasPlantel})`);
             }
+
+            // Sincronizar nombres y banderas en los paneles de espera del lobby
+            io.to(salaNombre).emit('jugadorSeUnioLobby', { 
+                jugadores: sala.jugadores.map(j => ({ username: j.username, seleccion: j.seleccion || "Eligiendo..." })) 
+            });
         });
 
-        // 🏁 5. LANZAR EL MINI-MUNDIAL DESDE OCTAVOS (Acción exclusiva del Host creador)
+        // LANZAR EL MINI-MUNDIAL (Llenado automático y secuencial)
         socket.on('lanzarMinimundial', async ({ salaToken }) => {
             const salaNombre = `sala_${salaToken}`;
             const sala = salasActivas[salaNombre];
             if (!sala) return;
 
-            // Rellenar con BOTS inteligentes si faltan cupos para completar los 16 de Octavos
+            // Rellenar cupos con BOTS (asumen selecciones libres remanentes de forma inmediata)
             let botCount = 1;
             while (sala.jugadores.length < 16) {
-                const usadas = sala.jugadores.map(j => j.seleccion);
+                const usadas = sala.jugadores.map(j => j.seleccion).filter(Boolean);
                 const disponibles = LISTA_SELECCIONES.filter(s => !usadas.includes(s));
                 const seleccionBot = disponibles.length > 0 ? disponibles[0] : "Sorpresa FC";
 
@@ -1862,38 +1852,46 @@ function inicializarModuloMultijugador(io, pool) {
                     username: `Bot IA ${botCount++}`,
                     socketId: null,
                     seleccion: seleccionBot,
-                    estrellasPlantel: Math.floor(Math.random() * 3) + 3, // Nivel variable entre 3 y 5 estrellas
-                    esBot: true
+                    estrellasPlantel: Math.floor(Math.random() * 3) + 3, // 3 a 5 estrellas
+                    esBot: true,
+                    draftConfirmado: true
                 });
             }
 
+            // Aquellos jugadores reales que no le dieron click al draft se les asigna una de contingencia
+            sala.jugadores.forEach(j => {
+                if (!j.draftConfirmado) {
+                    const usadas = sala.jugadores.map(x => x.seleccion).filter(Boolean);
+                    const disponibles = LISTA_SELECCIONES.filter(s => !usadas.includes(s));
+                    j.seleccion = disponibles.length > 0 ? disponibles[0] : "Invitado FC";
+                    j.draftConfirmado = true;
+                }
+            });
+
             sala.estado = "JUGANDO";
+            sala.faseActual = "octavos";
+            sala.partidoIndiceActual = 0; // Iniciamos en el cruce 1 de octavos
+            
             await pool.query("UPDATE salas_multijugador SET estado = 'JUGANDO' WHERE id = $1", [sala.dbId]);
 
-            // Mezclar y armar los 8 cruces directos
             sala.fixture = armarCrucesOctavos(sala.jugadores);
 
             io.to(salaNombre).emit('mundialComenzado', { fixture: sala.fixture, pozoTotal: sala.pozoTotal });
             
-            // Ejecutar el motor automático de simulación basado en estrellas
-            correrSimulacionFase(salaNombre, io, pool);
+            // Iniciar el motor secuencial uno por uno
+            simularPartidoIndividual(salaNombre, io, pool);
         });
 
-        // 🚪 GESTIONAR DESCONEXIONES DURANTE EL TORNEO
         socket.on('disconnect', () => {
             for (const salaNombre in salasActivas) {
                 const sala = salasActivas[salaNombre];
                 const index = sala.jugadores.findIndex(j => j.socketId === socket.id);
                 if (index !== -1) {
                     const desertor = sala.jugadores[index];
-                    console.log(`⚠️ El jugador ${desertor.username} abandonó el lobby/torneo.`);
-                    
                     if (sala.estado === "LOBBY") {
-                        // Si se va en el lobby, se lo remueve y listo
                         sala.jugadores.splice(index, 1);
-                        io.to(salaNombre).emit('jugadorSeUnioLobby', { jugadores: sala.jugadores.map(j => ({username: j.username, seleccion: j.seleccion})) });
+                        io.to(salaNombre).emit('jugadorSeUnioLobby', { jugadores: sala.jugadores.map(j => ({username: j.username, seleccion: j.seleccion || "Eligiendo..."})) });
                     } else {
-                        // Si ya arrancó el Mundial, sus partidos se le darán por perdidos (0 estrellas)
                         desertor.estrellasPlantel = 0;
                         desertor.socketId = null;
                     }
@@ -1903,7 +1901,101 @@ function inicializarModuloMultijugador(io, pool) {
         });
     });
 
-    // --- FUNCIONES INTERNAS DEL MOTOR DEL TORNEO ---
+    // ========================================================================
+    // 📺 MOTOR SECUENCIAL TRANSMISOR PARTIDO A PARTIDO (1v1 INDIVIDUAL)
+    // ========================================================================
+    function simularPartidoIndividual(salaNombre, io, pool) {
+        const sala = salasActivas[salaNombre];
+        if (!sala || sala.estado !== "JUGANDO") return;
+
+        const fase = sala.faseActual;
+        const partidosDeFase = sala.fixture[fase];
+        const idx = sala.partidoIndiceActual;
+
+        // Si se completaron todos los partidos de la lista de esta fase, avanzamos de ronda
+        if (idx >= partidosDeFase.length) {
+            avanzarDeFaseMundial(salaNombre, io, pool);
+            return;
+        }
+
+        const cruce = partidosDeFase[idx];
+        let min = 0;
+
+        // Notificar el inicio del partido enfocado a las pantallas
+        io.to(salaNombre).emit('partidoEnFocoVivido', {
+            fase: fase.toUpperCase(),
+            partidoNumero: idx + 1,
+            totalPartidos: partidosDeFase.length,
+            local: { username: cruce.local.username, seleccion: cruce.local.seleccion },
+            visitante: { username: cruce.visitante.username, seleccion: cruce.visitante.seleccion }
+        });
+
+        const timerPartido = setInterval(() => {
+            min += 15;
+
+            const fuerzaLocal = cruce.local.estrellasPlantel || 1;
+            const fuerzaVisitante = cruce.visitante.estrellasPlantel || 1;
+
+            if (Math.random() * 100 < (fuerzaLocal * 7)) cruce.golesLocal++;
+            if (Math.random() * 100 < (fuerzaVisitante * 7)) cruce.golesVisitante++;
+
+            io.to(salaNombre).emit('tickMinutoIndividual', {
+                minuto: min,
+                golesLocal: cruce.golesLocal,
+                golesVisitante: cruce.golesVisitante,
+                fixture: sala.fixture
+            });
+
+            if (min >= 90) {
+                clearInterval(timerPartido);
+
+                // Prórroga/Penales automáticos e instantáneos si hay empate
+                if (cruce.golesLocal === cruce.golesVisitante) {
+                    if (Math.random() > 0.5) cruce.golesLocal++; else cruce.golesVisitante++;
+                }
+
+                cruce.terminado = true;
+                cruce.ganador = cruce.golesLocal > cruce.golesVisitante ? cruce.local : cruce.visitante;
+
+                io.to(salaNombre).emit('partidoIndividualConcluido', { fixture: sala.fixture });
+
+                // Retardo de 3 segundos de transmisión y salta al siguiente cruce de la lista
+                setTimeout(() => {
+                    sala.partidoIndiceActual++;
+                    simularPartidoIndividual(salaNombre, io, pool);
+                }, 3000);
+            }
+        }, 1000); // 1 segundo real = 15 minutos de partido televisado
+    }
+
+    function avanzarDeFaseMundial(salaNombre, io, pool) {
+        const sala = salasActivas[salaNombre];
+        if (!sala) return;
+
+        if (sala.faseActual === "octavos") {
+            sala.faseActual = "cuartos";
+            const ganadores = sala.fixture.octavos.map(c => c.ganador);
+            for (let i = 0; i < 8; i += 2) sala.fixture.cuartos.push({ local: ganadores[i], visitante: ganadores[i+1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
+        } else if (sala.faseActual === "cuartos") {
+            sala.faseActual = "semi";
+            const ganadores = sala.fixture.cuartos.map(c => c.ganador);
+            for (let i = 0; i < 4; i += 2) sala.fixture.semi.push({ local: ganadores[i], visitante: ganadores[i+1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
+        } else if (sala.faseActual === "semi") {
+            sala.faseActual = "final";
+            const ganadores = sala.fixture.semi.map(c => c.ganador);
+            sala.fixture.final.push({ local: ganadores[0], visitante: ganadores[1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
+        } else if (sala.faseActual === "final") {
+            finalizarTorneoCompleto(salaNombre, io, pool);
+            return;
+        }
+
+        sala.partidoIndiceActual = 0; // Reiniciamos el puntero para la nueva etapa
+        io.to(salaNombre).emit('nuevaFaseAlcanzada', { fase: sala.faseActual.toUpperCase(), fixture: sala.fixture });
+        
+        setTimeout(() => {
+            simularPartidoIndividual(salaNombre, io, pool);
+        }, 4000);
+    }
 
     function obtenerSalasPublicas(salas) {
         return Object.values(salas)
@@ -1920,68 +2012,6 @@ function inicializarModuloMultijugador(io, pool) {
         return { octavos, cuartos: [], semi: [], final: [], campeon: null };
     }
 
-    function correrSimulacionFase(salaNombre, io, pool) {
-        const sala = salasActivas[salaNombre];
-        if (!sala || sala.estado !== "JUGANDO") return;
-
-        let faseActual = "octavos";
-        if (sala.fixture.octavos.every(c => c.terminado)) faseActual = "cuartos";
-        if (faseActual === "cuartos" && sala.fixture.cuartos.length === 4 && sala.fixture.cuartos.every(c => c.terminado)) faseActual = "semi";
-        if (faseActual === "semi" && sala.fixture.semi.length === 2 && sala.fixture.semi.every(c => c.terminado)) faseActual = "final";
-        if (faseActual === "final" && sala.fixture.final.length === 1 && sala.fixture.final[0].terminado) {
-            finalizarTorneoCompleto(salaNombre, io, pool);
-            return;
-        }
-
-        // Generar la siguiente fase si corresponde
-        if (faseActual === "cuartos" && sala.fixture.cuartos.length === 0) {
-            const ganadores = sala.fixture.octavos.map(c => c.ganador);
-            for (let i = 0; i < 8; i += 2) sala.fixture.cuartos.push({ local: ganadores[i], visitante: ganadores[i+1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
-        } else if (faseActual === "semi" && sala.fixture.semi.length === 0) {
-            const ganadores = sala.fixture.cuartos.map(c => c.ganador);
-            for (let i = 0; i < 4; i += 2) sala.fixture.semi.push({ local: ganadores[i], visitante: ganadores[i+1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
-        } else if (faseActual === "final" && sala.fixture.final.length === 0) {
-            const ganadores = sala.fixture.semi.map(c => c.ganador);
-            sala.fixture.final.push({ local: ganadores[0], visitante: ganadores[1], golesLocal: 0, golesVisitante: 0, terminado: false, ganador: null });
-        }
-
-        // Simular los partidos pendientes de la fase actual usando la ventaja de Estrellas del Álbum
-        const partidosAVictimar = sala.fixture[faseActual].filter(c => !c.terminado);
-        
-        let min = 0;
-        const intervalo = setInterval(() => {
-            min += 15;
-            
-            partidosAVictimar.forEach(cruce => {
-                // Relación de probabilidades basada en el nivel de estrellas del álbum recopilado
-                const fuerzaLocal = cruce.local.estrellasPlantel || 1;
-                const fuerzaVisitante = cruce.visitante.estrellasPlantel || 1;
-
-                if (Math.random() * 100 < (fuerzaLocal * 8)) cruce.golesLocal++;
-                if (Math.random() * 100 < (fuerzaVisitante * 8)) cruce.golesVisitante++;
-            });
-
-            io.to(salaNombre).emit('actualizacionMinutoMundial', { fase: faseActual.toUpperCase(), minuto: min, fixture: sala.fixture });
-
-            if (min >= 90) {
-                clearInterval(intervalo);
-                partidosAVictimar.forEach(cruce => {
-                    // Desempate por penales simple si terminan igualados
-                    if (cruce.golesLocal === cruce.golesVisitante) {
-                        if (Math.random() > 0.5) cruce.golesLocal++; else cruce.golesVisitante++;
-                    }
-                    cruce.terminado = true;
-                    cruce.ganador = cruce.golesLocal > cruce.golesVisitante ? cruce.local : cruce.visitante;
-                });
-
-                io.to(salaNombre).emit('faseMundialConcluida', { fixture: sala.fixture });
-                
-                // Delay de 4 segundos entre fases para que los jugadores procesen el árbol de llaves
-                setTimeout(() => correrSimulacionFase(salaNombre, io, pool), 4000);
-            }
-        }, 800); // Velocidad supersónica de simulación televisada en directo
-    }
-
     async function finalizarTorneoCompleto(salaNombre, io, pool) {
         const sala = salasActivas[salaNombre];
         if (!sala) return;
@@ -1992,7 +2022,6 @@ function inicializarModuloMultijugador(io, pool) {
         let mensajeDestacado = `🏆 ¡EL MUNDIAL TERMINÓ! Campeón del Mundo: ${campeon.seleccion.toUpperCase()} (${campeon.username})`;
 
         try {
-            // Si el campeón es un jugador real (no un BOT), le transferimos todo el pozo acumulado
             if (!campeon.esBot) {
                 await pool.query("UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2", [sala.pozoTotal, campeon.usuarioId]);
                 mensajeDestacado += ` y se lleva el pozo de 💰 ${sala.pozoTotal} monedas de oro!`;
@@ -2001,14 +2030,7 @@ function inicializarModuloMultijugador(io, pool) {
             }
 
             await pool.query("UPDATE salas_multijugador SET estado = 'FINALIZADO' WHERE id = $1", [sala.dbId]);
-            
-            io.to(salaNombre).emit('mundialFinalizadoCompleto', {
-                ganadorId: campeon.usuarioId,
-                username: campeon.username,
-                mensaje: mensajeDestacado,
-                fixture: sala.fixture
-            });
-
+            io.to(salaNombre).emit('mundialFinalizadoCompleto', { ganadorId: campeon.usuarioId, username: campeon.username, mensaje: mensajeDestacado, fixture: sala.fixture });
         } catch (err) {
             console.error("❌ Error al cerrar premios del Mundial:", err.message);
         } finally {
