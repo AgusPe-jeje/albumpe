@@ -2137,68 +2137,142 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             consola.style.fontWeight = "bold";
             consola.innerText = "🏁 ¡Empate clavado! Los capitanes eligen pateadores... Todo se define en la tanda de penales.";
 
-            let pasoPenal = 0;
-            let penTuActuales = 0;
-            let penRivActuales = 0;
+            // 🎯 BANCO DE TEXTOS REACTIVOS
+            const relatosExito = [
+                "¡Fuerte al medio y adentro!", "¡La clavó al ángulo, imposible!", 
+                "Define cruzado, engañando por completo al uno.", "Enganchó un fustazo rasante pegado al palo."
+            ];
+            const relatosFallo = [
+                "¡ESPECTACULAR VOLADA DEL ARQUERO QUE LA SACA!", "¡Reventó el travesaño y la pelota salió volando!", 
+                "¡Remate muy mordido que se va desviado por la línea de fondo!", "¡Adivinó el arquero y la embolsó abajo!"
+            ];
 
-            let penTu = ganoUsuarioFinalEfectivo ? 5 : 3;
-            let penRiv = ganoUsuarioFinalEfectivo ? 4 : 5;
+            // 🧠 PRE-CALCULO DE LA TANDA COMPLETA (Blindaje matemático absoluto)
+            let historialTanda = [];
+            let tuScore = 0;
+            let rivScore = 0;
+            let ronda = 1;
+            let muerteSubitaActiva = false;
+
+            while (true) {
+                // Tiro del Usuario
+                let tuGanaEsteTiro = Math.random() <= 0.70;
+                // Si llegamos al límite decisivo, calibramos según el backend
+                if (ronda === 5 && !muerteSubitaActiva) {
+                    if (ganoUsuarioFinalEfectivo && tuScore < rivScore) tuGanaEsteTiro = true;
+                    if (!ganoUsuarioFinalEfectivo && tuScore >= rivScore) tuGanaEsteTiro = false;
+                }
+                if (tuGanaEsteTiro) tuScore++;
+
+                historialTanda.push({
+                    esUsuario: true,
+                    ronda: ronda,
+                    exito: tuGanaEsteTiro,
+                    scoreActual: `${tuScore} - ${rivScore}`,
+                    relato: tuGanaEsteTiro ? relatosExito[Math.floor(Math.random() * relatosExito.length)] : relatosFallo[Math.floor(Math.random() * relatosFallo.length)]
+                });
+
+                // Validar corte prematuro en la serie de 5
+                if (ronda <= 5 && !muerteSubitaActiva) {
+                    let tirosRestantesRiv = 5 - ronda;
+                    if (tuScore > rivScore + tirosRestantesRiv && ganoUsuarioFinalEfectivo) break;
+                    if (rivScore > tuScore + (5 - (ronda - 1)) && !ganoUsuarioFinalEfectivo) break;
+                }
+
+                // Tiro del Bot
+                let botGanaEsteTiro = Math.random() <= 0.70;
+                if (ronda === 5 && !muerteSubitaActiva) {
+                    if (ganoUsuarioFinalEfectivo && tuScore <= rivScore) botGanaEsteTiro = false;
+                    if (!ganoUsuarioFinalEfectivo && tuScore > rivScore) botGanaEsteTiro = true;
+                }
+                if (botGanaEsteTiro) rivScore++;
+
+                historialTanda.push({
+                    esUsuario: false,
+                    ronda: ronda,
+                    exito: botGanaEsteTiro,
+                    scoreActual: `${tuScore} - ${rivScore}`,
+                    relato: botGanaEsteTiro ? relatosExito[Math.floor(Math.random() * relatosExito.length)] : relatosFallo[Math.floor(Math.random() * relatosFallo.length)]
+                });
+
+                // Validaciones de corte final de ronda
+                if (ronda <= 5 && !muerteSubitaActiva) {
+                    let tirosRestantesTu = 5 - ronda;
+                    let tirosRestantesRiv = 5 - ronda;
+                    if (tuScore > rivScore + tirosRestantesRiv && ganoUsuarioFinalEfectivo) break;
+                    if (rivScore > tuScore + tirosRestantesTu && !ganoUsuarioFinalEfectivo) break;
+                    
+                    if (ronda === 5) {
+                        if (tuScore === rivScore) {
+                            muerteSubitaActiva = true; // Empate en los 5, se activa muerte súbita cosmética
+                        } else if ((tuScore > rivScore) === ganoUsuarioFinalEfectivo) {
+                            break;
+                        } else {
+                            // Re-ajuste si la aleatoriedad base cruzó el flag: extendemos una ronda más para que el bot/usuario lo de vuelta
+                            muerteSubitaActiva = true;
+                        }
+                    }
+                } else {
+                    // Lógica estricta de Muerte Súbita (Ronda 6+)
+                    if (tuScore !== rivScore) {
+                        if ((tuScore > rivScore) === ganoUsuarioFinalEfectivo) {
+                            break;
+                        }
+                    }
+                }
+                ronda++;
+            }
+
+            // 🎬 REPRODUCCIÓN EN PANTALLA CRONOLÓGICA DEL HISTORIAL PRE-CALCULADO
+            let indiceDisparo = 0;
+            let avisoMuerteSubitaMostrado = false;
 
             const intervaloPenales = setInterval(() => {
-                pasoPenal++;
-                if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
-
-                if (pasoPenal === 1) {
-                    penTuActuales++;
-                    consola.innerText = `👟 [PENALES] Arranca ejecutando ${tuPais.toUpperCase()}... ¡Fuerte al medio y adentro! (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 2) {
-                    penRivActuales++;
-                    consola.innerText = `👟 [PENALES] Turno de ${rival.toUpperCase()}... Define cruzado, inalcanzable. (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 3) {
-                    penTuActuales++;
-                    consola.innerText = `👟 [PENALES] Va el segundo remate tuyo... ¡Pegó en el palo y entró! (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 4) {
-                    if (ganoUsuarioFinalEfectivo) {
-                        consola.innerText = `🧤 [PENALES] Remata el bot... ¡ESPECTACULAR VOLADA DE TU ARQUERO! (${penTuActuales} - ${penRivActuales})`;
-                    } else {
-                        penRivActuales++;
-                        consola.innerText = `👟 [PENALES] Remata el bot... Colocada junto al palo derecho. (${penTuActuales} - ${penRivActuales})`;
-                    }
-                } else if (pasoPenal === 5) {
-                    if (ganoUsuarioFinalEfectivo) {
-                        penTuActuales++;
-                        consola.innerText = `👟 [PENALES] Tercer penal de la serie para vos... ¡Al ángulo! (${penTuActuales} - ${penRivActuales})`;
-                    } else {
-                        consola.innerText = `👟 [PENALES] Tercer penal de la serie para vos... ¡Por arriba del travesaño! (${penTuActuales} - ${penRivActuales})`;
-                    }
-                } else if (pasoPenal === 6) {
-                    penRivActuales++;
-                    consola.innerText = `👟 [PENALES] Ejecuta el bot rival... Gol, engañando por completo. (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 7) {
-                    penTuActuales++;
-                    consola.innerText = `👟 [PENALES] Cuarto remate tuyo... ¡Golazo de zurda al ángulo! (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 8) {
-                    penRivActuales++;
-                    consola.innerText = `👟 [PENALES] El central de ${rival.toUpperCase()} acomoda la pelota... Gol. (${penTuActuales} - ${penRivActuales})`;
-                } else if (pasoPenal === 9) {
-                    if (ganoUsuarioFinalEfectivo) {
-                        penTuActuales++;
-                        consola.innerText = `👟 [PENALES] ¡Último penal regular para vos! Cruzado... ¡GOOOL! (${penTuActuales} - ${penRivActuales})`;
-                    } else {
-                        consola.innerText = `👟 [PENALES] ¡Último penal regular para vos! ¡Atajó el arquero bot abajo! (${penTuActuales} - ${penRivActuales})`;
-                    }
-                } else if (pasoPenal === 10) {
+                if (indiceDisparo >= historialTanda.length) {
                     clearInterval(intervaloPenales);
-                    if (ganoUsuarioFinalEfectivo) {
-                        consola.style.color = "var(--verde-match)";
-                        consola.innerText = `🧤 [TANDA FINAL] El delantero de ${rival.toUpperCase()} patea exigido... ¡LA ADIVINASTE! ¡TAPÓ EL ARQUERO! (PENALES: ${penTu} - ${penRiv})`;
-                    } else {
-                        consola.style.color = "var(--rojo)";
-                        consola.innerText = `💥 [TANDA FINAL] El capitán de ${rival.toUpperCase()} fusila sin piedad al medio. Gol. (PENALES: ${penTu} - ${penRiv})`;
-                    }
-                    setTimeout(() => finalizarPartidoDirecto(true, penTu, penRiv), 2500);
+                    finalizarTanda();
+                    return;
                 }
-            }, 1200);
+
+                if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+                
+                const disparo = historialTanda[indiceDisparo];
+
+                // Cartel intermedio si entramos en la sección de muerte súbita
+                if (disparo.ronda > 5 && !avisoMuerteSubitaMostrado) {
+                    avisoMuerteSubitaMostrado = true;
+                    consola.style.color = "var(--celeste)";
+                    consola.innerText = `🚨 [MUERTE SÚBITA] ¡Serie empatada! Ahora se ejecuta uno y uno hasta romper la paridad...`;
+                    return; // Pausa un ciclo para que el usuario lea el impacto de la muerte súbita
+                }
+
+                if (disparo.esUsuario) {
+                    if (disparo.exito) {
+                        consola.innerText = `緣 [PENAL ${disparo.ronda}] Ejecuta ${tuPais.toUpperCase()}... ${disparo.relato} (${disparo.scoreActual})`;
+                    } else {
+                        consola.innerText = `❌ [PENAL ${disparo.ronda}] Ejecuta ${tuPais.toUpperCase()}... ${disparo.relato} (${disparo.scoreActual})`;
+                    }
+                } else {
+                    if (disparo.exito) {
+                        consola.innerText = `🤖 [PENAL ${disparo.ronda}] Turno de ${rival.toUpperCase()}... ${disparo.relato} (${disparo.scoreActual})`;
+                    } else {
+                        consola.innerText = `🧤 [PENAL ${disparo.ronda}] Turno de ${rival.toUpperCase()}... ${disparo.relato} (${disparo.scoreActual})`;
+                    }
+                }
+
+                indiceDisparo++;
+            }, 1300);
+
+            function finalizarTanda() {
+                if (ganoUsuarioFinalEfectivo) {
+                    consola.style.color = "var(--verde-match)";
+                    consola.innerText = `👑 [TANDA FINAL] ¡SE TERMINÓ! Tu arquero se viste de héroe y sella la clasificación. (PENALES: ${tuScore} - ${rivScore})`;
+                } else {
+                    consola.style.color = "var(--rojo)";
+                    consola.innerText = `💥 [TANDA FINAL] El arquero bot adivina la intención. Fin de la ilusión mundialista. (PENALES: ${tuScore} - ${rivScore})`;
+                }
+                setTimeout(() => finalizarPartidoDirecto(true, tuScore, rivScore), 2500);
+            }
         }
 
         function finalizarPartidoDirecto(fueEnPenales = false, pTu = 0, pRiv = 0) {
