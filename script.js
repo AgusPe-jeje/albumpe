@@ -1662,7 +1662,6 @@ function actualizarEstrellasVisualesDraft() {
 }
 
 async function ejecutarTorneoMundial() {
-    // Si no hay 3 jugadores elegidos en el Draft local, frena
     if (jugadoresSeleccionadosDraft.length !== 3) return alert("❌ Completá la alineación de 3 jugadores.");
 
     mostrarCarga("Pidiendo autorización de planilla a la FIFA...");
@@ -1676,11 +1675,12 @@ async function ejecutarTorneoMundial() {
                   jugadorIds: jugadoresSeleccionadosDraft
              }) 
         });
-        const data = await res.json(); ocultarCarga();
+        const data = await res.json(); 
+        ocultarCarga();
 
         if (!data.ok) return alert(data.mensaje);
 
-        // 🎯 SECTOR MISIONES API: Corregido al tipo exacto del backend ("mundial_partidos")
+        // 🎯 SECTOR MISIONES API: Trackeo correcto
         if (typeof trackearProgresoMision === 'function') {
              await trackearProgresoMision("mundial_partidos", 1);
         }
@@ -1691,24 +1691,21 @@ async function ejecutarTorneoMundial() {
         const contenedorLista = document.getElementById("lista-cruces-mundial-simulacion");
         contenedorLista.innerHTML = "";
 
-        if (!data.progreso.ganoClasificacion) {
-             contenedorLista.innerHTML = `<div class="item-historial-partido" style="color:var(--rojo); border-color:var(--rojo); text-align:center;"><span>❌ Quedaste afuera por falta de puntos en eliminatorias.</span></div>`;
-             usuarioActual.monedas = data.datosActualizados?.monedas || usuarioActual.monedas;
-             actualizarInterfazUI(); chequearEstadoMundialServer(); liberarNavegacionArenaUI(); return;
-        }
-
+        // 📊 ESTRUCTURA DE LA TABLA EN VIVO DE GRUPOS
         const wrapperTabla = document.createElement("div");
         wrapperTabla.style.cssText = "background:rgba(0,0,0,0.4); padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid #1a2436;";
         wrapperTabla.innerHTML = `<h4 style="color:var(--dorado); margin:0 0 10px 0; font-family:'Oswald'; text-align:center;">📊 TABLA EN VIVO</h4><table style="width:100%; border-collapse:collapse; text-align:center; font-weight:bold;"><thead><tr style="color:#64748b; font-size:0.85rem;"><th>POS</th><th style="text-align:left;">SELECCIÓN</th><th>GF</th><th>GC</th><th>PTS</th></tr></thead><tbody id="tbody-tabla-grupo-live"></tbody></table>`;
         contenedorLista.appendChild(wrapperTabla);
 
         const renderizarTablaGrupoLive = (tablaEstado) => {
-             const tbody = document.getElementById("tbody-tabla-grupo-live"); if (!tbody) return;
+             const tbody = document.getElementById("tbody-tabla-grupo-live"); 
+             if (!tbody) return;
              let listaOrdenada = Object.values(tablaEstado).sort((a,b) => b.pts !== a.pts ? b.pts - a.pts : (b.gf - b.gc) - (a.gf - a.gc));
              tbody.innerHTML = "";
              listaOrdenada.forEach((fila, idx) => {
                   const esTuPais = fila.pais === window.mundialSeleccionUsuario;
-                  const tr = document.createElement("tr"); tr.style.color = esTuPais ? "var(--verde-match)" : "#fff";
+                  const tr = document.createElement("tr"); 
+                  tr.style.color = esTuPais ? "var(--verde-match)" : "#fff";
                   tr.innerHTML = `<td style="padding:6px 0; color:${idx < 2 ? 'var(--verde-match)':'var(--rojo)'};">${idx + 1}</td><td style="text-align:left;">⚽ ${fila.pais.toUpperCase()}</td><td>${fila.gf}</td><td>${fila.gc}</td><td style="color:var(--dorado);">${fila.pts}</td>`;
                   tbody.appendChild(tr);
              });
@@ -1720,13 +1717,14 @@ async function ejecutarTorneoMundial() {
 
         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
-        // SIMULACIÓN CRONOLÓGICA DE LA FASE DE GRUPOS
+        // 📅 SIMULACIÓN CRONOLÓGICA DE LA FASE DE GRUPOS
         for (let f = 0; f < data.progreso.bitacoraGrupo.length; f++) {
              const fechaData = data.progreso.bitacoraGrupo[f];
              const divFecha = document.createElement("div");
              divFecha.style.cssText = "background:#0b111e; padding:12px; border-radius:8px; border-left:4px solid var(--celeste); margin-bottom:15px;";
-             divFecha.innerHTML = `<div style="color:var(--celeste); font-size:0.9rem; font-weight:bold;">📅 FECHA ${fechaData.fecha}</div><div style="display:flex; justify-content:space-between;"><span>🇺🇾 ${fechaData.local} vs ${fechaData.visitante}</span><span id="goles-m1-f${f}" style="color:var(--verde-match); font-weight:bold;">0 - 0</span></div><div style="display:flex; justify-content:space-between;"><span>🤖 ${fechaData.botL} vs ${fechaData.botV}</span><span id="goles-m2-f${f}" style="color:#aaa;">0 - 0</span></div><div id="reloj-f${f}" style="text-align:center; font-size:0.8rem; color:#64748b;">⏱️ 00:00</div>`;
-             contenedorLista.appendChild(divFecha); divFecha.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+             divFecha.innerHTML = `<div style="color:var(--celeste); font-size:0.9rem; font-weight:bold;">📅 FECHA ${fechaData.fecha}</div><div style="display:flex; justify-content:space-between;"><span>⚽ ${fechaData.local} vs ${fechaData.visitante}</span><span id="goles-m1-f${f}" style="color:var(--verde-match); font-weight:bold;">0 - 0</span></div><div style="display:flex; justify-content:space-between;"><span>🤖 ${fechaData.botL} vs ${fechaData.botV}</span><span id="goles-m2-f${f}" style="color:#aaa;">0 - 0</span></div><div id="reloj-f${f}" style="text-align:center; font-size:0.8rem; color:#64748b;">⏱️ 00:00</div>`;
+             contenedorLista.appendChild(divFecha); 
+             divFecha.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
              await new Promise((resolveFecha) => {
                   let segV = 0; let g1_L = 0; let g1_V = 0; let g2_L = 0; let g2_V = 0;
@@ -1768,16 +1766,20 @@ async function ejecutarTorneoMundial() {
              });
         }
 
+        // 🛑 EVALUACIÓN REAL DE CLASIFICACIÓN A PLAYOFFS
         if (!data.progreso.clasifico) {
              const cartelEliminado = document.createElement("div");
-             cartelEliminado.style.cssText = "text-align:center; padding:15px; border:2px solid var(--rojo); color:var(--rojo); font-weight:bold; border-radius:8px;";
+             cartelEliminado.style.cssText = "text-align:center; padding:15px; border:2px solid var(--rojo); color:var(--rojo); font-weight:bold; border-radius:8px; margin-top: 15px;";
              cartelEliminado.innerText = `❌ Quedaste fuera en Grupos (Puesto #${data.progreso.posicionFinalGrupo}).`;
              contenedorLista.appendChild(cartelEliminado);
              usuarioActual.monedas = data.datosActualizados?.monedas || usuarioActual.monedas;
-             actualizarInterfazUI(); chequearEstadoMundialServer(); liberarNavegacionArenaUI(); return;
+             actualizarInterfazUI(); 
+             chequearEstadoMundialServer(); 
+             liberarNavegacionArenaUI(); 
+             return;
         }
 
-        // REPRODUCCIÓN CRONOLÓGICA DE PLAYOFFS ELIMINATORIOS
+        // 🏆 REPRODUCCIÓN DE LOS PLAYOFFS (SI CLASIFICASTE)
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
              const partido = data.progreso.bitacoraPlayoffs[i];
              const ganoEsteCruce = partido.resultado.includes("Ganaste");
@@ -1789,9 +1791,9 @@ async function ejecutarTorneoMundial() {
              const corona = document.createElement("div");
              corona.style.cssText = "text-align:center; margin-top:20px; color:var(--dorado); font-size:1.4rem; font-weight:bold;";
              corona.innerText = "🏆 ¡CAMPEÓN DEL MUNDO! 🏆\n🎁 ¡Premio de 5.000 de Oro depositado!";
-             contenedorLista.appendChild(corona); corona.scrollIntoView({ behavior: 'smooth' });
+             contenedorLista.appendChild(corona); 
+             corona.scrollIntoView({ behavior: 'smooth' });
 
-             // 🎯 SECTOR MISIONES API: Impactamos las 5.000 monedas ganadas offline
              if (typeof trackearProgresoMision === 'function') {
                   await trackearProgresoMision("acumular_oro", 5000);
              }
@@ -1801,10 +1803,16 @@ async function ejecutarTorneoMundial() {
              usuarioActual.monedas = data.datosActualizados.monedas;
              usuarioActual.puntos_ranking = data.datosActualizados.puntos_ranking;
              usuarioActual.copas_mundiales = data.datosActualizados.copas_mundiales;
-             actualizarInterfazUI(); cargarRankingMundialesLocal();
+             actualizarInterfazUI(); 
+             if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
         }
-        chequearEstadoMundialServer(); liberarNavegacionArenaUI();
-    } catch (err) { console.error(err); ocultarCarga(); liberarNavegacionArenaUI(); }
+        chequearEstadoMundialServer(); 
+        liberarNavegacionArenaUI();
+    } catch (err) { 
+        console.error(err); 
+        ocultarCarga(); 
+        liberarNavegacionArenaUI(); 
+    }
 }
 
 // 🎭 BANCO MUNDIAL DE INCIDENCIAS INTERACTIVAS (RELATOS Y DECISIONES TÁCTICAS)
