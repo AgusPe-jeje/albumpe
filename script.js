@@ -1914,12 +1914,10 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 </span>
             </div>
 
-            <!-- 🎙️ CONSOLA DE RELATOS -->
             <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px; line-height: 1.4; transition: background 0.3s, color 0.3s;">
-                ⚽ El árbitro da la orden... ¡Comienzan los cruces de eliminación directa!
+                ⚽ El árbitro da la orden... ¡Comienzan los cruces de elimination directa!
             </div>
 
-            <!-- 👔 MÓDULO INTERACTIVO DE DECISIONES TÁCTICAS -->
             <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center; box-shadow: 0 0 15px rgba(255,177,0,0.15);">
                 <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald'; font-size:1.1rem; letter-spacing:0.5px;">🚨 JUGADA EN CURSO</h4>
                 <p id="evento-texto-${idUnico}" style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px; text-align:left;"></p>
@@ -1943,7 +1941,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         const promedioDraft = cartasElegidas.reduce((acc, c) => acc + MAPA_PUNTOS_RAREZA[c.rareza.toLowerCase()], 0) / 3;
         const esPartidoDefensivo = promedioDraft < 72;
 
-        // ⏱️ MOTOR ACELERADO: 550ms por minuto virtual (Playoffs en ~50 Segundos)
+        // ⏱️ MOTOR ACELERADO: 550ms por minuto virtual (~50 Segundos por partido)
         const timer = setInterval(() => {
             if (partidoPausado) return;
 
@@ -1952,50 +1950,38 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
             document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-            // 🎯 PROCESAMIENTO SIMULTÁNEO SEGURO DE TU EQUIPO
+            // 🎯 GOL TUYO PROGRAMADO POR EL BACKEND
             if (cronogramaGolesTu.includes(segundoVirtual)) {
                 cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
                 
-                let tipoVisual = Math.random();
-                if (tipoVisual <= 0.35) {
-                    // 👔 Jugada Interactiva a favor (Ganas sí o sí porque el gol está pactado por backend)
-                    const llavesAtaque = ["penal_favor", "corner_favor", "tirolibre_favor", "contrataque_favor"];
-                    const jugada = llavesAtaque[Math.floor(Math.random() * llavesAtaque.length)];
-                    ejecutarPausaEstratégica(jugada, true, true);
-                } else if (tipoVisual <= 0.60) {
-                    // 🖥️ Momento VAR Convalidado
-                    ejecutarMomentoVAR(true, true);
+                // 🎲 35% de probabilidad de que tu gol pase por el VAR
+                if (Math.random() <= 0.35) {
+                    const seConvalida = Math.random() <= 0.50; // 50/50 de éxito o anulación
+                    ejecutarMomentoVAR(true, seConvalida);
                 } else {
-                    // ⚽ Gol ordinario directo
+                    // Gol limpio directo sin interrupción tecnológica
                     golesTuActuales++;
                     dispararEstimulantesImpacto(`⚽ ¡GOOOL DE ${tuPais.toUpperCase()}! Impresionante zapatazo que se clava en la red.`);
                 }
             }
 
-            // 🤖 PROCESAMIENTO SIMULTÁNEO SEGURO DEL RIVAL
+            // 🤖 GOL RIVAL PROGRAMADO POR EL BACKEND
             if (cronogramaGolesRival.includes(segundoVirtual)) {
                 cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
 
-                // 🛡️ ANTI-SUPERPOSICIÓN: Si vos también hacías un gol en este minuto, lo retrasamos 2.5 segundos reales
+                // 🛡️ ANTI-SUPERPOSICIÓN DE CARTELERAS
                 const arrancaConDelay = partidoPausado; 
 
                 setTimeout(() => {
-                    // Esperamos a que cualquier pausa previa termine antes de mandar el gol rival
                     const checkYDispararRival = () => {
                         if (partidoPausado) {
-                            setTimeout(checkYDispararRival, 500);
+                            setTimeout(checkYDispararRival, 400);
                         } else {
-                            let tipoVisualRival = Math.random();
-                            if (tipoVisualRival <= 0.30) {
-                                // 👔 Jugada Interactiva de Defensa (Fallas la defensa porque el gol rival está pactado)
-                                const llavesDefensa = ["defensa_urgente", "atajar_penal"];
-                                const jugada = llavesDefensa[Math.floor(Math.random() * llavesDefensa.length)];
-                                ejecutarPausaEstratégica(jugada, false, false);
-                            } else if (tipoVisualRival <= 0.55) {
-                                // 🖥️ Momento VAR Convalidado para el Rival
-                                ejecutarMomentoVAR(false, true);
+                            // 🎲 35% de probabilidad de que el gol del bot pase por el VAR
+                            if (Math.random() <= 0.35) {
+                                const seConvalidaRival = Math.random() <= 0.50; // 50/50 igualitario
+                                ejecutarMomentoVAR(false, seConvalidaRival);
                             } else {
-                                // ⚽ Gol ordinario directo del rival
                                 golesRivalActuales++;
                                 dispararEstimulantesImpacto(`💥 Gol de ${rival.toUpperCase()}. El delantero define cruzado e inalcanzable.`);
                             }
@@ -2047,31 +2033,38 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
         }
 
-        // 🖥️ SUB-MOTOR DE CONTROL DE VAR (Sincronizado al Score)
+        // 🖥️ SUB-MOTOR DE CONTROL DE VAR REAL (Se gatilla antes de subir al marcador)
         function ejecutarMomentoVAR(esAtaqueFavor, seConvalidaGol) {
             partidoPausado = true;
             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
-            const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
+            const equipoQueMarcaba = esAtaqueFavor ? tuPais.toUpperCase() : rival.toUpperCase();
 
             consola.style.background = "#451a03";
-            consola.innerHTML = `🚨 El árbitro detiene el juego de golpe y se lleva la mano al oído. <span class="badge-var-live">🖥️ REVISANDO VAR</span>`;
+            consola.style.color = "#fff";
+            consola.innerHTML = `🚨 ¡Se gritaba gol de ${equipoQueMarcaba}! Pero el árbitro detiene el festejo y se lleva la mano al oído. <span class="badge-var-live">🖥️ REVISANDO VAR</span>`;
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
             setTimeout(() => {
-                consola.innerText = "🖥️ Se analiza una posible infracción milimétrica en el inicio de la jugada de peligro...";
-            }, 2500);
+                consola.innerText = "🖥️ Los asistentes trazan las líneas digitales de fuera de juego... Hay suspenso extremo.";
+            }, 2300);
 
             setTimeout(() => {
                 if (seConvalidaGol) {
+                    // Si el VAR da luz verde, RECIÉN AHÍ alteramos la variable del marcador
                     if (esAtaqueFavor) golesTuActuales++; else golesRivalActuales++;
+                    
                     consola.style.background = "rgba(34, 197, 94, 0.15)";
                     consola.style.color = "var(--verde-match)";
-                    consola.innerText = `🏁 ¡GOL VÁLIDO! El VAR confirma que no hubo anomalías. ¡Se grita con el alma!`;
-                    scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
+                    consola.innerText = `🏁 ¡GOL TOTALMENTE LÍCITO! El VAR confirma la posición habilitada de ${equipoQueMarcaba}.`;
+                    
+                    // Dispara el destello de pantalla y actualiza la UI
+                    dispararEstimulantesImpacto(consola.innerText);
                 } else {
+                    // Si se anula, el marcador queda intacto y cambia a diseño de advertencia
                     consola.style.background = "rgba(239, 68, 68, 0.15)";
                     consola.style.color = "var(--rojo)";
-                    consola.innerText = `❌ ¡ANULADO POR EL VAR! Se detectó infracción previa y el juego se reanuda con tiro libre.`;
+                    consola.innerText = `❌ ¡ANULADO POR EL VAR! Se detectó un fuera de juego milimétrico de ${equipoQueMarcaba}. El gol NO sube al marcador.`;
+                    if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
                 }
 
                 setTimeout(() => {
@@ -2079,7 +2072,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                     consola.style.color = "#cbd5e1";
                     partidoPausado = false;
                 }, 2500);
-            }, 5000);
+            }, 4500);
         }
 
         // 🏆 TANDA DE PENALES
@@ -2125,9 +2118,8 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             }, 1500);
         }
 
-        // FINALIZADOR DE UI LIMPIO (No pisa los goles reales)
+        // FINALIZADOR DE UI LIMPIO
         function finalizarPartidoDirecto(fueEnPenales = false, pTu = 0, pRiv = 0) {
-            // Ajuste seguro: Sincroniza visualmente al valor exacto final por si las dudas
             document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
 
             filaPartido.style.borderColor = ganoUsuario ? "var(--verde-match)" : "var(--rojo)";
@@ -2141,60 +2133,6 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             
             filaPartido.appendChild(finLabel);
             resolve();
-        }
-
-        // 👔 PAUSA ESTRATÉGICA INTERACTIVA SCONIZADA
-        function ejecutarPausaEstratégica(tipoLlave, esAtaque, debeSerGol) {
-            partidoPausado = true;
-            const ev = CATALOGO_EVENTOS_MUNDIAL[tipoLlave];
-            const modulo = document.getElementById(`modulo-interactivo-${idUnico}`);
-            const txtTitulo = document.getElementById(`evento-titulo-${idUnico}`);
-            const txtCuerpo = document.getElementById(`evento-texto-${idUnico}`);
-            const contenedorOpciones = document.getElementById(`evento-opciones-${idUnico}`);
-
-            txtTitulo.innerText = ev.titulo;
-            txtCuerpo.innerText = ev.relato;
-            contenedorOpciones.innerHTML = "";
-            modulo.style.display = "block";
-
-            ev.opciones.forEach(opc => {
-                const btn = document.createElement("button");
-                btn.className = "btn-estadio";
-                btn.style.cssText = "padding:8px 12px; font-size:0.8rem; background:#1e293b; color:#fff; width:100%; text-align:left; border-radius:5px; border:1px solid #334155; cursor:pointer;";
-                btn.innerText = `💥 ${opc.texto}`;
-
-                btn.onclick = () => {
-                    modulo.style.display = "none";
-
-                    if (debeSerGol) {
-                        if (esAtaque) {
-                            golesTuActuales++;
-                            dispararEstimulantesImpacto(`🎉 ${opc.okTexto}`);
-                        } else {
-                            golesRivalActuales++;
-                            dispararEstimulantesImpacto(`❌ ${opc.badTexto}`);
-                        }
-                    } else {
-                        // Acciones que salvan o desperdician jugadas sin alterar el marcador fijo
-                        if (esAtaque) {
-                            document.getElementById(`consola-incidencias-${idUnico}`).style.color = "var(--rojo)";
-                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `❌ ${opc.badTexto}`;
-                        } else {
-                            document.getElementById(`consola-incidencias-${idUnico}`).style.color = "var(--verde-match)";
-                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `🎉 ${opc.okTexto}`;
-                        }
-                    }
-
-                    document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-                    
-                    setTimeout(() => {
-                        const caja = document.getElementById(`consola-incidencias-${idUnico}`);
-                        if (caja) { caja.style.color = "#cbd5e1"; caja.style.fontWeight = "normal"; }
-                        partidoPausado = false;
-                    }, 2000);
-                };
-                contenedorOpciones.appendChild(btn);
-            });
         }
     });
 }
