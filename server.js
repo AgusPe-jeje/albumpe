@@ -1174,6 +1174,143 @@ app.post('/api/misiones/reclamar', verificarToken, async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Error en cobro de misiones." }); }
 });
 
+// ========================================================================
+// 🦾 BOT COMERCIANTE: POOL DE CONTRATOS EXPANDIDO Y VIGENTE
+// ========================================================================
+const POOL_GLOBAL_SBC = [
+    // 🇦🇷 ARGENTINA (Fácil de completar con duplicados comunes y raros)
+    { id: 101, titulo: "⚔️ DESAFÍO ALBICELESTE", descripcion: "Entregá 3 jugadores COMUNES de ARGENTINA.", requisitos: { cantidad: 3, rareza: "comun", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 1500 } },
+    { id: 107, titulo: "🔥 POTENCIA DE LIGA LOCAL", descripcion: "El Bot busca 2 cartas RARAS nacidas en ARGENTINA.", requisitos: { cantidad: 2, rareza: "rara", pais: "argentina" }, recompensa: { tipo: "oro_directo", valor: 2500 } },
+
+    // 🇧🇷 BRASIL (Ideal para quemar esas copas épicas o armar economías)
+    { id: 102, titulo: "🇧🇷 JOGO BONITO TRADER", descripcion: "El Bot busca 2 cracks de rareza ÉPICA de BRASIL.", requisitos: { cantidad: 2, rareza: "epica", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 3500 } },
+    { id: 108, titulo: "🌴 SAMBA DE INTERCAMBIO", descripcion: "Sacrificá 3 cartas COMUNES nacidas en BRASIL.", requisitos: { cantidad: 3, rareza: "comun", pais: "brasil" }, recompensa: { tipo: "oro_directo", valor: 1200 } },
+
+    // 🇫🇷 FRANCIA (Consistente para balancear con cartas intermedias y tops)
+    { id: 103, titulo: "🇪🇺 MURALLA EUROPEA", descripcion: "Sacrificá 3 jugadores RAROS nacidos en FRANCIA.", requisitos: { cantidad: 3, rareza: "rara", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 5000 } },
+    { id: 109, titulo: "🐓 GALOS DE ÉLITE", descripcion: "El Bot exige 2 estrellas de rareza ÉPICA de FRANCIA.", requisitos: { cantidad: 2, rareza: "epica", pais: "francia" }, recompensa: { tipo: "oro_directo", valor: 4200 } },
+
+    // 🏴󠁧󠁢󠁥󠁮󠁧󠁿 INGLATERRA (Recompensas pesadas para el end-game)
+    { id: 104, titulo: "🦁 ORGULLO INGLÉS", descripcion: "Entregá 2 cracks de rareza LEGENDARIA nacidos en INGLATERRA.", requisitos: { cantidad: 2, rareza: "legendaria", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 8000 } },
+    { id: 110, titulo: "🛡️ ACADEMIA DE LONDRES", descripcion: "Buscamos 3 cartas RARAS nacidas en INGLATERRA.", requisitos: { cantidad: 3, rareza: "rara", pais: "inglaterra" }, recompensa: { tipo: "oro_directo", valor: 3800 } },
+
+    // 🇪🇸 ESPAÑA (Alineado a tus cartas reales en la Arena)
+    { id: 105, titulo: "🇪🇸 FURIA ROJA DE INTERCAMBIO", descripcion: "El Bot exige 3 jugadores RAROS nacidos en ESPAÑA.", requisitos: { cantidad: 3, rareza: "rara", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 3000 } },
+    { id: 111, titulo: "🪄 TOQUE MEDITERRÁNEO", descripcion: "Entregá 2 jugadores COMUNES nacidos en ESPAÑA.", requisitos: { cantidad: 2, rareza: "comun", pais: "españa" }, recompensa: { tipo: "oro_directo", valor: 1000 } },
+
+    // 🇮🇹 ITALIA (Ajustado a tus bases de datos para que sea 100% posible)
+    { id: 106, titulo: "🇮🇹 CANDADO AZZURRO", descripcion: "Sacrificá 3 jugadores COMUNES nacidos en ITALIA.", requisitos: { cantidad: 3, remove: "comun", pais: "italia" }, requisitos: { cantidad: 3, rareza: "comun", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 1400 } },
+    { id: 112, titulo: "🏛️ GLADIADORES PREMIUM", descripcion: "El comerciante busca 2 cartas RARAS nacidas en ITALIA.", requisitos: { cantidad: 2, rareza: "rara", pais: "italia" }, recompensa: { tipo: "oro_directo", valor: 2800 } }
+];
+
+// 🔄 FUNCIÓN MATEMÁTICA: Devuelve el número de semana del año calendario actual
+function obtenerNumeroSemanaActual() {
+    const ahora = new Date();
+    const principioDeAño = new Date(ahora.getFullYear(), 0, 1);
+    const milisegundosPasados = ahora - principioDeAño;
+    const diasPasados = Math.floor(milisegundosPasados / (1000 * 60 * 60 * 24));
+    return Math.ceil((diasPasados + principioDeAño.getDay() + 1) / 7);
+}
+
+// 🔄 FUNCIÓN FILTRADORA: Elige dinámicamente qué contratos mostrar esta semana
+function obtenerContratosDeLaSemana() {
+    const numeroSemana = obtenerNumeroSemanaActual();
+    const cantidadAExhibir = 2; // Cuántos contratos querés activos en simultáneo
+    
+    const contratosRotativos = [];
+    for (let i = 0; i < cantidadAExhibir; i++) {
+        const indiceCalculado = (numeroSemana + i) % POOL_GLOBAL_SBC.length;
+        contratosRotativos.push(POOL_GLOBAL_SBC[indiceCalculado]);
+    }
+    return contratosRotativos;
+}
+
+// 2️⃣ Endpoint Actualizado: Devuelve solo los contratos que tocan esta semana
+app.get('/api/contratos/activo', verificarToken, (req, res) => {
+    const contratosActivos = obtenerContratosDeLaSemana();
+    res.json({ ok: true, contratos: contratosActivos });
+});
+
+// 3️⃣ Endpoint Atómico de Procesamiento (Corregido contra explotación de duplicados)
+app.post('/api/contratos/completar', verificarToken, async (req, res) => {
+    const usuarioId = req.usuarioLogueado.id;
+    const { contratoId, jugadorIds } = req.body;
+
+    // 🛡️ IMPORTANTE: El usuario solo puede completar un contrato si está en la rotación activa actual
+    const contratosPermitidosHoy = obtenerContratosDeLaSemana();
+    const contratoElegido = contratosPermitidosHoy.find(c => c.id === Number(contratoId));
+    
+    if (!contratoElegido) {
+        return res.status(404).json({ ok: false, mensaje: "❌ Este contrato no está disponible en la cartelera de esta semana." });
+    }
+
+    const reqConfig = contratoElegido.requisitos;
+
+    if (!jugadorIds || !Array.isArray(jugadorIds) || jugadorIds.length !== reqConfig.cantidad) {
+        return res.status(400).json({ ok: false, mensaje: `⚠️ Debés seleccionar exactamente ${reqConfig.cantidad} jugadores.` });
+    }
+
+    // Mapeamos cuántas copias de cada ID quiere entregar (Evita bugs si manda el mismo ID repetido varias veces)
+    const mapaConteoPases = {};
+    jugadorIds.forEach(id => {
+        mapaConteoPases[id] = (mapaConteoPases[id] || 0) + 1;
+    });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Procesamos la verificación sobre el mapa agrupado de IDs únicos
+        for (const [jId, cantidadAEntregar] of Object.entries(mapaConteoPases)) {
+            const queryJugador = "SELECT nombre, pais, rareza FROM jugadores WHERE id = $1";
+            const jugRes = await client.query(queryJugador, [jId]);
+
+            if (jugRes.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.json({ ok: false, mensaje: "❌ Uno de los jugadores no existe en la Arena." });
+            }
+
+            const j = jugRes.rows[0];
+            if (j.rareza.toLowerCase() !== reqConfig.rareza.toLowerCase() || j.pais.toLowerCase() !== reqConfig.pais.toLowerCase()) {
+                await client.query('ROLLBACK');
+                return res.json({ ok: false, mensaje: `❌ ${j.nombre.toUpperCase()} no cumple los requisitos vigentes.` });
+            }
+
+            const queryProgreso = "SELECT cantidad FROM usuario_progreso WHERE usuario_id = $1 AND jugador_id = $2";
+            const progRes = await client.query(queryProgreso, [usuarioId, jId]);
+            const cantidadDisponible = progRes.rows[0]?.cantidad || 0;
+
+            // La cantidad restante después de entregar NO puede ser menor a 1 (para retener la carta base en el álbum)
+            if (cantidadDisponible - cantidadAEntregar < 1) {
+                await client.query('ROLLBACK');
+                return res.json({ ok: false, mensaje: `❌ No tenés copias REPETIDAS suficientes de ${j.nombre.toUpperCase()} para cubrir la planilla.` });
+            }
+        }
+
+        // Si todas las validaciones pasaron, descontamos las unidades reales indicadas en el conteo
+        for (const [jId, cantidadAEntregar] of Object.entries(mapaConteoPases)) {
+            await client.query(
+                `UPDATE usuario_progreso SET cantidad = cantidad - $1 WHERE usuario_id = $2 AND jugador_id = $3`, 
+                [cantidadAEntregar, usuarioId, jId]
+            );
+        }
+
+        const premioOro = contratoElegido.recompensa.valor;
+        const userRes = await client.query(`UPDATE usuarios SET monedas = monedas + $1 WHERE id = $2 RETURNING monedas`, [premioOro, usuarioId]);
+        const nuevoOroTotal = userRes.rows[0].monedas;
+
+        await client.query('COMMIT');
+        res.json({ ok: true, nuevoOro: nuevoOroTotal, mensaje: `💪 ¡CONTRATO CERRADO! El Bot procesó la rotación y te acreditó 🪙 ${premioOro} de Oro.` });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Error interno en la transacción de contratos:", err);
+        res.status(500).json({ ok: false, error: "Error interno en los servidores." });
+    } finally {
+        client.release();
+    }
+});
+
 /* ========================================================================
    🎁 RECOMPENSAS DIARIAS (ZONA HORARIA BSAS)
    ======================================================================== */
