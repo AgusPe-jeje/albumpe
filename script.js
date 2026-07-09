@@ -4764,62 +4764,68 @@ function prepararFaseDraftUI() {
             return;
         }
 
-        // Grilla adaptativa para que entren cómodas
-        contenedorCartas.style.gridTemplateColumns = "repeat(auto-fill, minmax(140px, 1fr))";
-        contenedorCartas.style.gap = "15px";
+        // Grilla adaptativa bien espaciada para el tamaño de los cromos
+        contenedorCartas.style.gridTemplateColumns = "repeat(auto-fill, minmax(150px, 1fr))";
+        contenedorCartas.style.gap = "20px";
 
         mapeoPaises[paisElegido].forEach(c => {
-            // 🎯 CORRECCIÓN CLAVE: Mapeamos directo a la columna 'foto' de tu base de datos de Neon
             const urlImagen = c.foto || 'img/default-card.png';
 
             const label = document.createElement('label');
             
-            // Estilo base de la mini-carta
+            // Estilo de la tarjeta contenedora externa
             label.style.cssText = `
                 position: relative;
-                background: #1e293b; 
-                padding: 10px; 
-                border-radius: 10px; 
+                background: #111827; 
+                padding: 12px; 
+                border-radius: 12px; 
                 color: #fff; 
-                border: 1px solid #334155; 
+                border: 2px solid #1f2937; 
                 cursor: pointer; 
                 user-select: none;
                 display: flex;
                 flex-direction: column;
                 align-items: center;
                 text-align: center;
-                transition: all 0.2s ease;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             `;
             
-            // Renderizamos la estructura usando c.foto
+            // Estructura: Imagen del cromo completa + Textos limpios abajo
             label.innerHTML = `
-                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="position: absolute; top: 8px; left: 8px; accent-color: var(--verde-match); width: 16px; height: 16px; cursor: pointer; z-index: 2;">
-                <div style="width: 100%; height: 140px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; background: #020617; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
-                    <img src="${urlImagen}" alt="${c.nombre}" style="max-width: 95%; max-height: 95%; object-fit: contain; pointer-events: none;">
+                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="position: absolute; top: 18px; left: 18px; accent-color: var(--verde-match); width: 18px; height: 18px; cursor: pointer; z-index: 2;">
+                
+                <!-- Contenedor del cromo sin fondos que lo tapen -->
+                <div style="width: 100%; height: auto; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 6px; overflow: hidden; transition: transform 0.2s ease;">
+                    <img src="${urlImagen}" alt="${c.nombre}" style="width: 100%; height: auto; object-fit: contain; pointer-events: none; border-radius: 4px;">
                 </div>
-                <span style="font-size: 0.85rem; font-weight: bold; line-height: 1.2; display: block; height: 32px; overflow: hidden; text-overflow: ellipsis;">${c.nombre}</span>
-                <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.7rem; text-transform: uppercase; margin-top: 4px; letter-spacing: 0.5px;">${c.rareza}</small>
+                
+                <span style="font-size: 0.9rem; font-weight: bold; line-height: 1.2; display: block; margin-top: 4px; font-family: 'Oswald'; text-transform: uppercase; letter-spacing: 0.3px;">${c.nombre}</span>
+                <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold;">${c.rareza}</small>
             `;
             
-            // Efecto visual al seleccionar (Encendido neón)
+            // ⚡ EFECTO HOVER Y SELECCIÓN NEÓN
             const checkboxInterno = label.querySelector('input[type="checkbox"]');
+            const imgContainer = label.querySelector('div');
+
             checkboxInterno.addEventListener('change', () => {
                 if (checkboxInterno.checked) {
                     label.style.border = "2px solid var(--verde-match)";
-                    label.style.boxShadow = "0 0 12px rgba(34, 197, 94, 0.4)";
+                    label.style.boxShadow = "0 0 16px rgba(34, 197, 94, 0.4)";
                     label.style.background = "#142236";
+                    if (imgContainer) imgContainer.style.transform = "scale(1.03)";
                 } else {
-                    label.style.border = "1px solid #334155";
-                    label.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
-                    label.style.background = "#1e293b";
+                    label.style.border = "2px solid #1f2937";
+                    label.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
+                    label.style.background = "#111827";
+                    if (imgContainer) imgContainer.style.transform = "scale(1)";
                 }
             });
 
             contenedorCartas.appendChild(label);
         });
 
-        // Toque limitador estricto de 3 opciones
+        // Limitador estricto de 3 selecciones
         const checkboxes = document.querySelectorAll('input[name="cartas-draft-check"]');
         checkboxes.forEach(box => {
             box.addEventListener('change', () => {
@@ -4827,9 +4833,12 @@ function prepararFaseDraftUI() {
                 if (checked.length > 3) {
                     box.checked = false;
                     const labelPadre = box.parentElement;
-                    labelPadre.style.border = "1px solid #334155";
-                    labelPadre.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
-                    labelPadre.style.background = "#1e293b";
+                    const imgContainer = labelPadre.querySelector('div');
+                    
+                    labelPadre.style.border = "2px solid #1f2937";
+                    labelPadre.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
+                    labelPadre.style.background = "#111827";
+                    if (imgContainer) imgContainer.style.transform = "scale(1)";
                 }
             });
         });
