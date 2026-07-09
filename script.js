@@ -1781,19 +1781,23 @@ async function ejecutarTorneoMundial() {
 
         // 🏆 REPRODUCCIÓN DE LOS PLAYOFFS (SI CLASIFICASTE)
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
-             const partido = data.progreso.bitacoraPlayoffs[i];
-             
-             // Usamos el flag nativo del backend para saber si avanzamos o morimos acá
-             const ganoEsteCruce = partido.ganoUsuarioReal === true;
-             
-             // Esperamos a que el partido se simule en la pantalla minuto a minuto
-             await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, ganoEsteCruce, partido);
-             
-             // 🔥 SI PERDISTE, SE DEJA DE SIMULAR INMEDIATAMENTE
-             if (!ganoEsteCruce) {
-                  console.log("🛑 Eliminado del torneo. Frenando motores de la Arena.");
-                  break; 
-             }
+            const partido = data.progreso.bitacoraPlayoffs[i];
+            
+            // 1. Mandamos a simular el partido minuto a minuto (o tanda de penales)
+            await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, partido.ganoUsuarioReal, partido);
+            
+            // 2. 🔥 EL CANDADO INDESTRUCTIBLE: Chequeamos el flag real que mandó el backend
+            // Si el backend decretó que perdiste (ya sea en los 90' o por penales), cortamos el bucle acá mismo
+            if (partido.ganoUsuarioReal === false) {
+                console.log("🛑 Eliminado del Mundial. Se frenan las simulaciones de las siguientes rondas.");
+                
+                // Acá podés activar el botón de "Volver al Vestuario" o limpiar la pantalla de la Arena
+                if (document.getElementById("btn-volver-vestuario")) {
+                    document.getElementById("btn-volver-vestuario").style.display = "block";
+                }
+                
+                break; // Corta el bucle for en seco. El mundial NO sigue.
+            }
         }
 
         if (data.progreso.campeon) {
