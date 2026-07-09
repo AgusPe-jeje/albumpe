@@ -3830,18 +3830,18 @@ function toggleVisibilidadMisiones() {
     // Conmutamos la clase de colapso
     wrapper.classList.toggle("colapsado");
 
-    // 🔄 Controlamos el display en base a si tiene la clase o no
+    // ⚡ ANIMACIÓN DE DESPLIEGUE FLUIDA
     if (wrapper.classList.contains("colapsado")) {
-        wrapper.style.display = "none";
+        wrapper.style.maxHeight = "0px"; // Se encoge a cero
         boton.innerText = "▼";
-        boton.style.color = "var(--dorado)"; // Pasa a dorado para resaltar que está guardado
+        boton.style.color = "var(--dorado)"; 
     } else {
-        wrapper.style.display = "block";
+        // scrollHeight lee los píxeles reales que miden tus misiones renderizadas adentro
+        wrapper.style.maxHeight = wrapper.scrollHeight + "px"; // Se estira de forma exacta
         boton.innerText = "▲";
-        boton.style.color = "#64748b"; // Vuelve al color gris neutro
+        boton.style.color = "#64748b"; 
     }
 
-    // Opcional: Gatillo de audio si ya tenés cargada la librería de sonidos
     if (typeof AudioArena !== 'undefined' && AudioArena.play) {
         AudioArena.play('click');
     }
