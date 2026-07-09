@@ -604,36 +604,87 @@
             <div id="modulo-comerciante-bot" class="modulo-contenido" style="display: none;">
                 </div>
 
-                <div id="modulo-multijugador-pvp" class="modulo-contenido" style="display: none; max-width: 650px; margin: 20px auto; padding: 25px; background: #0f172a; border: 2px solid var(--celeste); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
-                    <h3 style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.8rem; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">⚔️ ARENA MULTIJUGADOR ONLINE</h3>
-                    <p style="color: #94a3b8; font-size: 0.95rem; font-style: italic; line-height: 1.5; margin-bottom: 20px;">
-                        "Enfrentá en tiempo real a otros directores técnicos de la Arena. Tu poder de ataque se calculará según el nivel de tus cromos colectados."
-                    </p>
+            <div id="modulo-multijugador-pvp" class="modulo-contenido" style="display: none; max-width: 850px; margin: 20px auto; padding: 25px; background: #0f172a; border: 2px solid var(--celeste); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+                
+                <h3 style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.8rem; margin-top: 0; text-transform: uppercase; letter-spacing: 1px;">🏆 ARENA MINI-MUNDIAL ONLINE</h3>
+                <p style="color: #94a3b8; font-size: 0.95rem; font-style: italic; line-height: 1.5; margin-bottom: 20px;">
+                    "Creá salas con apuestas u contraseñas. Al iniciar, se simulará un Mundial desde Octavos de Final. Tu Selección se asigna al azar y tus chances aumentan según las estrellas que tengas en tu álbum."
+                </p>
 
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <button type="button" id="btn-buscar-rival-pvp" class="btn-estadio" style="background: var(--celeste); color: #000; font-weight: bold; font-size: 1.1rem; padding: 12px 30px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer;">
-                            🔍 ENCONTRAR PARTIDO ONLINE
+                <div id="panel-setup-torneo" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px;">
+                    
+                    <div style="background: rgba(2, 6, 23, 0.4); padding: 20px; border-radius: 12px; border: 1px solid #1e293b; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h4 style="color: var(--dorado); font-family: 'Oswald'; margin-top: 0; text-transform: uppercase; letter-spacing: 0.5px;">🆕 Crear Sala Mundial</h4>
+                            
+                            <label style="color: #94a3b8; display: block; font-size: 0.85rem; margin: 10px 0 4px; font-weight: bold;">💰 APUESTA DE ORO:</label>
+                            <input type="number" id="apuesta-oro-pvp" value="100" min="0" style="width: 100%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px; box-sizing: border-box; font-family: monospace;">
+                            
+                            <label style="color: #94a3b8; display: block; font-size: 0.85rem; margin: 12px 0 4px; font-weight: bold;">🔐 CONTRASEÑA (OPCIONAL):</label>
+                            <input type="password" id="pass-sala-pvp" placeholder="Vacío si querés que sea pública" style="width: 100%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px; box-sizing: border-box;">
+                        </div>
+                        
+                        <button type="button" onclick="crearLobbyMundial()" class="btn-estadio" style="margin-top: 20px; background: var(--verde-match); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
+                            CREAR TORNEO
                         </button>
-                        <p id="estado-matchmaking-pvp" style="color: #64748b; font-size: 0.9rem; margin-top: 10px; font-weight: bold;">Estado: Listo para conectar</p>
                     </div>
 
-                    <div id="marcador-pvp-live" style="display: none; background: rgba(2, 6, 23, 0.6); padding: 15px; border-radius: 12px; border: 1px solid #1e293b;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(30, 41, 59, 0.5); padding-bottom: 10px; margin-bottom: 14px;">
-                            <span style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.5px;">🏆 PARTIDO OFICIAL MULTIJUGADOR</span>
-                            <span id="reloj-pvp-live" style="font-weight: bold; color: var(--celeste); font-family: 'Courier New', monospace; font-size: 0.95rem;">⏱️ MINUTO 00:00</span>
+                    <div style="background: rgba(2, 6, 23, 0.4); padding: 20px; border-radius: 12px; border: 1px solid #1e293b; display: flex; flex-direction: column; justify-content: space-between;">
+                        <div>
+                            <h4 style="color: var(--celeste); font-family: 'Oswald'; margin-top: 0; text-transform: uppercase; letter-spacing: 0.5px;">🔑 SALAS PÚBLICAS ACTIVAS</h4>
+                            
+                            <div id="lista-salas-disponibles" style="max-height: 115px; overflow-y: auto; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 12px; background: #020617; padding: 10px; border-radius: 8px; border: 1px solid #1e293b;">
+                                <p style="color: #64748b; font-style: italic; margin: 0;">Buscando salas en la red...</p>
+                            </div>
                         </div>
 
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
-                            <span style="width: 35%; text-align: left; font-weight: bold; font-size: 1.15rem; color: #fff; font-family: 'Oswald';">TU SQUAD</span>
-                            <span id="score-pvp-live" style="font-family: 'Oswald'; font-size: 2.2rem; background: #020617; padding: 2px 24px; border-radius: 8px; color: var(--verde-match); min-width: 90px; text-align: center; border: 1px solid #334155; box-shadow: inset 0 0 12px rgba(0,0,0,0.9);">0 - 0</span>
-                            <span style="width: 35%; text-align: right; font-weight: bold; font-size: 1.15rem; color: #fff; font-family: 'Oswald';">RIVAL 📡</span>
-                        </div>
-
-                        <div id="consola-pvp-live" style="background: #020617; padding: 14px; border-radius: 8px; min-height: 48px; color: #cbd5e1; font-size: 0.9rem; border: 1px solid rgba(30, 41, 59, 0.8); margin-top: 14px; text-align: left; line-height: 1.5;">
-                            Esperando orden del árbitro en los vestuarios...
+                        <div>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="token-unirse-manual" placeholder="Código Sala" style="width: 50%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px; font-family: monospace; text-transform: uppercase;">
+                                <input type="password" id="pass-unirse-manual" placeholder="Contraseña" style="width: 50%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px;">
+                            </div>
+                            
+                            <button type="button" onclick="unirseLobbyMundial()" class="btn-estadio" style="margin-top: 12px; background: var(--celeste); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
+                                UNIRSE A SALA
+                            </button>
                         </div>
                     </div>
                 </div>
+
+                <div id="panel-lobby-torneo" style="display: none; background: rgba(30, 41, 59, 0.3); padding: 20px; border-radius: 12px; border: 1px solid #1e293b; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-bottom: 15px;">
+                        <h4 id="titulo-sala-token" style="color: var(--dorado); font-family: 'Oswald'; margin: 0; text-transform: uppercase; font-size: 1.2rem;">SALA DE SELECCIÓN: -</h4>
+                        <div id="seleccion-asignada-pills" style="background: var(--verde-match); color: #000; padding: 5px 14px; font-weight: bold; border-radius: 20px; font-size: 0.85rem; font-family: 'Oswald';">ASIGNANDO PAÍS...</div>
+                    </div>
+                    
+                    <div style="background: #020617; padding: 14px; border-radius: 8px; border-left: 4px solid var(--celeste); margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <p style="margin: 0; font-size: 0.9rem; color: #cbd5e1;">📊 <strong>Poder de Ataque de tu Colección:</strong></p>
+                            <span style="font-size: 0.8rem; color: #64748b;">(Calculado nativamente en base a las cartas e íconos que pegaste)</span>
+                        </div>
+                        <span id="txt-estrellas-calculadas" style="color: var(--dorado); font-family: 'Oswald'; font-weight: bold; font-size: 1.4rem; text-shadow: 0 0 8px rgba(234, 179, 8, 0.4);">⭐ 0 ESTRELLAS</span>
+                    </div>
+
+                    <div id="lista-participantes-lobby" style="color: #fff; font-size: 0.9rem; background: rgba(2, 6, 23, 0.5); padding: 12px; border-radius: 8px; min-height: 60px;">
+                        </div>
+
+                    <button type="button" id="btn-start-mundial" onclick="lanzarEstructuraMundial()" style="display: none; margin-top: 20px; background: var(--dorado); color: #000; width: 100%; padding: 14px; font-weight: bold; font-size: 1.15rem; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);">
+                        🏁 LARGAR OCTAVOS DE FINAL
+                    </button>
+                </div>
+
+                <div id="panel-fixture-mundial" style="display: none; background: rgba(2, 6, 23, 0.6); padding: 20px; border-radius: 12px; border: 1px solid #1e293b;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(30, 41, 59, 0.8); padding-bottom: 12px; margin-bottom: 15px;">
+                        <span style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.5px;">🏆 TRANSMISIÓN OFICIAL MUNDIALISTA</span>
+                        <span id="reloj-pvp-live" style="font-weight: bold; color: var(--celeste); font-family: 'Courier New', monospace; font-size: 0.95rem;">⏱️ ESPERANDO PITAZO...</span>
+                    </div>
+
+                    <div id="contenedor-render-cruces" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
+                        </div>
+                </div>
+
+            </div>
 
         </section>
     </main>
