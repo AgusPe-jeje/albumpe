@@ -3746,22 +3746,31 @@ async function inspeccionarPerfilRival(usuarioId) {
           if (document.getElementById("rival-stat-epicas")) document.getElementById("rival-stat-epicas").innerText = rival.estadisticasAlbum?.epicas || 0;
           if (document.getElementById("rival-stat-legendarias")) document.getElementById("rival-stat-legendarias").innerText = rival.estadisticasAlbum?.legendarias || 0;
 
-          // 3. Bloque B: Rendimiento en Competencia del Rival
-          const txtTimbaEfectividad = document.getElementById("rival-txt-timba-efectividad");
-          if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${rival.estadisticasTimba?.porcentajeEfectividad || 0}%`;
+          // 3. ⚽ Bloque B: Rendimiento en Competencia del Rival (Remapeado y Protegido)
+          const txtPenalesEfectividad = document.getElementById("rival-txt-penales-efectividad") || document.getElementById("rival-txt-timba-efectividad");
+          const txtPenalesJugadas = document.getElementById("rival-txt-penales-jugadas") || document.getElementById("rival-txt-timba-jugadas");
 
-          const txtTimbaJugadas = document.getElementById("rival-txt-timba-jugadas");
-          if (txtTimbaJugadas) {
-               const ganadas = (rival.estadisticasTimba?.ganadasExacto || 0) + (rival.estadisticasTimba?.ganadasSigno || 0);
-               txtTimbaJugadas.innerText = `${ganadas} Ganados / ${rival.estadisticasTimba?.jugadas || 0} Totales`;
+          // Obtenemos los penales totales y ganados desde el server
+          const totales = rival.estadisticasPenales?.jugadas ?? rival.penales_jugados ?? 0;
+          const ganados = rival.estadisticasPenales?.ganadas ?? rival.penales_ganados ?? 0;
+          
+          // Calculamos el porcentaje matemático exacto para evitar discrepancias
+          const porcentaje = totales > 0 ? Math.round((ganados / totales) * 100) : 0;
+
+          if (txtPenalesEfectividad) {
+               txtPenalesEfectividad.innerText = `${porcentaje}%`;
+          }
+
+          if (txtPenalesJugadas) {
+               txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
           }
 
           const txtMundiales = document.getElementById("rival-stat-mundiales-copas");
           if (txtMundiales) {
-               txtMundiales.innerText = `🏆 ${rival.copasMundiales || 0}`;
+               txtMundiales.innerText = `🏆 ${rival.copasMundiales ?? rival.copas_mundiales ?? 0}`;
           }
 
-          // 4. Render de la Foto de Perfil del Rival (Mantiene su avatar redondo intacto)
+          // 4. Render de la Foto de Perfil del Rival
           const divAvatar = document.getElementById("rival-avatar-user");
           if (divAvatar && rival.foto) {
                divAvatar.style.borderRadius = "12px";
@@ -3771,14 +3780,13 @@ async function inspeccionarPerfilRival(usuarioId) {
                divAvatar.innerText = ""; 
           }
 
-          // 5. 🌟 RENDER DE CROMO DESTACADO DEL RIVAL CORREGIDO
-          // 🔥 Lee estrictamente la propiedad 'cromo_destacado' del rival
+          // 5. 🌟 RENDER DE CROMO DESTACADO DEL RIVAL (Ruta Plana de Neon)
           const contenedorDestacado = document.getElementById("rival-contenedor-destacado");
           if (contenedorDestacado) {
-               if (rival.cromo_destacado) {
+               if (rival.cromo_destacado && typeof rival.cromo_destacado === "string" && rival.cromo_destacado.trim() !== "") {
                     contenedorDestacado.innerHTML = `
-                        <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                            <img src="${rival.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
+                        <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto; border: 2px solid var(--dorado);">
+                            <img src="${rival.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;" alt="Cromo Destacado Rival">
                         </div>
                     `;
                } else {
