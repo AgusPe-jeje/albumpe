@@ -1347,9 +1347,8 @@ app.post('/api/usuarios/reclamar-diario', verificarToken, async (req, res) => {
 app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
     const { usuarioId } = req.params;
     try {
-        // ⚽ Agregamos u.penales_jugados y u.penales_ganados al SELECT y al GROUP BY
         const perfilQuery = `
-            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, 
+            SELECT u.id, u.username AS nombre_usuario, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, u.torneos_ganados, u.ranking_semanal_top1, COALESCE(fp.ruta_jpg, 'fotos/_defecto.jpg') AS foto_perfil, 
             COALESCE(COUNT(CASE WHEN j.rareza = 'comun' AND up.cantidad > 0 THEN 1 END), 0) AS comunes, 
             COALESCE(COUNT(CASE WHEN j.rareza = 'rara' AND up.cantidad > 0 THEN 1 END), 0) AS raras, 
             COALESCE(COUNT(CASE WHEN j.rareza = 'epica' AND up.cantidad > 0 THEN 1 END), 0) AS epicas, 
@@ -1360,17 +1359,25 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
             LEFT JOIN usuario_progreso up ON u.id = up.usuario_id 
             LEFT JOIN jugadores j ON up.jugador_id = j.id 
             WHERE u.id = $1 
-            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, fp.ruta_jpg;`;
+            GROUP BY u.id, u.username, u.monedas, u.puntos_ranking, u.timbas_jugadas, u.timbas_ganadas_exacto, u.timbas_ganadas_signo, u.eligio_avatar, u.cromo_destacado, u.copas_mundiales, u.penales_jugados, u.penales_ganados, u.torneos_ganados, u.ranking_semanal_top1, fp.ruta_jpg;`;
 
         const result = await pool.query(perfilQuery, [usuarioId]);
         if (result.rows.length === 0) return res.status(404).json({ ok: false, mensaje: "El competidor no existe." });
 
         const datos = result.rows[0];
 
-        // 🧮 Cálculo de efectividad de penales directo del servidor
-        const penalesJugados = parseInt(datos.penales_jugados || 0);
-        const penalesGanados = parseInt(datos.penales_ganados || 0);
-        const efectividadPenales = penalesJugados > 0 ? Math.round((penalesGanados / penalesJugados) * 100) : 0;
+        // 🧠 Lógica para calcular la selección favorita (La que más pases tiene en posesión en usuario_progreso)
+        const seleccionFavQuery = `
+            SELECT j.pais, COUNT(*) as cantidad_cromos
+            FROM usuario_progreso up
+            JOIN jugadores j ON up.jugador_id = j.id
+            WHERE up.usuario_id = $1 AND up.cantidad > 0
+            GROUP BY j.pais
+            ORDER BY cantidad_cromos DESC
+            LIMIT 1
+        `;
+        const favResult = await pool.query(seleccionFavQuery, [usuarioId]);
+        const seleccionFavorita = favResult.rows.length > 0 ? favResult.rows[0].pais.toUpperCase() : "NINGUNA";
 
         return res.json({
             ok: true,
@@ -1380,9 +1387,11 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 monedas: datos.monedas, 
                 eligio_avatar: datos.eligio_avatar, 
                 puntosRanking: datos.puntos_ranking, 
-                copasMundiales: datos.copas_mundiales, 
                 foto: datos.foto_perfil, 
                 cromo_destacado: datos.cromo_destacado,
+                torneosGanados: parseInt(datos.torneos_ganados || 0),
+                top1Semanales: parseInt(datos.ranking_semanal_top1 || 0),
+                seleccionTop: seleccionFavorita,
                 estadisticasAlbum: { 
                     comunes: parseInt(datos.comunes || 0), 
                     raras: parseInt(datos.raras || 0), 
@@ -1390,16 +1399,14 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                     legendarias: parseInt(datos.legendarias || 0), 
                     porcentajeCompletado: parseFloat(datos.porcentaje_album) || 0 
                 },
-                // 🎯 Mandamos la data de penales estructurada para el cliente
                 estadisticasPenales: {
-                    jugadas: penalesJugados,
-                    ganadas: penalesGanados,
-                    porcentajeEfectividad: efectividadPenales
+                    jugadas: parseInt(datos.penales_jugados || 0),
+                    ganadas: parseInt(datos.penales_ganados || 0)
                 }
             }
         });
     } catch (err) { 
-        console.error("❌ Error al cargar perfil con penales:", err);
+        console.error("❌ Error al cargar perfil expandido:", err);
         res.status(500).json({ ok: false, mensaje: "Error al cargar perfil." }); 
     }
 });
