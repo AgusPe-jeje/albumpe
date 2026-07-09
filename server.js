@@ -128,7 +128,7 @@ async function inicializarTablas() {
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             timbas_hoy INTEGER DEFAULT 10,
             copas_mundiales INTEGER DEFAULT 0, 
-            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL
             ultimo_reset_misiones VARCHAR(10) DEFAULT NULL,
             racha_login INTEGER DEFAULT 0,
             ultimo_login_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -851,7 +851,10 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         await client.query('BEGIN');
         const jCheck = await client.query("SELECT j.rareza FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.jugador_id = ANY($2) AND up.cantidad > 0", [usuario_id, jugadorIds]);
 
-        if (jCheck.rows.length !== 3) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Error: Jugadores no disponibles en tu plantel." }); }
+        if (jCheck.rows.length !== 3) { 
+            await client.query('ROLLBACK'); 
+            return res.json({ ok: false, mensaje: "❌ Error: Jugadores no disponibles en tu plantel." }); 
+        }
 
         const promedio = jCheck.rows.reduce((acc, row) => acc + VALOR_STATS_RAREZA[row.rareza.toLowerCase()], 0) / 3;
         let estrellas = (promedio >= 90) ? 5 : ((promedio >= 79) ? 4 : ((promedio >= 70) ? 3 : ((promedio >= 62) ? 2 : 1)));
@@ -871,7 +874,8 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         }
 
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            let g1 = Math.floor(Math.random() * 3); let g2 = Math.floor(Math.random() * 3);
+            let g1 = Math.floor(Math.random() * 3); 
+            let g2 = Math.floor(Math.random() * 3);
             if (esUsuario) {
                 if (Math.random() <= chanceVictoria && g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
                 else if (Math.random() > chanceVictoria && g2 <= g1) g2 = g1 + Math.floor(Math.random() * 2) + 1;
@@ -879,27 +883,58 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             return { goles1: g1, goles2: g2, minutosEq1: generarMinutosGolesFútbol(g1), minutosEq2: generarMinutosGolesFútbol(g2) };
         }
 
-        let let_f1_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo1, true);
-        let let_f1_m2 = simularMatchCompleto(rivalGrupo2, rivalGrupo3, false);
-        let bitacoraGrupo = [{ fecha: 1, local: seleccionElegida, visitante: rivalGrupo1, gL: let_f1_m1.goles1, gV: let_f1_m1.goles2, minutosL: let_f1_m1.minutosEq1, minutosV: let_f1_m1.minutosEq2, botL: rivalGrupo2, botV: rivalGrupo3, gBL: let_f1_m2.goles1, gBV: let_f1_m2.goles2, minutosBL: let_f1_m2.minutosEq1, minutosBV: let_f1_m2.minutosEq2 }];
+        // FIX FIXTURE: Sincronización milimétrica de cruces del grupo de 4
+        // Fecha 1: Usuario vs Rival 1 | Rival 2 vs Rival 3
+        let f1_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo1, true);
+        let f1_m2 = simularMatchCompleto(rivalGrupo2, rivalGrupo3, false);
+        let bitacoraGrupo = [{ 
+            fecha: 1, 
+            local: seleccionElegida, visitante: rivalGrupo1, gL: f1_m1.goles1, gV: f1_m1.goles2, minutosL: f1_m1.minutosEq1, minutosV: f1_m1.minutosEq2, 
+            botL: rivalGrupo2, botV: rivalGrupo3, gBL: f1_m2.goles1, gBV: f1_m2.goles2, minutosBL: f1_m2.minutosEq1, minutosBV: f1_m2.minutosEq2 
+        }];
 
-        let let_f2_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo2, true);
-        let let_f2_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo3, false);
-        bitacoraGrupo.push({ fecha: 2, local: seleccionElegida, visitante: rivalGrupo2, gL: let_f2_m1.goles1, gV: let_f2_m1.goles2, minutosL: let_f2_m1.minutosEq1, minutosV: let_f2_m1.minutosEq2, botL: rivalGrupo1, botV: rivalGrupo3, gBL: let_f2_m2.goles1, gBV: let_f2_m2.goles2, minutosBL: let_f2_m2.minutosEq1, minutosBV: let_f2_m2.minutosEq2 });
+        // Fecha 2: Usuario vs Rival 2 | Rival 1 vs Rival 3
+        let f2_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo2, true);
+        let f2_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo3, false);
+        bitacoraGrupo.push({ 
+            fecha: 2, 
+            local: seleccionElegida, visitante: rivalGrupo2, gL: f2_m1.goles1, gV: f2_m1.goles2, minutosL: f2_m1.minutosEq1, minutosV: f2_m1.minutosEq2, 
+            botL: rivalGrupo1, botV: rivalGrupo3, gBL: f2_m2.goles1, gBV: f2_m2.goles2, minutosBL: f2_m2.minutosEq1, minutosBV: f2_m2.minutosEq2 
+        });
 
-        let let_f3_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo3, true);
-        let let_f3_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo2, false);
-        bitacoraGrupo.push({ fecha: 3, local: seleccionElegida, visitante: rivalGrupo3, gL: let_f3_m1.goles1, gV: let_f3_m1.goles2, minutosL: let_f3_m1.minutosEq1, minutosV: let_f3_m1.minutosEq2, botL: rivalGrupo1, botV: rivalGrupo2, gBL: let_f3_m2.goles1, gBV: let_f3_m2.goles2, minutosBL: let_f3_m2.minutosEq1, minutosBV: let_f3_m2.minutosEq2 });
+        // Fecha 3: Usuario vs Rival 3 | Rival 1 vs Rival 2
+        let f3_m1 = simularMatchCompleto(seleccionElegida, rivalGrupo3, true);
+        let f3_m2 = simularMatchCompleto(rivalGrupo1, rivalGrupo2, false);
+        bitacoraGrupo.push({ 
+            fecha: 3, 
+            local: seleccionElegida, visitante: rivalGrupo3, gL: f3_m1.goles1, gV: f3_m1.goles2, minutosL: f3_m1.minutosEq1, minutosV: f3_m1.minutosEq2, 
+            botL: rivalGrupo1, botV: rivalGrupo2, gBL: f3_m2.goles1, gBV: f3_m2.goles2, minutosBL: f3_m2.minutosEq1, minutesBV: f3_m2.minutosEq2 
+        });
 
-        let tablaPuntos = {}; integrantesGrupo.forEach(p => { tablaPuntos[p] = { pais: p, pts: 0, gf: 0, gc: 0 }; });
+        let tablaPuntos = {}; 
+        integrantesGrupo.forEach(p => { tablaPuntos[p] = { pais: p, pts: 0, gf: 0, gc: 0 }; });
 
         function acumular(loc, vis, gl, gv) {
-            tablaPuntos[loc].gf += gl; tablaPuntos[loc].gc += gv; tablaPuntos[vis].gf += gv; tablaPuntos[vis].gc += gl;
-            if (gl > gv) tablaPuntos[loc].pts += 3; else if (gl < gv) tablaPuntos[vis].pts += 3; else { tablaPuntos[loc].pts += 1; tablaPuntos[vis].pts += 1; }
+            tablaPuntos[loc].gf += gl; tablaPuntos[loc].gc += gv; 
+            tablaPuntos[vis].gf += gv; tablaPuntos[vis].gc += gl;
+            if (gl > gv) tablaPuntos[loc].pts += 3; 
+            else if (gl < gv) tablaPuntos[vis].pts += 3; 
+            else { tablaPuntos[loc].pts += 1; tablaPuntos[vis].pts += 1; }
         }
-        bitacoraGrupo.forEach(f => { acumular(f.local, f.visitante, f.gL, f.gV); acumular(f.botL, f.botV, f.gBL, f.gBV); });
+        
+        bitacoraGrupo.forEach(f => { 
+            acumular(f.local, f.visitante, f.gL, f.gV); 
+            acumular(f.botL, f.botV, f.gBL, f.gBV); 
+        });
 
-        let tablaOrdenada = Object.values(tablaPuntos).sort((a,b) => (b.pts !== a.pts) ? (b.pts - a.pts) : ((b.gf - b.gc) - (a.gf - a.gc)));
+        let tablaOrdenada = Object.values(tablaPuntos).sort((a,b) => {
+            if (b.pts !== a.pts) return b.pts - a.pts;
+            let difA = a.gf - a.gc;
+            let difB = b.gf - b.gc;
+            if (difB !== difA) return difB - difA;
+            return b.gf - a.gf; // Desempate por goles a favor
+        });
+
         let posicionUsuario = tablaOrdenada.findIndex(r => r.pais === seleccionElegida) + 1;
         let clasificaALlaves = posicionUsuario <= 2; 
 
@@ -907,18 +942,23 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         if (clasificaALlaves) {
             const llaves = [
-                { ronda: "Octavos de Final", rival: botsDisponibles[3], pen: 0 }, { ronda: "Cuartos de Final", rival: botsDisponibles[4], pen: 0.08 },
-                { ronda: "Semifinal", rival: botsDisponibles[5], pen: 0.16 }, { ronda: "Gran Final del Mundo", rival: botsDisponibles[6], pen: 0.24 }
+                { ronda: "Octavos de Final", rival: botsDisponibles[3], pen: 0 }, 
+                { ronda: "Cuartos de Final", rival: botsDisponibles[4], pen: 0.08 },
+                { ronda: "Semifinal", rival: botsDisponibles[5], pen: 0.16 }, 
+                { ronda: "Gran Final del Mundo", rival: botsDisponibles[6], pen: 0.24 }
             ];
             campeon = true;
             for (let llave of llaves) {
                 faseAlcanzada = llave.ronda;
-                let gTu = Math.floor(Math.random() * 3); let gRiv = Math.floor(Math.random() * 3);
+                let gTu = Math.floor(Math.random() * 3); 
+                let gRiv = Math.floor(Math.random() * 3);
+                
                 if (Math.random() <= Math.max(0.10, chanceVictoria - llave.pen)) {
                     if (gTu <= gRiv) gTu = gRiv + 1;
                     bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅", gL: gTu, gV: gRiv, ganoUsuarioReal: true, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                 } else {
-                    campeon = false; if (gRiv <= gTu) gRiv = gTu + 1;
+                    campeon = false; 
+                    if (gRiv <= gTu) gRiv = gTu + 1;
                     bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                     break;
                 }
@@ -927,16 +967,30 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         const ahora = new Date();
         if (campeon) {
-            await client.query("UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
+            // Sincroniza con las nuevas columnas competitivas
+            await client.query(`
+                UPDATE usuarios 
+                SET monedas = monedas + 5000, 
+                    copas_mundiales = copas_mundiales + 1, 
+                    torneos_ganados = torneos_ganados + 1,
+                    puntos_ranking = puntos_ranking + 50, 
+                    ultima_timba_mundial = $1 
+                WHERE id = $2`, [ahora, usuario_id]);
         } else {
             await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
         }
 
-        const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
+        const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales, torneos_ganados FROM usuarios WHERE id = $1", [usuario_id]);
         await client.query('COMMIT');
 
         return res.json({ ok: true, progreso: { integrantesGrupo, bitacoraGrupo, clasifico: clasificaALlaves, posicionFinalGrupo: posicionUsuario, campeon, faseAlcanzada, bitacoraPlayoffs }, datosActualizados: userFinal.rows[0] });
-    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: "Fallo estructural en la Arena." }); } finally { client.release(); }
+    } catch (err) { 
+        await client.query('ROLLBACK'); 
+        console.error("❌ Error estructural en /api/mundial/jugar:", err);
+        return res.status(500).json({ ok: false, error: "Fallo estructural en la Arena." }); 
+    } finally { 
+        client.release(); 
+    }
 });
 
 /* ========================================================================
