@@ -3819,18 +3819,21 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. Bloque B: Estadísticas de Juego Remapeadas
-        const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
-        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba?.porcentajeEfectividad || 0}%`;
+        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas con Penales
+        const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
+        if (txtPenalesEfectividad) {
+            txtPenalesEfectividad.innerText = `${perfil.estadisticasPenales?.porcentajeEfectividad || 0}%`;
+        }
 
-        const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
-        if (txtTimbaJugadas) {
-            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
-            txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba?.jugadas || 0} Totales`;
+        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
+        if (txtPenalesJugadas) {
+            const ganados = perfil.estadisticasPenales?.ganadas || 0;
+            const totales = perfil.estadisticasPenales?.jugadas || 0;
+            txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
         }
 
         const txtMundiales = document.getElementById("stat-mundiales-copas");
-        if (txtMundiales) txtMundiales.innerText = `🏆 ${usuarioActual.copas_mundiales || 0}`;
+        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.copasMundiales || 0}`;
 
         const txtMonedas = document.getElementById("stat-monedas");
         if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas.toLocaleString() : 0;
@@ -3845,13 +3848,13 @@ async function actualizarMiPerfilUI() {
             divAvatar.innerText = "";
         }
 
-        // 🌟 NUEVO BLOQUE: Render del Cromo Insignia de mi Vestuario
+        // 🌟 5. NUEVO BLOQUE: Render del Cromo Insignia (Ruta Plana de Neon)
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
-            if (perfil.cromo_destacado) {
+            if (perfil.cromo_destacado && typeof perfil.cromo_destacado === "string" && perfil.cromo_destacado.trim() !== "") {
                 contenedorDestacado.innerHTML = `
-                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                        <img src="${perfil.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto; border: 2px solid var(--dorado);">
+                        <img src="${perfil.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;" alt="Cromo Destacado">
                     </div>
                 `;
             } else {
