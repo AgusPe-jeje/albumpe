@@ -138,129 +138,135 @@ function cerrarModalAyuda() {
 }
 
 async function autenticarUsuario(accion) {
-    const username = document.getElementById("input-usuario").value.trim();
-    const password = document.getElementById("input-pass").value;
-    
-    const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
+     const username = document.getElementById("input-usuario").value.trim();
+     const password = document.getElementById("input-pass").value;
+     
+     if (!username || !password) return alert("❌ Completá los datos.");
 
-    if (!username || !password) {
-        if (btnAuth) btnAuth.disabled = false;
-        return alert("❌ Completá los datos.");
-    }
+     // 🛡️ SECURITY FIX: Buscamos el botón usando su clase real del HTML para evitar el crash por null
+     const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
+     if (btnAuth) btnAuth.disabled = true;
 
-    // 🧹 REINICIO TOTAL DE SESIÓN PREVIA: Borramos datos flotantes antes de iniciar la nueva
-    usuarioActual = null;
-    localStorage.removeItem("cromo_destacado_perfil");
-    albumCompleto = [];
-    window.albumCompleto = [];
+     const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
+     const endpointFinal = accion === 'login' ? 'login' : 'registro';
 
-    // Limpiamos los textos del Scoreboard de la pantalla vieja inmediatamente
-    if (typeof actualizarInterfazUI === "function") {
-        actualizarInterfazUI();
-    }
+     mostrarCarga(textoSpinner);
 
-    try {
-        if (btnAuth) {
-            btnAuth.disabled = true;
-            btnAuth.style.opacity = "0.5";
-            btnAuth.style.cursor = "not-allowed";
-        }
+     try {
+          const res = await fetch(`${URL_BASE}/${endpointFinal}`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ username, password })
+          });
+          
+          // 🛡️ SECURITY FIX: Si el servidor responde con un estado de error (401, 403, 500, 503), frenamos
+          if (!res.ok) {
+               ocultarCarga();
+               if (btnAuth) btnAuth.disabled = false;
+               
+               try {
+                    const errorData = await res.json();
+                    return alert(errorData.error || `❌ Error del servidor (Código ${res.status})`);
+               } catch {
+                    return alert(`🚧 Error inesperado en la infraestructura de la Arena (Código ${res.status}).`);
+               }
+          }
+          
+          const data = await res.json();
+          ocultarCarga();
 
-        const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta...";
-        mostrarCarga(textoSpinner);
+          if (data.error) {
+               alert(data.error);
+               if (btnAuth) btnAuth.disabled = false;
+          } else {
+               // 1️⃣ PRIMERO: Guardamos el token con la clave unificada "token"
+               if (data.token) {
+                    localStorage.setItem("token", data.token);
+               }
 
-        // 🏟️ RUTA CORREGIDA: Apunta exactamente a tu backend (/api/login o /api/registro)
-        const endpoint = `${URL_BASE}/${accion === 'login' ? 'login' : 'registro'}`;
+               // 2️⃣ SEGUNDO: Inicializamos el estado del usuario en memoria global
+               usuarioActual = data.usuario;
+               
+               // 3️⃣ TERCERO: Transición limpia de la interfaz visual
+               document.getElementById("seccion-login").style.display = "none";
+               
+               const interfazJuego = document.getElementById("interfaz-juego");
+               if (interfazJuego) {
+                    interfazJuego.style.removeProperty("display");
+                    interfazJuego.classList.add("mostrar");
+               }
+               
+               // 4️⃣ CUARTO: Ahora que el token y el user existen, llamamos secuencialmente a las APIs
+               await cargarMisionesDelServidor();
+               
+               if (typeof iniciarCronometroResetMisiones === 'function') {
+                    iniciarCronometroResetMisiones();
+               }
+               
+               // Flujo de anuncios o racha diaria
+               if (typeof iniciarControladorAnunciosSeguro === 'function') {
+                    setTimeout(iniciarControladorAnunciosSeguro, 1000); 
+               } else if (typeof verificarRecompensaDiaria === 'function') {
+                    setTimeout(verificarRecompensaDiaria, 1000);
+               }
+               
+               filtroEstadoActual = 'todas';
+               filtroRarezaActual = 'todas';
+               
+               actualizarInterfazUI();
+               cargarAlbumLocal();
+               iniciarCronometroResetRanking();
+               if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
+               
+               if (typeof verificarAvatarInicial === 'function') {
+                    verificarAvatarInicial();
+               }
 
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-
-        // 🛡️ PARCHE DE SEGURIDAD: Validamos si el servidor devolvió HTML (como el error 404 anterior)
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-            throw new Error(`El servidor respondió con un formato incorrecto (HTTP ${response.status}). Ruta inválida o caída.`);
-        }
-
-        const data = await response.json();
-
-        // ⚡ VALIDACIÓN FLEXIBLE: Verificamos si la petición falló en el backend
-        if (!response.ok) {
-            throw new Error(data.error || "Error en las credenciales.");
-        }
-
-        // 🔓 Guardamos el token nuevo de la cuenta entrante
-        localStorage.setItem('token', data.token);
-        
-        // Sincronizamos la variable global con el nuevo usuario genuino de Neon
-        usuarioActual = data.usuario; 
-
-        // 🔄 Pintamos las monedas, copas y nombre del nuevo jugador al instante
-        if (typeof actualizarInterfazUI === "function") {
-            actualizarInterfazUI();
-        }
-
-        ocultarCarga();
-
-        // 🛍️ ¡RUMBO A LA TIENDA AUTOMÁTICAMENTE!
-        const btnTienda = document.querySelector("button[onclick*='modulo-sobres']");
-        if (typeof cambiarModulo === "function" && btnTienda) {
-            cambiarModulo('modulo-sobres', btnTienda);
-        } else {
-            document.querySelectorAll(".modulo-contenido").forEach(mod => mod.classList.remove("activo"));
-            const modSobres = document.getElementById("modulo-sobres");
-            if (modSobres) modSobres.classList.add("activo");
-        }
-
-        // 🎯 TRANSICIÓN NATIVA DE PANTALLAS:
-        document.getElementById("seccion-login").style.display = "none";
-        const interfazJuego = document.getElementById("interfaz-juego");
-        if (interfazJuego) {
-             interfazJuego.style.display = "block";
-             interfazJuego.classList.add("mostrar");
-        }
-
-        // Cargamos el progreso de este álbum en segundo plano
-        if (typeof cargarAlbumLocal === "function") {
-            cargarAlbumLocal();
-        }
-
-        // 🚀 GATILLO REAL CORREGIDO: Llamamos a tu función verdadera de la DB
-        if (typeof cargarMisionesDelServidor === "function") { 
-            cargarMisionesDelServidor(); 
-        }
-
-    } catch (error) {
-        ocultarCarga();
-        console.error("❌ Error en la autenticación:", error);
-        alert(error.message);
-    } finally {
-        if (btnAuth) {
-            btnAuth.disabled = false;
-            btnAuth.style.opacity = "1";
-            btnAuth.style.cursor = "pointer";
-        }
-    }
+               // ⏱️ CONTROL ASÍNCRO: Postergamos los alerts para permitir el repintado del DOM
+               setTimeout(() => {
+                    if (accion === 'login') {
+                         alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
+                    } else {
+                         alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
+                    }
+               }, 0);
+          }
+     } catch (err) {
+          console.error("❌ Fallo crítico de red o código en autenticación:", err);
+          ocultarCarga();
+          if (btnAuth) btnAuth.disabled = false;
+          alert("📡 Error de conexión. No se pudo establecer contacto con los servidores centrales de la Arena.");
+     }
 }
 
-function actualizarInterfazUI() {
-     // 🧹 Si no hay usuario activo (por ejemplo, recién cerraste sesión), limpiamos los contadores a 0
-     if (!usuarioActual) {
-          const lblUsuario = document.getElementById("lbl-usuario");
-          if (lblUsuario) lblUsuario.innerText = "INVITADO";
-          
-          if (document.getElementById("lbl-monedas")) document.getElementById("lbl-monedas").innerText = "0";
-          if (document.getElementById("lbl-ranking")) document.getElementById("lbl-ranking").innerText = "0";
-          if (document.getElementById("lbl-copas-mundiales")) document.getElementById("lbl-copas-mundiales").innerText = "0";
-          
-          // Si llegás a agregar contadores de penales en el header:
-          if (document.getElementById("lbl-penales-porcentaje")) document.getElementById("lbl-penales-porcentaje").innerText = "0%";
-          return;
-     }
+function obtenerHeadersSeguros() {
+    // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
+    const token = localStorage.getItem("token");
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+}
 
-     // 🦾 Si hay un usuario genuino logueado, inyectamos sus datos reales de Neon
+// 🔥 CAPTURA DE ENTER PARA INICIAR SESIÓN EN LA ARENA
+document.addEventListener("DOMContentLoaded", () => {
+    const inputUser = document.getElementById("input-usuario");
+    const inputPass = document.getElementById("input-pass");
+
+    const manejarEnterLogin = (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault(); // Evita cualquier recarga de página molesta
+            autenticarUsuario('login');
+        }
+    };
+
+    // Asignamos el evento a ambos campos para máxima comodidad
+    if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
+    if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
+});
+
+function actualizarInterfazUI() {
+     if (!usuarioActual) return;
      document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
      document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
      document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking;
@@ -269,41 +275,7 @@ function actualizarInterfazUI() {
      if (lblMundiales) {
           lblMundiales.innerText = usuarioActual.copas_mundiales || 0;
      }
-
-     // 🔄 Sincronización en memoria síncrona opcional por si manejás penales en el objeto global:
-     // Si al patear el penal actualizás 'usuarioActual.penales_jugados' y 'usuarioActual.penales_ganados':
-     const lblPenalesHeader = document.getElementById("lbl-penales-header-rapido");
-     if (lblPenalesHeader && usuarioActual.penales_jugados !== undefined) {
-          const ef = usuarioActual.penales_jugados > 0 ? Math.round((usuarioActual.penales_ganados / usuarioActual.penales_jugados) * 100) : 0;
-          lblPenalesHeader.innerText = `${ef}%`;
-     }
 }
-
-function obtenerHeadersSeguros() {
-     // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
-     const token = localStorage.getItem("token");
-     return {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-     };
-}
-
-// 🔥 CAPTURA DE ENTER PARA INICIAR SESIÓN EN LA ARENA
-document.addEventListener("DOMContentLoaded", () => {
-     const inputUser = document.getElementById("input-usuario");
-     const inputPass = document.getElementById("input-pass");
-
-     const manejarEnterLogin = (event) => {
-          if (event.key === "Enter") {
-               event.preventDefault(); // Evita cualquier recarga de página molesta
-               autenticarUsuario('login');
-          }
-     };
-
-     // Asignamos el evento a ambos campos para máxima comodidad
-     if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
-     if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
-});
 
 async function cerrarSesionLocal() {
      if (!usuarioActual) return;
@@ -1147,7 +1119,6 @@ async function ejecutarPenalLocal(direccionElegida) {
 
           usuarioActual.monedas = data.datos.monedas;
           usuarioActual.puntos_ranking = data.datos.puntos_ranking;
-          
           actualizarInterfazUI();
           cargarRankingLocal();
           
@@ -1161,27 +1132,16 @@ async function ejecutarPenalLocal(direccionElegida) {
           }
           arrancarCronometroVisual(data.siguienteIn);
 
-          // ⚽ DISPARO ESTADÍSTICAS DEL PERFIL: Mandamos la actualización a la base de datos de Neon
-          const token = localStorage.getItem("token");
-          await fetch(`${URL_BASE}/usuarios/registrar-penal`, {
-               method: "POST",
-               headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-               },
-               body: JSON.stringify({ ganoPartido: esGol }) // Registramos si fue gol (victoria) o atajada (derrota)
-          });
-
-          // 🔄 Sincronizamos las cajas de Mi Perfil en background para cuando entre a mirar
-          if (typeof actualizarMiPerfilUI === "function") {
-               actualizarMiPerfilUI();
-          }
-
-          // 🟢 SECTOR MISIONES API: Trackeo en plural
+          // 🟢 SECTOR MISIONES API: Trackeo en plural sincronizado con el backend
           if (typeof trackearProgresoMision === 'function') {
+               // 1. Sumamos el tiro a la tanda de penales jugada
                await trackearProgresoMision("penales", 1);
+               
+               // 2. Si terminó en gol, impactamos también el contador de goles anotados
                if (esGol) {
                     await trackearProgresoMision("goles_penales", 1);
+
+                    // 🔥 NUEVO DISPARADOR: Sumamos las 100 monedas de oro al objetivo de acumular oro
                     await trackearProgresoMision("acumular_oro", 100);
                }
           }
@@ -1227,45 +1187,45 @@ function arrancarCronometroTimbaVisual(milisegundos) {
 }
 
 async function actualizarTimbasRestantesUI() {
-    if (!usuarioActual) return;
-    
-    try {
-        // Fetch blindado con cabecera de Tester para saltear el maintenance mode
-        const res = await fetch(`${URL_BASE}/timbas-restantes/${usuarioActual.id}`, {
-            method: "GET",
-            headers: obtenerHeadersSeguros()
-        });
-        
-        // 🎯 DEFINICIÓN UNIFICADA: Guardamos la respuesta en 'datos' para que coincida con tu código de abajo
-        const datos = await res.json();
-        
-        // Resguardo preventivo por si el server responde un 503 o estructura corrupta
-        if (datos.timbas === undefined) return;
+     if (!usuarioActual) return;
+     const lblCronometro = document.getElementById('cronometro-timba');
+     if (!lblCronometro) return;
 
-        // 🎰 Actualizamos los indicadores en la UI de tu ruleta
-        const lblTimbasContador = document.getElementById("perfil-txt-timba-jugadas") 
-            || document.getElementById("timbas-restantes-contador"); // Selector de respaldo
-            
-        const lblRuletaTimer = document.getElementById("timer-ruleta-energia")
-            || document.getElementById("perfil-txt-timba-efectividad");
+     try {
+          const res = await fetch(`${URL_BASE}/timbas-restantes/${usuarioActual.id}`);
+          const datos = await res.json();
+          
+          // 🔥 CORREGIDO: Usamos la variable global correcta del loop de la timba
+          if (intervaloCronometroTimba) {
+               clearInterval(intervaloCronometroTimba);
+          }
+          
+          // 2. Pintamos el estado actual de tus apuestas
+          if (datos.timbas <= 0) {
+               lblCronometro.style.borderColor = 'var(--rojo)';
+               lblCronometro.style.color = 'var(--rojo)';
+               lblCronometro.innerText = '❌ SIN ENERGÍA PARA TIMBEAR ⏱️';
+          } else {
+               lblCronometro.style.borderColor = 'var(--dorado)';
+               lblCronometro.style.color = 'var(--dorado)';
+               lblCronometro.innerText = '🎰 Apuestas disponibles: ' + datos.timbas + '/10';
+          }
 
-        // Inyectamos los datos reales que mandó el controlador
-        if (lblTimbasContador) {
-            // Nota: Podés ajustar este string al formato que más te guste para la caja
-            lblTimbasContador.innerText = `🔋 Giros Disponibles: ${datos.timbas} / 10`;
-        }
+          // 🔥 3. AGUANTAR EL MUNDO POR 5 SEGUNDOS
+          if (datos.siguienteIn > 0 && datos.timbas < 10) {
+               const TIEMPO_CONGELADO_MS = 5000; // ⏱️ Se queda fijo 5 segundos enteros
 
-        if (lblRuletaTimer && datos.siguienteIn > 0) {
-            const minutos = Math.floor(datos.siguienteIn / 60000);
-            const segundos = Math.floor((datos.siguienteIn % 60000) / 1000);
-            lblRuletaTimer.innerText = `⏱️ Próximo en: ${minutos}:${segundos.toString().padStart(2, '0')}`;
-        } else if (lblRuletaTimer) {
-            lblRuletaTimer.innerText = `🔋 ¡Energía al Máximo!`;
-        }
-
-    } catch (err) {
-        console.error("❌ Error al traer timbas restantes:", err);
-    }
+               setTimeout(() => {
+                    // Pasados los 5 segundos, recalculamos el tiempo restante y reactivamos tu loop dinámico
+                    const tiempoTranscurrido = TIEMPO_CONGELADO_MS;
+                    const tiempoAjustado = datos.siguienteIn - tiempoTranscurrido;
+                    
+                    arrancarCronometroTimbaVisual(tiempoAjustado > 0 ? tiempoAjustado : datos.siguienteIn);
+               }, TIEMPO_CONGELADO_MS);
+          }
+     } catch (err) { 
+          console.error('Error al actualizar créditos de timba:', err); 
+     }
 }
 
 function rotarPartidoTimba() {
@@ -2256,32 +2216,23 @@ function liberarNavegacionArenaUI() {
    ======================================================================== */
 
 async function cargarRankingLocal() {
-     // Disparamos la carga del ranking mundial en paralelo
      cargarRankingMundialesLocal();
-     
      const tbody = document.getElementById("tabla-ranking-body");
      if (!tbody) return;
 
      try {
-          // Fetch usando el helper seguro para pasar el token Bearer JWT al servidor
+          const token = localStorage.getItem("token");
+
+          // Fetch con cabecera de tester para pasar el candado de mantenimiento
           const res = await fetch(`${URL_BASE}/ranking`, {
                method: "GET",
-               headers: obtenerHeadersSeguros()
+               headers: { "Authorization": `Bearer ${token}` }
           });
-
-          // Parche de resguardo: Si el server responde con mantenimiento (503), evitamos romper el JSON parser
-          const contentType = res.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:var(--rojo); padding:10px;">🚧 Arena en mantenimiento estructural</td></tr>`;
-               return;
-          }
-
           const data = await res.json();
           tbody.innerHTML = "";
 
           if (!data.ranking || data.ranking.length === 0) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding:10px;">No hay jugadores en la arena</td></tr>`; 
-               return;
+               tbody.innerHTML = `<tr><td colspan="3" style="color:#777;">No hay jugadores en la arena</td></tr>`; return;
           }
 
           data.ranking.forEach((user, index) => {
@@ -2293,6 +2244,7 @@ async function cargarRankingLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
+               // 🔥 CORREGIDO: Eliminadas las comillas extras de la función onclick para pasar el entero nativo
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
@@ -2305,9 +2257,7 @@ async function cargarRankingLocal() {
                `;
                tbody.appendChild(tr);
           });
-     } catch (err) { 
-          console.error("Error al cargar ranking de penales:", err); 
-     }
+     } catch (err) { console.error(err); }
 }
 
 async function cargarRankingMundialesLocal() {
@@ -2315,38 +2265,34 @@ async function cargarRankingMundialesLocal() {
      if (!tbody) return;
 
      try {
-          // Fetch con cabecera unificada segura
+          const token = localStorage.getItem("token");
+
+          // Fetch con cabecera de tester para pasar el candado de mantenimiento
           const res = await fetch(`${URL_BASE}/ranking-mundiales`, {
                method: "GET",
-               headers: obtenerHeadersSeguros()
+               headers: { "Authorization": `Bearer ${token}` }
           });
-
-          const contentType = res.headers.get("content-type");
-          if (!contentType || !contentType.includes("application/json")) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:var(--rojo); padding: 15px;">🚧 Marcadores en mantenimiento por reformas</td></tr>`;
-               return;
-          }
-
           const data = await res.json();
           tbody.innerHTML = "";
 
           if (!data.ranking || data.ranking.length === 0) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding: 15px;">🌟 Todavía no hay campeones en la Arena. ¡Sé el primero! 👑</td></tr>`; 
-               return;
+               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding: 15px;">🌟 Todavía no hay campeones en la Arena. ¡Sé el primero! 👑</td></tr>`; return;
           }
 
           data.ranking.forEach((user, index) => {
-               const tr = document.createElement("tr");
-               if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
+                const tr = document.createElement("tr");
+                if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
 
-               let posicionText = index + 1;
-               if (index === 0) posicionText = "🥇";
-               if (index === 1) posicionText = "🥈";
-               if (index === 2) posicionText = "🥉";
+                let posicionText = index + 1;
+                if (index === 0) posicionText = "🥇";
+                if (index === 1) posicionText = "🥈";
+                if (index === 2) posicionText = "🥉";
 
-               const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
+                // 🛡️ ESCANEO COMPLETO DE PROPIEDADES EN POSTGRES
+                //console.log("🕵️ Escaneando datos de la fila del ranking:", user);
+                const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
 
-               tr.innerHTML = `
+                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
                         class="celda-rival-click"
@@ -2355,19 +2301,22 @@ async function cargarRankingMundialesLocal() {
                         👤 ${user.username} ${usuarioActual && Number(idDetectado) === Number(usuarioActual.id) ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
                     </td>
                     <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales || user.copas || 0}</td>
-               `;
+                `;
 
-               const celdaClick = tr.querySelector(".celda-rival-click");
-               if (celdaClick) {
+                const celdaClick = tr.querySelector(".celda-rival-click");
+                
+                if (celdaClick) {
                     celdaClick.addEventListener("click", async () => {
                         if (!idDetectado) {
-                                console.error("❌ Mapeo roto. Sin ID:", user);
+                                console.error("❌ Mapeo roto. El objeto de la DB no contiene ninguna propiedad de ID conocida:", user);
                                 return alert("❌ Error de datos: No se pudo rastrear el ID único de este competidor.");
                         }
 
                         const idLimpio = Number(idDetectado);
+                        
+                        // Control extra: Si dio NaN el casteo numérico por venir corrupto de la DB, frenamos acá
                         if (isNaN(idLimpio)) {
-                                console.error("❌ ID corrupto (NaN):", idDetectado);
+                                console.error("❌ El ID detectado no es un número válido (NaN):", idDetectado);
                                 return alert("❌ Error de casteo: El ID del rival llegó corrupto de la base de datos.");
                         }
 
@@ -2375,17 +2324,16 @@ async function cargarRankingMundialesLocal() {
                                 await inspeccionarPerfilRival(idLimpio);
                         }
                     });
-               }
+                }
 
-               tbody.appendChild(tr);
-          });
-     } catch (err) { 
-          console.error("Error al cargar ranking de mundiales:", err); 
-     }
+                tbody.appendChild(tr);
+            });
+     } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
 }
 
 // Variable global temporal para retener los datos del informe que vienen de Neon
 let datosInformeParcheCache = null;
+
 /* ========================================================================
    📢 PASO 1: CONTROLADOR DE NOVEDADES Y PARCHES DE LA ARENA (MULTIMEDIA NATIVO)
    ======================================================================== */
@@ -2879,14 +2827,18 @@ async function comprarCartaMercado(ofertaId) {
                 usuarioActual.monedas = data.nuevoOro;
             }
 
-            // 🔄 Cambiado cargarDatosUsuario() por tu función real de la Arena
-            if (typeof actualizarInterfazUI === "function") {
-                actualizarInterfazUI();
+            const elMonedas = document.getElementById("lbl-monedas");
+            if (elMonedas && data.nuevoOro !== undefined) {
+                elMonedas.innerText = data.nuevoOro;
             }
-            
-            if (typeof actualizarMiPerfilUI === "function") {
-                actualizarMiPerfilUI();
+
+            // 🎵 Gatillo de audio premium
+            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+                AudioArena.play('monedas');
             }
+
+            if (typeof cargarDatosUsuario === "function") cargarDatosUsuario();
+            if (typeof actualizarPerfilUI === "function") actualizarPerfilUI();
 
             cargarAlbumLocal(); 
             obtenerOfertasMercado(); // 🔥 FIX: Corregido de obtenerOffersMercado() a obtenerOfertasMercado()
@@ -2894,11 +2846,6 @@ async function comprarCartaMercado(ofertaId) {
             // Refrescamos el historial dinámico si ya metiste el feed global abajo
             if (typeof actualizarHistorialTransferenciasUI === "function") {
                 actualizarHistorialTransferenciasUI();
-            }
-
-            // 🎵 Gatillo de audio premium
-            if (typeof AudioArena !== 'undefined' && AudioArena.play) {
-                AudioArena.play('monedas');
             }
 
         } else {
@@ -3224,39 +3171,31 @@ function iniciarCronometroResetMisiones() {
 
     intervaloResetMisiones = setInterval(() => {
         const ahora = new Date();
-        
-        // 🇦🇷 Forzamos a obtener el tiempo exacto en la zona horaria de Buenos Aires
-        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
-        const ahoraArg = new Date(ahoraArgStr);
+        const medianoche = new Date();
+        medianoche.setHours(24, 0, 0, 0); // Define el corte automático de fin de día
 
-        // 🎯 Definimos la medianoche exacta del día de hoy de forma manual y limpia
-        const medianoche = new Date(ahoraArg.getFullYear(), ahoraArg.getMonth(), ahoraArg.getDate() + 1, 0, 0, 0, 0);
+        let tiempoRestanteMs = medianoche - ahora;
 
-        // Operación atómica con timestamps de milisegundos reales
-        const tiempoRestanteMs = medianoche.getTime() - ahoraArg.getTime();
-
-        // 🛡️ PARCHE DE SEGURIDAD INTERNO
-        if (isNaN(tiempoRestanteMs) || tiempoRestanteMs <= 0) {
+        // 🛡️ PARCHE DE SEGURIDAD: Si el reloj cae en un remanente negativo o cero absoluto, 
+        // frenamos el loop, forzamos el cartel y desfasamos la recarga para romper el bucle.
+        if (tiempoRestanteMs <= 0) {
             clearInterval(intervaloResetMisiones);
             elTimer.innerHTML = `🔄 REINICIANDO CARTELERA...`;
             
             setTimeout(() => {
-                if (typeof cargarMisionesDelServidor === "function") {
-                    cargarMisionesDelServidor(); 
-                }
-            }, 3000); 
+                // Pedimos las misiones y este mismo método encenderá un reloj limpio apuntando al día de mañana
+                cargarMisionesDelServidor(); 
+            }, 3000); // 3 segundos de resguardo estructural
             return;
         }
 
         const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
         const horas = Math.floor(totalSegundos / 3600);
-        const minutos = Math.floor((totalSegundos % 3600) / 60); 
+        const minutos = Math.floor((totalSegundos % 3600) / 60); // 🔥 FIX: Alineado a nomenclatura en español
         const segundos = totalSegundos % 60;
 
         const stringReloj = `${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
-        
-        // Usamos innerHTML para que respete si tenías algún emoji o estructura de Twemoji previa
-        elTimer.innerHTML = `🔄 REINICIO EN: ${stringReloj}`;
+        elTimer.innerText = `🔄 REINICIO EN: ${stringReloj}`;
     }, 1000);
 }
 
@@ -3639,67 +3578,66 @@ let intervaloResetRanking = null; // Control atómico anti-loops
 function iniciarCronometroResetRanking() {
     if (intervaloResetRanking) clearInterval(intervaloResetRanking);
 
-    const calcularYRenderizar = async () => {
+    const calcularYRenderizar = () => {
         const ahora = new Date();
         
-        // 🇦🇷 Convertimos la hora actual de forma segura a la hora de Buenos Aires
-        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
-        const ahoraArg = new Date(ahoraArgStr);
-        
         // Calculamos los días que faltan para el próximo lunes (Day 1 en JS)
-        let diasFaltantes = (1 - ahoraArg.getDay() + 7) % 7;
+        let diasFaltantes = (1 - ahora.getDay() + 7) % 7;
         
-        // Si ya es lunes pero pasó la medianoche, el reset es el próximo lunes
-        if (diasFaltantes === 0 && (ahoraArg.getHours() > 0 || ahoraArg.getMinutes() > 0 || ahoraArg.getSeconds() > 0)) {
+        // Si ya es lunes, pero pasó la medianoche, el próximo reset es el lunes que viene
+        if (diasFaltantes === 0 && (ahora.getHours() > 0 || ahora.getMinutes() > 0 || ahora.getSeconds() > 0)) {
             diasFaltantes = 7;
         }
 
-        // 🎯 Creamos el objetivo del lunes a la medianoche de forma nativa e independiente
-        const proximoLunesReset = new Date(ahoraArg.getFullYear(), ahoraArg.getMonth(), ahoraArg.getDate() + diasFaltantes, 0, 0, 0, 0);
+        const proximoLunesReset = new Date();
+        proximoLunesReset.setDate(ahora.getDate() + diasFaltantes);
+        proximoLunesReset.setHours(0, 0, 0, 0);
 
-        // Operación matemática limpia entre Timestamps numéricos (evita NaN)
-        const tiempoRestanteMs = proximoLunesReset.getTime() - ahoraArg.getTime();
+        const tiempoRestanteMs = proximoLunesReset - ahora;
 
+        // 🎯 CAPTURAMOS LAS TRES ETIQUETAS DE LA ARENA
         const timerPenales = document.getElementById("timer-ranking-semanal");
         const timerMundial = document.getElementById("timer-ranking-semanal-mundial");
         const timerSBC = document.getElementById("sbc-timer-rotacion");
 
-        // Si hay error de cálculo o ya llegó a cero, disparamos el reset
-        if (isNaN(tiempoRestanteMs) || tiempoRestanteMs <= 0) {
-            const msgReset = "🔄 CALCULANDO LIGA...";
-            [timerPenales, timerMundial, timerSBC].forEach(el => { if (el) el.innerText = msgReset; });
-            
+        if (tiempoRestanteMs <= 0) {
             clearInterval(intervaloResetRanking);
+            const msgReset = "🔄 ROTANDO CARTELERA Y DISTRIBUYENDO PREMIOS...";
             
-            // Espera asíncrona de 10s para que Render procese la base de datos de Neon
-            await new Promise(r => setTimeout(r, 10000)); 
+            if (timerPenales) timerPenales.innerText = msgReset;
+            if (timerMundial) timerMundial.innerText = msgReset;
+            if (timerSBC) timerSBC.innerText = msgReset;
             
-            if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
-            if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
-            if (typeof cargarModuloSBC === 'function') cargarModuloSBC();
-            
-            iniciarCronometroResetRanking();
+            setTimeout(() => {
+                if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
+                if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
+                if (typeof cargarModuloSBC === 'function') cargarModuloSBC();
+                iniciarCronometroResetRanking();
+            }, 10000);
             return;
         }
 
-        // Convertimos los milisegundos restantes a strings legibles
         const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
         const dias = Math.floor(totalSegundos / 86400);
         const horas = Math.floor((totalSegundos % 86400) / 3600);
         const minutos = Math.floor((totalSegundos % 3600) / 60);
         const segundos = totalSegundos % 60;
 
-        const str = `${dias > 0 ? dias + 'd ' : ''}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
+        const stringDias = dias > 0 ? `${dias}d ` : "";
+        const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
         
-        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${str}`;
-        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${str}`;
-        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${str}`;
+        // 🚀 INYECCIÓN SIMULTÁNEA CONTROLADA (No rompe si el elemento no está renderizado)
+        if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
+        if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
     };
 
+    // Executamos una vez al instante para ganarle al delay del primer segundo
     calcularYRenderizar();
+
+    // Arrancamos el bucle limpio
     intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
 }
-
 
 function toggleVisibilidadMisiones() {
     const wrapper = document.getElementById("wrapper-desplegable-misiones");
@@ -3881,29 +3819,14 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. Bloque B: Estadísticas de Juego Remapeadas (Timba por un lado si tenés IDs, y Penales por el otro)
-        if (perfil.estadisticasTimba) {
-            const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
-            if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba.porcentajeEfectividad || 0}%`;
+        // 3. Bloque B: Estadísticas de Juego Remapeadas
+        const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
+        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${perfil.estadisticasTimba?.porcentajeEfectividad || 0}%`;
 
-            const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
-            if (txtTimbaJugadas) {
-                const ganadas = (perfil.estadisticasTimba.ganadasExacto || 0) + (perfil.estadisticasTimba.ganadasSigno || 0);
-                txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba.jugadas || 0} Totales`;
-            }
-        }
-
-        // ⚽ INYECCIÓN REMAPEADA DE PENALES (Usa los nuevos IDs del HTML)
-        if (perfil.estadisticasPenales) {
-            const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
-            if (txtPenalesEfectividad) {
-                txtPenalesEfectividad.innerText = `${perfil.estadisticasPenales.porcentajeEfectividad || 0}%`;
-            }
-
-            const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
-            if (txtPenalesJugadas) {
-                txtPenalesJugadas.innerText = `${perfil.estadisticasPenales.ganados || 0} Ganados / ${perfil.estadisticasPenales.jugados || 0} Totales`;
-            }
+        const txtTimbaJugadas = document.getElementById("perfil-txt-timba-jugadas");
+        if (txtTimbaJugadas) {
+            const ganadas = (perfil.estadisticasTimba?.ganadasExacto || 0) + (perfil.estadisticasTimba?.ganadasSigno || 0);
+            txtTimbaJugadas.innerText = `${ganadas} Ganados / ${perfil.estadisticasTimba?.jugadas || 0} Totales`;
         }
 
         const txtMundiales = document.getElementById("stat-mundiales-copas");
@@ -3922,39 +3845,44 @@ async function actualizarMiPerfilUI() {
             divAvatar.innerText = "";
         }
 
-        // 🌟 NUEVO BLOQUE CORREGIDO: Usamos la URL de la base de datos o la de memoria en tiempo real
+        // 🌟 NUEVO BLOQUE: Render del Cromo Insignia de mi Vestuario
         const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
         if (contenedorDestacado) {
             if (perfil.cromo_destacado) {
-                const cromoMapeado = { id: 0, nombre: "Cromo Insignia", foto: perfil.cromo_destacado, rareza: "legendaria" };
-                localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromoMapeado));
+                contenedorDestacado.innerHTML = `
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
+                        <img src="${perfil.cromo_destacado}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                `;
+            } else {
+                contenedorDestacado.innerHTML = `<p style="color: #64748b; font-style: italic; font-size: 0.85rem; margin: 0;">No se seleccionó cromo insignia...</p>`;
             }
-            renderizarCromoDestacadoUI();
         }
 
+        // ✍️ CARGA DE FIRMAS: Traemos las firmas de mi propio muro para exhibirlas
         if (typeof cargarFirmasDelPerfil === "function") {
              cargarFirmasDelPerfil(usuarioActual.id);
         }
+
     } catch (err) {
         console.error("❌ Error al renderizar los nuevos bloques del perfil:", err);
     }
 }
 
-async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
+async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
     if (!usuarioActual || !usuarioActual.id) return alert("⚠️ No se detectó una sesión activa.");
 
     try {
         mostrarCarga("Actualizando tu jugador destacado...");
+
         const token = localStorage.getItem("token");
-        
-        // Conexión limpia con el Backend
         const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ fotoUrl: cromoRutaImagen })
+            body: JSON.stringify({ fotoUrl: fotoUrl })
         });
 
         const data = await res.json();
@@ -3963,17 +3891,20 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // Guardamos en la memoria del juego y en LocalStorage para tu diseño
-            usuarioActual.cromo_destacado = cromoRutaImagen;
-            const cromoObjeto = { id, nombre, foto: cromoRutaImagen, rareza };
-            localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromoObjeto));
+            // 🔄 Sincronizamos la memoria local con la nueva columna separada
+            usuarioActual.cromo_destacado = fotoUrl;
 
-            // Dibujamos la carta con su color de rareza al instante
-            if (typeof renderizarCromoDestacadoUI === "function") {
-                renderizarCromoDestacadoUI();
+            // 🎯 FORZAMOS EL REDIBUJADO VISUAL INMEDIATO DEL CROMO DESTACADO (Mi Perfil)
+            const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
+            if (contenedorDestacado) {
+                contenedorDestacado.innerHTML = `
+                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
+                        <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                `;
             }
             
-            // Refrescamos estadísticas del perfil
+            // 🔄 Recargamos el perfil de fondo para actualizar estadísticas de ser necesario
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
@@ -3982,11 +3913,10 @@ async function marcarCromoComoDestacado(id, nombre, cromoRutaImagen, rareza) {
         }
     } catch (err) {
         if (typeof ocultarCarga === "function") ocultarCarga();
-        console.error("❌ Error al enviar el cromo destacado:", err);
+        console.error("Error al enviar el cromo destacado:", err);
         alert("❌ Error de red al intentar conectar con el vestuario.");
     }
 }
-
 
 // A. Abre el panel dinámico y renderiza tus banderas/avatares desde Neon
 async function abrirCatalogoAvataresUI() {
@@ -4064,6 +3994,13 @@ async function procesarCambioFotoPerfil(fotoId) {
     }
 }
 
+// Guarda tu carta favorita en el almacenamiento local del juego
+function marcarCromoComoDestacado(id, nombre, foto, rareza) {
+    const cromo = { id, nombre, foto, rareza };
+    localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromo));
+    alert(`🌟 ¡${nombre.toUpperCase()} fue asignado como tu cromo insignia del vestuario!`);
+}
+
 // Inyecta el cromo seleccionado dentro de la caja de tu perfil
 function renderizarCromoDestacadoUI() {
     const contenedor = document.getElementById("perfil-contenedor-destacado");
@@ -4078,6 +4015,7 @@ function renderizarCromoDestacadoUI() {
 
     const cromo = JSON.parse(cromoGuardado);
     
+    // Determinamos el color de borde según la rareza para mantener la estética limpia
     let colorBorde = "var(--celeste)";
     if (cromo.rareza.toLowerCase() === "epica") colorBorde = "#a855f7";
     if (cromo.rareza.toLowerCase() === "legendaria") colorBorde = "var(--dorado)";
@@ -4233,74 +4171,67 @@ async function equiparAvatarDesdeTienda(fotoId) {
 // ========================================================================
 
 async function cargarFirmasDelPerfil(perfilId) {
-    if (!perfilId) return;
-    
-    const contenedorFirmas = document.getElementById("contenedor-lista-firmas") 
-        || document.getElementById("bloque-firmas-muro"); // Resguardo por si cambia el ID en tu HTML
+    // 🛡️ ESCUDO: Si no hay id válido de perfil, abortamos para evitar URLs rotas
+    if (!perfilId || perfilId === "null" || perfilId === "undefined") return;
+
+    const esMiMuro = usuarioActual && usuarioActual.id === parseInt(perfilId);
+    const idContenedor = esMiMuro ? "mi-contenedor-lista-firmas" : "contenedor-lista-firmas";
+
+    const contenedor = document.getElementById(idContenedor);
+    if (!contenedor) return;
+    contenedor.innerHTML = "<p style='color: #64748b; font-size: 0.9rem;'>Cargando dedicatorias...</p>";
 
     try {
-        // 🎯 DEFINICIÓN ATÓMICA DE LA VARIABLE:
-        // Evaluamos numéricamente si el ID del perfil que estamos mirando es el de nuestra sesión
-        const esMiMuro = usuarioActual && Number(perfilId) === Number(usuarioActual.id);
-
-        // Fetch seguro enviando los headers de Tester para saltear el 503
+        // 🔓 Petición pública limpia sin pasar por obtenerHeadersSeguros()
         const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
-            method: "GET",
-            headers: obtenerHeadersSeguros() 
+            method: 'GET'
         });
-        
         const data = await res.json();
-        
-        if (!data.ok || !data.firmas) {
-            if (contenedorFirmas) {
-                contenedorFirmas.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem; padding: 15px;">Aún no hay firmas en este libro. ¡Sé el primero!</p>`;
+
+        if (!data.ok || data.firmas.length === 0) {
+            if (esMiMuro) {
+                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó tu vestuario todavía. ¡Hacete notar en las tablas para que vengan! 📋</p>";
+            } else {
+                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó este muro todavía. ¡Sé el primero en dejar tu marca! 🚀</p>";
             }
             return;
         }
 
-        if (contenedorFirmas) {
-            contenedorFirmas.innerHTML = ""; // Limpiamos la visual anterior
-
-            if (data.firmas.length === 0) {
-                contenedorFirmas.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem; padding: 15px;">Aún no hay firmas en este libro. ¡Sé el primero!</p>`;
-                return;
+        contenedor.innerHTML = "";
+        data.firmas.forEach(f => {
+            const divFirma = document.createElement("div");
+            divFirma.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left;";
+            
+            const fechaOriginal = new Date(f.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+            let flagFecha = `<span style="color: #475569; font-size: 0.75rem;">${fechaOriginal}</span>`;
+            
+            if (f.editado_en) {
+                const fechaEdit = new Date(f.editado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+                flagFecha = `<span style="color: var(--dorado); font-size: 0.75rem;" title="Original: ${fechaOriginal}">✏️ Editado el ${fechaEdit}</span>`;
             }
 
-            // Recorremos las firmas que nos devolvió Neon
-            data.firmas.forEach(firma => {
-                const divFirma = document.createElement("div");
-                divFirma.className = "tarjeta-firma-libro";
-                divFirma.style.cssText = "background: rgba(15,23,42,0.6); padding: 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #1e293b; position: relative;";
+            const esMio = usuarioActual && usuarioActual.id === f.autor_id;
+            const botonera = esMio ? `
+                <div style="display: flex; gap: 8px; margin-top: 5px; justify-content: flex-end;">
+                    <button onclick="dispararEditarFirma(${f.id}, '${f.mensaje}', ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #334155;">Editar</button>
+                    <button onclick="ejecutarBorrarFirma(${f.id}, ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #ef4444; color: #fff;">Borrar</button>
+                </div>
+            ` : '';
 
-                // Validamos si la firma le pertenece al usuario logueado en esta sesión
-                const esAutorDeLaFirma = usuarioActual && Number(firma.autor_id) === Number(usuarioActual.id);
+            divFirma.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: var(--celeste); font-size: 0.9rem;">@${f.username}</strong>
+                    ${flagFecha}
+                </div>
+                <p id="texto-firma-${f.id}" style="margin: 4px 0; color: #cbd5e1; font-size: 0.9rem; word-break: break-word;">${f.mensaje}</p>
+                ${botonera}
+            `;
+            contenedor.appendChild(divFirma);
+        });
 
-                // 🗑️ LÓGICA DE BORRADO INTEGRADA: 
-                // Se puede borrar si el dueño del muro quiere limpiarlo O si el que la escribió se arrepintió
-                const mostrarBotonBorrar = esMiMuro || esAutorDeLaFirma;
-
-                divFirma.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <span style="color: var(--celeste); font-weight: bold; font-size: 0.85rem;">✍️ ${firma.username.toUpperCase()}</span>
-                        <span style="color: #475569; font-size: 0.7rem;">${new Date(firma.creado_en).toLocaleDateString()}</span>
-                    </div>
-                    <p style="color: #cbd5e1; font-size: 0.85rem; margin: 0; padding-right: 25px; word-break: break-word;">${firma.mensaje}</p>
-                    ${mostrarBotonBorrar ? `
-                        <button onclick="eliminarFirmaLocal(${firma.id}, ${perfilId})" 
-                                style="position: absolute; top: 8px; right: 8px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem; padding: 2px 6px;" 
-                                title="Eliminar firma">
-                            ❌
-                        </button>
-                    ` : ""}
-                `;
-                contenedorFirmas.appendChild(divFirma);
-            });
-        }
     } catch (err) {
-        console.error("❌ Error al cargar firmas:", err);
-        if (contenedorFirmas) {
-            contenedorFirmas.innerHTML = `<p style="color: var(--rojo); text-align: center; font-size: 0.85rem;">Fallo de red al conectar con el libro de firmas.</p>`;
-        }
+        console.error("❌ Fallo de red en firmas:", err);
+        contenedor.innerHTML = "<p style='color: #ef4444; text-align: center; font-size: 0.85rem;'>📡 Error al conectar con el servidor de firmas.</p>";
     }
 }
 
