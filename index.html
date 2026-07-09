@@ -624,7 +624,7 @@
                             <input type="password" id="pass-sala-pvp" placeholder="Vacío si querés que sea pública" style="width: 100%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px; box-sizing: border-box;">
                         </div>
                         
-                        <button type="button" onclick="crearLobbyMundial()" class="btn-estadio" style="margin-top: 20px; background: var(--verde-match); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
+                        <button type="button" id="btn-crear-sala-mundial" class="btn-estadio" style="margin-top: 20px; background: var(--verde-match); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
                             CREAR TORNEO
                         </button>
                     </div>
@@ -644,7 +644,7 @@
                                 <input type="password" id="pass-unirse-manual" placeholder="Contraseña" style="width: 50%; padding: 10px; background: #020617; border: 1px solid #334155; color: #fff; border-radius: 8px;">
                             </div>
                             
-                            <button type="button" onclick="unirseLobbyMundial()" class="btn-estadio" style="margin-top: 12px; background: var(--celeste); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
+                            <button type="button" id="btn-unirse-sala-mundial" class="btn-estadio" style="margin-top: 12px; background: var(--celeste); color: #000; font-weight: bold; padding: 12px; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; width: 100%;">
                                 UNIRSE A SALA
                             </button>
                         </div>
@@ -665,25 +665,21 @@
                         <span id="txt-estrellas-calculadas" style="color: var(--dorado); font-family: 'Oswald'; font-weight: bold; font-size: 1.4rem; text-shadow: 0 0 8px rgba(234, 179, 8, 0.4);">⭐ 0 ESTRELLAS</span>
                     </div>
 
-                    <div id="lista-participantes-lobby" style="color: #fff; font-size: 0.9rem; background: rgba(2, 6, 23, 0.5); padding: 12px; border-radius: 8px; min-height: 60px;">
-                        </div>
+                    <div id="lista-participantes-lobby" style="color: #fff; font-size: 0.9rem; background: rgba(2, 6, 23, 0.5); padding: 12px; border-radius: 8px; min-height: 60px;"></div>
 
-                    <button type="button" id="btn-start-mundial" onclick="lanzarEstructuraMundial()" style="display: none; margin-top: 20px; background: var(--dorado); color: #000; width: 100%; padding: 14px; font-weight: bold; font-size: 1.15rem; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);">
+                    <button type="button" id="btn-start-mundial" style="display: none; margin-top: 20px; background: var(--dorado); color: #000; width: 100%; padding: 14px; font-weight: bold; font-size: 1.15rem; border-radius: 8px; font-family: 'Oswald'; text-transform: uppercase; border: none; cursor: pointer; box-shadow: 0 4px 14px rgba(234, 179, 8, 0.3);">
                         🏁 LARGAR OCTAVOS DE FINAL
                     </button>
                 </div>
 
                 <div id="panel-fixture-mundial" style="display: none; background: rgba(2, 6, 23, 0.6); padding: 20px; border-radius: 12px; border: 1px solid #1e293b;">
-                    
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(30, 41, 59, 0.8); padding-bottom: 12px; margin-bottom: 15px;">
                         <span style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.95rem; font-weight: 600; letter-spacing: 0.5px;">🏆 TRANSMISIÓN OFICIAL MUNDIALISTA</span>
                         <span id="reloj-pvp-live" style="font-weight: bold; color: var(--celeste); font-family: 'Courier New', monospace; font-size: 0.95rem;">⏱️ ESPERANDO PITAZO...</span>
                     </div>
 
-                    <div id="contenedor-render-cruces" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;">
-                        </div>
+                    <div id="contenedor-render-cruces" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 5px;"></div>
                 </div>
-
             </div>
 
         </section>
