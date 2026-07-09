@@ -838,7 +838,14 @@ app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
 
         await client.query('COMMIT');
         return res.json({ ok: true, terna: ternaFiltrada, rivalClasificacion, monedasActualizadas: nuevoOro });
-    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: err.message }); } finally { client.release(); }
+    } catch (err) {
+        // ESTO es lo que necesito que leas
+        console.error("DEBUG ERROR EN MUNDIAL:", err); 
+        res.status(500).json({ 
+            ok: false, 
+            mensaje: "Error interno", 
+            error: err.message // Esto te devolverá el error real al navegador
+        }); } finally { client.release(); }
 });
 
 app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
