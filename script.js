@@ -3830,11 +3830,13 @@ function toggleVisibilidadMisiones() {
     // Conmutamos la clase de colapso
     wrapper.classList.toggle("colapsado");
 
-    // Feedback visual y cambio de flecha
+    // 🔄 Controlamos el display en base a si tiene la clase o no
     if (wrapper.classList.contains("colapsado")) {
+        wrapper.style.display = "none";
         boton.innerText = "▼";
         boton.style.color = "var(--dorado)"; // Pasa a dorado para resaltar que está guardado
     } else {
+        wrapper.style.display = "block";
         boton.innerText = "▲";
         boton.style.color = "#64748b"; // Vuelve al color gris neutro
     }
