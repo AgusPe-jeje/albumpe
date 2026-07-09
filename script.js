@@ -4710,9 +4710,36 @@ function conectarYPrenderEscuchasPvP() {
         const listaDiv = document.getElementById('lista-participantes-lobby');
         if (!listaDiv) return;
 
-        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste); font-family:'Oswald'; text-transform: uppercase;">Participantes Confirmados (${jugadores.length}/16):</h5>`;
+        listaDiv.innerHTML = `<h5 style="margin:10px 0 12px; color:var(--celeste); font-family:'Oswald'; text-transform: uppercase; letter-spacing: 0.5px;">Participantes Confirmados (${jugadores.length}/16):</h5>`;
+        
         jugadores.forEach((j, idx) => {
-            listaDiv.innerHTML += `<p style="margin:3px 0; font-size:0.9rem; color:#94a3b8;">📋 ${idx + 1}. <strong>${j.username}</strong> - Equipo: <span style="color:#fff; font-weight:bold;">${j.seleccion === null ? 'Eligiendo...' : j.seleccion.toUpperCase()}</span></p>`;
+            // 🛡️ Si el jugador ya confirmó su draft, preparamos las estrellas, sino queda en "Eligiendo..."
+            let badgeEstrellas = "";
+            if (j.seleccion && j.estrellas) {
+                badgeEstrellas = `
+                    <span style="color: var(--dorado); font-family: 'Oswald'; font-weight: bold; font-size: 0.8rem; background: rgba(234, 179, 8, 0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(234, 179, 8, 0.2); margin-left: 8px; letter-spacing: 0.3px;">
+                        ⭐ ${j.estrellas} ESTRELLAS
+                    </span>
+                `;
+            }
+
+            const textoSeleccion = j.seleccion === null 
+                ? '<span style="color:#64748b; font-style:italic;">Eligiendo...</span>' 
+                : `<span style="color:#fff; font-weight:bold;">${j.seleccion.toUpperCase()}</span>`;
+
+            // Creamos una estructura limpia en forma de fila regular
+            const p = document.createElement('p');
+            p.style.cssText = "margin: 6px 0; font-size: 0.9rem; color: #94a3b8; display: flex; align-items: center; flex-wrap: wrap; background: #111827; padding: 6px 12px; border-radius: 6px; border: 1px solid #1f2937;";
+            
+            p.innerHTML = `
+                <span style="margin-right: 5px;">📋 ${idx + 1}.</span> 
+                <strong style="color: #fff; margin-right: 5px;">${j.username}</strong> 
+                <span style="margin-left: auto; display: inline-flex; align-items: center;">
+                    Equipo: ${textoSeleccion} ${badgeEstrellas}
+                </span>
+            `;
+            
+            listaDiv.appendChild(p);
         });
     });
 
@@ -4811,19 +4838,19 @@ function prepararFaseDraftUI(opcionesDraft) {
             const urlImagen = c.foto || 'img/default-card.png';
             const rarezaClean = c.rareza ? c.rareza.toLowerCase() : 'comun';
 
-            // 🎨 SISTEMA DE COLORES NEÓN PARA LAS PILLS SEGÚN RAREZA
-            let colorRareza = "#cbd5e1"; // Común (Blanco/Gris)
-            let shadowRareza = "none";
+            // 🎯 PALETA DE COLORES FIEL A TU ÁLBUM PANINI
+            let colorRareza = "#00ebd5"; // Común por defecto (Verde agua/Turquesa)
+            let shadowRareza = "0 0 8px rgba(0, 235, 213, 0.6)";
 
             if (rarezaClean.includes('legendaria') || rarezaClean.includes('icon') || rarezaClean.includes('mítica')) {
-                colorRareza = "#a855f7"; // Violeta Mítico
-                shadowRareza = "0 0 8px rgba(168, 85, 247, 0.6)";
+                colorRareza = "#bc00ff"; // Violeta Legendario
+                shadowRareza = "0 0 10px rgba(188, 0, 255, 0.7)";
             } else if (rarezaClean.includes('epica') || rarezaClean.includes('special')) {
-                colorRareza = "var(--dorado)"; // Épico Dorado
-                shadowRareza = "0 0 8px rgba(234, 179, 8, 0.6)";
+                colorRareza = "#ff007c"; // Rosa/Magenta Épico
+                shadowRareza = "0 0 10px rgba(255, 0, 124, 0.7)";
             } else if (rarezaClean.includes('rara') || rarezaClean.includes('oro')) {
-                colorRareza = "var(--celeste)"; // Raro Celeste
-                shadowRareza = "0 0 8px rgba(56, 189, 248, 0.6)";
+                colorRareza = "#009aff"; // Celeste Raro
+                shadowRareza = "0 0 10px rgba(0, 154, 255, 0.7)";
             }
 
             const label = document.createElement('label');
@@ -4852,7 +4879,7 @@ function prepararFaseDraftUI(opcionesDraft) {
                 </div>
                 <span style="font-size: 0.9rem; font-weight: bold; line-height: 1.2; display: block; margin-top: 4px; font-family: 'Oswald'; text-transform: uppercase; letter-spacing: 0.3px;">${c.nombre}</span>
                 
-                <small style="color: ${colorRareza}; font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold; text-shadow: ${shadowRareza}; background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                <small style="color: ${colorRareza}; font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold; text-shadow: ${shadowRareza}; background: rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 20px; border: 1px solid ${colorRareza}33;">
                     ${c.rareza}
                 </small>
             `;
@@ -4862,8 +4889,8 @@ function prepararFaseDraftUI(opcionesDraft) {
 
             checkboxInterno.addEventListener('change', () => {
                 if (checkboxInterno.checked) {
-                    label.style.border = "2px solid var(--verde-match)";
-                    label.style.boxShadow = "0 0 16px rgba(34, 197, 94, 0.5)";
+                    label.style.border = `2px solid ${colorRareza}`; // El borde que se enciende toma el color de su propia rareza
+                    label.style.boxShadow = `0 0 16px ${colorRareza}80`;
                     label.style.background = "#142236";
                     if (imgContainer) imgContainer.style.transform = "scale(1.03)";
                 } else {
@@ -4873,7 +4900,6 @@ function prepararFaseDraftUI(opcionesDraft) {
                     if (imgContainer) imgContainer.style.transform = "scale(1)";
                 }
 
-                // 📊 Disparar recuento instantáneo de estrellas
                 actualizarEstrellasDraftEnVivo();
             });
 
