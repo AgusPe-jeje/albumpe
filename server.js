@@ -808,7 +808,6 @@ app.get('/api/mundial/estado', verificarToken, async (req, res) => {
         client.release(); 
     }
 });
-ultima_timba_mundial
 app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const client = await pool.connect();
