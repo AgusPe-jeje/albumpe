@@ -808,6 +808,38 @@ app.get('/api/mundial/estado', verificarToken, async (req, res) => {
         client.release(); 
     }
 });
+app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
+    const usuario_id = req.usuarioLogueado.id;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const userCheck = await client.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
+        if (userCheck.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ ok: false, mensaje: "Usuario inválido." }); }
+
+        const usuario = userCheck.rows[0];
+        if (usuario.ultima_timba_mundial && (new Date() - new Date(usuario.ultima_timba_mundial) < COOLDOWN_MUNDIAL_MS)) {
+            await client.query('ROLLBACK'); return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Cooldown activo en el vestuario.` });
+        }
+
+        if (usuario.monedas < 1500) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "🪙 Se necesitan 1.500 monedas para la inscripción." }); }
+
+        const paisesValidosQuery = await client.query(`SELECT j.pais FROM usuario_progreso up JOIN jugadores j ON up.jugador_id = j.id WHERE up.usuario_id = $1 AND up.cantidad > 0 GROUP BY j.pais HAVING COUNT(j.id) >= 3`, [usuario_id]);
+        const paisesCandidatos = paisesValidosQuery.rows.map(r => r.pais);
+
+        if (paisesCandidatos.length === 0) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores del mismo país desbloqueados." }); }
+
+        const nuevoOro = usuario.monedas - 1500;
+        await client.query("UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", [nuevoOro, usuario_id]);
+
+        const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
+        let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
+        while (ternaFiltrada.includes(rivalClasificacion)) { rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)]; }
+
+        await client.query('COMMIT');
+        return res.json({ ok: true, terna: ternaFiltrada, rivalClasificacion, monedasActualizadas: nuevoOro });
+    } catch (err) { await client.query('ROLLBACK'); return res.status(500).json({ ok: false, error: err.message }); } finally { client.release(); }
+});
+
 app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const { seleccionElegida, jugadorIds } = req.body;
