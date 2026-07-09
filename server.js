@@ -1692,9 +1692,189 @@ app.get('/api/anuncio-actual', (req, res) => { res.json(CONFIG_ANUNCIO_SERVIDOR)
 setInterval(procesarResetSemanalRankings, 1000 * 60 * 60);
 setTimeout(procesarResetSemanalRankings, 5000);
 
+// ========================================================================
+// ⚔️ ACÁ VA EL MÓDULO AISLADO (Pegalo al fondo de todo, suelto)
+// ========================================================================
+function inicializarModuloMultijugador(io, pool) {
+    const salasActivas = {}; 
+
+    io.on('connection', (socket) => {
+        console.log(`📡 Conexión WebSocket establecida en la Arena: ${socket.id}`);
+
+        socket.on('buscarRival', async ({ usuarioId, username }) => {
+            try {
+                const salaDisponible = await pool.query(
+                    "SELECT * FROM salas_multijugador WHERE estado = 'ESPERANDO' AND creador_id != $1 LIMIT 1",
+                    [usuarioId]
+                );
+
+                if (salaDisponible.rows.length > 0) {
+                    const sala = salaDisponible.rows[0];
+                    await pool.query(
+                        "UPDATE salas_multijugador SET rival_id = $1, estado = 'JUGANDO' WHERE id = $2",
+                        [usuarioId, sala.id]
+                    );
+
+                    const salaNombre = `sala_${sala.sala_token}`;
+                    socket.join(salaNombre);
+
+                    salasActivas[salaNombre] = {
+                        dbId: sala.id,
+                        creador: { id: sala.creador_id, name: '', socketId: null, goles: 0, listo: false },
+                        rival: { id: usuarioId, name: username, socketId: socket.id, goles: 0, listo: false },
+                        cronometro: 0
+                    };
+
+                    io.to(salaNombre).emit('rivalEncontrado', {
+                        salaToken: sala.sala_token,
+                        rivalName: username
+                    });
+
+                } else {
+                    const tokenUnico = Math.random().toString(36).substring(2, 9);
+                    const nuevaSala = await pool.query(
+                        "INSERT INTO salas_multijugador (sala_token, creador_id, estado) VALUES ($1, $2, 'ESPERANDO') RETURNING id",
+                        [tokenUnico, usuarioId]
+                    );
+
+                    const salaNombre = `sala_${tokenUnico}`;
+                    socket.join(salaNombre);
+
+                    salasActivas[salaNombre] = {
+                        dbId: nuevaSala.rows[0].id,
+                        creador: { id: usuarioId, name: username, socketId: socket.id, goles: 0, listo: false },
+                        rival: null,
+                        cronometro: 0
+                    };
+
+                    socket.emit('salaCreada', { salaToken: tokenUnico });
+                }
+            } catch (err) {
+                console.error("❌ Error en matchmaking PvP:", err.message);
+                socket.emit('errorPvp', { mensaje: "Fallo en el sistema de emparejamiento." });
+            }
+        });
+
+        socket.on('jugadorListo', ({ salaToken, esCreador }) => {
+            const salaNombre = `sala_${salaToken}`;
+            const partida = salasActivas[salaNombre];
+            if (!partida) return;
+
+            if (esCreador) {
+                partida.creador.listo = true;
+                partida.creador.socketId = socket.id;
+            } else {
+                if (partida.rival) partida.rival.listo = true;
+            }
+
+            if (partida.creador.listo && partida.rival && partida.rival.listo) {
+                io.to(salaNombre).emit('comenzarPartidoPvP');
+                iniciarSimuladorPartidoPvP(salaNombre);
+            }
+        });
+
+        socket.on('registrarGolPvP', ({ salaToken, esCreador, relato }) => {
+            const salaNombre = `sala_${salaToken}`;
+            const partida = salasActivas[salaNombre];
+            if (!partida) return;
+
+            if (esCreador) partida.creador.goles++;
+            else partida.rival.goles++;
+
+            io.to(salaNombre).emit('marcadorActualizadoPvP', {
+                golesCreador: partida.creador.goles,
+                golesRival: partida.rival.goles,
+                relato: relato
+            });
+        });
+
+        socket.on('disconnect', () => {
+            for (const salaNombre in salasActivas) {
+                const partida = salasActivas[salaNombre];
+                if (partida.creador?.socketId === socket.id || partida.rival?.socketId === socket.id) {
+                    io.to(salaNombre).emit('rivalAbandono', { mensaje: "⚠️ Tu rival abandonó el campo de juego. Victoria por abandono." });
+                    pool.query("UPDATE salas_multijugador SET estado = 'FINALIZADO' WHERE id = $1", [partida.dbId]).catch(e => {});
+                    delete salasActivas[salaNombre];
+                    break;
+                }
+            }
+        });
+    });
+
+    function iniciarSimuladorPartidoPvP(salaNombre) {
+        const partida = salasActivas[salaNombre];
+        if (!partida) return;
+
+        const pvpTimer = setInterval(async () => {
+            partida.cronometro += 2;
+            if (partida.cronometro > 90) {
+                partida.cronometro = 90;
+                clearInterval(pvpTimer);
+                await finalizarPartidoPvP(salaNombre);
+                return;
+            }
+            io.to(salaNombre).emit('tickRelojPvP', { minuto: partida.cronometro });
+        }, 1000);
+    }
+
+    async function finalizarPartidoPvP(salaNombre) {
+        const partida = salasActivas[salaNombre];
+        if (!partida) return;
+
+        let ganadorId = null;
+        let mensajeFinal = "🏁 ¡FINAL DEL PARTIDO! Empate clavado en la Arena.";
+
+        if (partida.creador.goles > partida.rival.goles) {
+            ganadorId = partida.creador.id;
+            mensajeFinal = `👑 ¡FIN DEL PARTIDO! El creador de la sala gana el cruce.`;
+        } else if (partida.rival.goles > partida.creador.goles) {
+            ganadorId = partida.rival.id;
+            mensajeFinal = `👑 ¡FIN DEL PARTIDO! El retador se queda con los puntos.`;
+        }
+
+        try {
+            await pool.query(
+                "INSERT INTO historial_pvp (sala_id, ganador_id, goles_creador, goles_rival) VALUES ($1, $2, $3, $4)",
+                [partida.dbId, ganadorId, partida.creador.goles, partida.rival.goles]
+            );
+            await pool.query("UPDATE salas_multijugador SET estado = 'FINALIZADO' WHERE id = $1", [partida.dbId]);
+
+            if (ganadorId) {
+                await pool.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [ganadorId]);
+            }
+
+            io.to(salaNombre).emit('partidoTerminadoPvP', {
+                golesCreador: partida.creador.goles,
+                golesRival: partida.rival.goles,
+                ganadorId: ganadorId,
+                mensaje: mensajeFinal
+            });
+        } catch (err) {
+            console.error("❌ Error al liquidar premios PvP:", err.message);
+        } finally {
+            delete salasActivas[salaNombre];
+        }
+    }
+}
+
+
 /* ========================================================================
-   🚀 INICIALIZACIÓN DEL SERVIDOR
+   🚀 INICIALIZACIÓN FINAL DEL SERVIDOR (Esto va ABAJO DE TODO)
    ======================================================================== */
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor en la Nube activo en puerto ${PORT}`);
+const http = require('http');
+const { Server } = require('socket.io');
+
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*", 
+        methods: ["GET", "POST"]
+    }
+});
+
+// Llamamos al módulo pasándole las instancias que acabamos de crear arriba
+inicializarModuloMultijugador(io, pool);
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Servidor en la Nube con Socket.io activo en puerto ${PORT}`);
 });
