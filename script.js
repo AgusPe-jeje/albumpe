@@ -3835,21 +3835,27 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas con Penales
+        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas con Penales (Blindado con Fallbacks)
         const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
+        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
+
+        // Captura los datos tanto si vienen agrupados como si vienen en la raíz del objeto perfil de Neon
+        const totales = perfil.estadisticasPenales?.jugadas ?? perfil.penales_jugados ?? 0;
+        const ganados = perfil.estadisticasPenales?.ganadas ?? perfil.penales_ganados ?? 0;
+        
+        // Calculamos la efectividad acá en el cliente para asegurar consistencia visual
+        const porcentaje = totales > 0 ? Math.round((ganados / totales) * 100) : 0;
+
         if (txtPenalesEfectividad) {
-            txtPenalesEfectividad.innerText = `${perfil.estadisticasPenales?.porcentajeEfectividad || 0}%`;
+            txtPenalesEfectividad.innerText = `${porcentaje}%`;
         }
 
-        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
         if (txtPenalesJugadas) {
-            const ganados = perfil.estadisticasPenales?.ganadas || 0;
-            const totales = perfil.estadisticasPenales?.jugadas || 0;
             txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
         }
 
         const txtMundiales = document.getElementById("stat-mundiales-copas");
-        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.copasMundiales || 0}`;
+        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.copasMundiales ?? perfil.copas_mundiales ?? 0}`;
 
         const txtMonedas = document.getElementById("stat-monedas");
         if (txtMonedas) txtMonedas.innerText = perfil.monedas !== undefined ? perfil.monedas.toLocaleString() : 0;
