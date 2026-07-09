@@ -1782,9 +1782,18 @@ async function ejecutarTorneoMundial() {
         // 🏆 REPRODUCCIÓN DE LOS PLAYOFFS (SI CLASIFICASTE)
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
              const partido = data.progreso.bitacoraPlayoffs[i];
-             const ganoEsteCruce = partido.resultado.includes("Ganaste");
+             
+             // Usamos el flag nativo del backend para saber si avanzamos o morimos acá
+             const ganoEsteCruce = partido.ganoUsuarioReal === true;
+             
+             // Esperamos a que el partido se simule en la pantalla minuto a minuto
              await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, ganoEsteCruce, partido);
-             if (!ganoEsteCruce) break;
+             
+             // 🔥 SI PERDISTE, SE DEJA DE SIMULAR INMEDIATAMENTE
+             if (!ganoEsteCruce) {
+                  console.log("🛑 Eliminado del torneo. Frenando motores de la Arena.");
+                  break; 
+             }
         }
 
         if (data.progreso.campeon) {
