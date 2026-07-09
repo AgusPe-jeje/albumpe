@@ -128,7 +128,7 @@ async function inicializarTablas() {
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             timbas_hoy INTEGER DEFAULT 10,
             copas_mundiales INTEGER DEFAULT 0, 
-            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL
+            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL,
             ultimo_reset_misiones VARCHAR(10) DEFAULT NULL,
             racha_login INTEGER DEFAULT 0,
             ultimo_login_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
