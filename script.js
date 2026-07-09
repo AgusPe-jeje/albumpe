@@ -2256,23 +2256,32 @@ function liberarNavegacionArenaUI() {
    ======================================================================== */
 
 async function cargarRankingLocal() {
+     // Disparamos la carga del ranking mundial en paralelo
      cargarRankingMundialesLocal();
+     
      const tbody = document.getElementById("tabla-ranking-body");
      if (!tbody) return;
 
      try {
-          const token = localStorage.getItem("token");
-
-          // Fetch con cabecera de tester para pasar el candado de mantenimiento
+          // Fetch usando el helper seguro para pasar el token Bearer JWT al servidor
           const res = await fetch(`${URL_BASE}/ranking`, {
                method: "GET",
-               headers: { "Authorization": `Bearer ${token}` }
+               headers: obtenerHeadersSeguros()
           });
+
+          // Parche de resguardo: Si el server responde con mantenimiento (503), evitamos romper el JSON parser
+          const contentType = res.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+               tbody.innerHTML = `<tr><td colspan="3" style="color:var(--rojo); padding:10px;">🚧 Arena en mantenimiento estructural</td></tr>`;
+               return;
+          }
+
           const data = await res.json();
           tbody.innerHTML = "";
 
           if (!data.ranking || data.ranking.length === 0) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:#777;">No hay jugadores en la arena</td></tr>`; return;
+               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding:10px;">No hay jugadores en la arena</td></tr>`; 
+               return;
           }
 
           data.ranking.forEach((user, index) => {
@@ -2284,7 +2293,6 @@ async function cargarRankingLocal() {
                if (index === 1) posicionText = "🥈";
                if (index === 2) posicionText = "🥉";
 
-               // 🔥 CORREGIDO: Eliminadas las comillas extras de la función onclick para pasar el entero nativo
                tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
@@ -2297,7 +2305,9 @@ async function cargarRankingLocal() {
                `;
                tbody.appendChild(tr);
           });
-     } catch (err) { console.error(err); }
+     } catch (err) { 
+          console.error("Error al cargar ranking de penales:", err); 
+     }
 }
 
 async function cargarRankingMundialesLocal() {
@@ -2305,34 +2315,38 @@ async function cargarRankingMundialesLocal() {
      if (!tbody) return;
 
      try {
-          const token = localStorage.getItem("token");
-
-          // Fetch con cabecera de tester para pasar el candado de mantenimiento
+          // Fetch con cabecera unificada segura
           const res = await fetch(`${URL_BASE}/ranking-mundiales`, {
                method: "GET",
-               headers: { "Authorization": `Bearer ${token}` }
+               headers: obtenerHeadersSeguros()
           });
+
+          const contentType = res.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+               tbody.innerHTML = `<tr><td colspan="3" style="color:var(--rojo); padding: 15px;">🚧 Marcadores en mantenimiento por reformas</td></tr>`;
+               return;
+          }
+
           const data = await res.json();
           tbody.innerHTML = "";
 
           if (!data.ranking || data.ranking.length === 0) {
-               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding: 15px;">🌟 Todavía no hay campeones en la Arena. ¡Sé el primero! 👑</td></tr>`; return;
+               tbody.innerHTML = `<tr><td colspan="3" style="color:#777; padding: 15px;">🌟 Todavía no hay campeones en la Arena. ¡Sé el primero! 👑</td></tr>`; 
+               return;
           }
 
           data.ranking.forEach((user, index) => {
-                const tr = document.createElement("tr");
-                if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
+               const tr = document.createElement("tr");
+               if (usuarioActual && user.username === usuarioActual.username) tr.className = "fila-usuario-actual";
 
-                let posicionText = index + 1;
-                if (index === 0) posicionText = "🥇";
-                if (index === 1) posicionText = "🥈";
-                if (index === 2) posicionText = "🥉";
+               let posicionText = index + 1;
+               if (index === 0) posicionText = "🥇";
+               if (index === 1) posicionText = "🥈";
+               if (index === 2) posicionText = "🥉";
 
-                // 🛡️ ESCANEO COMPLETO DE PROPIEDADES EN POSTGRES
-                //console.log("🕵️ Escaneando datos de la fila del ranking:", user);
-                const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
+               const idDetectado = user.id || user.usuario_id || user.id_usuario || user.autor_id;
 
-                tr.innerHTML = `
+               tr.innerHTML = `
                     <td><b>${posicionText}</b></td>
                     <td style="text-align: left; padding-left: 15px; cursor: pointer; color: #fff; transition: color 0.2s;" 
                         class="celda-rival-click"
@@ -2341,22 +2355,19 @@ async function cargarRankingMundialesLocal() {
                         👤 ${user.username} ${usuarioActual && Number(idDetectado) === Number(usuarioActual.id) ? '<span style="color:var(--celeste); font-size:0.8rem;">(Vos)</span>' : ''}
                     </td>
                     <td style="color: var(--dorado); font-weight: bold; font-size: 1.2rem;">🏆 ${user.copas_mundiales || user.copas || 0}</td>
-                `;
+               `;
 
-                const celdaClick = tr.querySelector(".celda-rival-click");
-                
-                if (celdaClick) {
+               const celdaClick = tr.querySelector(".celda-rival-click");
+               if (celdaClick) {
                     celdaClick.addEventListener("click", async () => {
                         if (!idDetectado) {
-                                console.error("❌ Mapeo roto. El objeto de la DB no contiene ninguna propiedad de ID conocida:", user);
+                                console.error("❌ Mapeo roto. Sin ID:", user);
                                 return alert("❌ Error de datos: No se pudo rastrear el ID único de este competidor.");
                         }
 
                         const idLimpio = Number(idDetectado);
-                        
-                        // Control extra: Si dio NaN el casteo numérico por venir corrupto de la DB, frenamos acá
                         if (isNaN(idLimpio)) {
-                                console.error("❌ El ID detectado no es un número válido (NaN):", idDetectado);
+                                console.error("❌ ID corrupto (NaN):", idDetectado);
                                 return alert("❌ Error de casteo: El ID del rival llegó corrupto de la base de datos.");
                         }
 
@@ -2364,16 +2375,17 @@ async function cargarRankingMundialesLocal() {
                                 await inspeccionarPerfilRival(idLimpio);
                         }
                     });
-                }
+               }
 
-                tbody.appendChild(tr);
-            });
-     } catch (err) { console.error("Error al cargar ranking de mundiales:", err); }
+               tbody.appendChild(tr);
+          });
+     } catch (err) { 
+          console.error("Error al cargar ranking de mundiales:", err); 
+     }
 }
 
 // Variable global temporal para retener los datos del informe que vienen de Neon
 let datosInformeParcheCache = null;
-
 /* ========================================================================
    📢 PASO 1: CONTROLADOR DE NOVEDADES Y PARCHES DE LA ARENA (MULTIMEDIA NATIVO)
    ======================================================================== */
@@ -3212,31 +3224,39 @@ function iniciarCronometroResetMisiones() {
 
     intervaloResetMisiones = setInterval(() => {
         const ahora = new Date();
-        const medianoche = new Date();
-        medianoche.setHours(24, 0, 0, 0); // Define el corte automático de fin de día
+        
+        // 🇦🇷 Forzamos a obtener el tiempo exacto en la zona horaria de Buenos Aires
+        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+        const ahoraArg = new Date(ahoraArgStr);
 
-        let tiempoRestanteMs = medianoche - ahora;
+        // 🎯 Definimos la medianoche exacta del día de hoy de forma manual y limpia
+        const medianoche = new Date(ahoraArg.getFullYear(), ahoraArg.getMonth(), ahoraArg.getDate() + 1, 0, 0, 0, 0);
 
-        // 🛡️ PARCHE DE SEGURIDAD: Si el reloj cae en un remanente negativo o cero absoluto, 
-        // frenamos el loop, forzamos el cartel y desfasamos la recarga para romper el bucle.
-        if (tiempoRestanteMs <= 0) {
+        // Operación atómica con timestamps de milisegundos reales
+        const tiempoRestanteMs = medianoche.getTime() - ahoraArg.getTime();
+
+        // 🛡️ PARCHE DE SEGURIDAD INTERNO
+        if (isNaN(tiempoRestanteMs) || tiempoRestanteMs <= 0) {
             clearInterval(intervaloResetMisiones);
             elTimer.innerHTML = `🔄 REINICIANDO CARTELERA...`;
             
             setTimeout(() => {
-                // Pedimos las misiones y este mismo método encenderá un reloj limpio apuntando al día de mañana
-                cargarMisionesDelServidor(); 
-            }, 3000); // 3 segundos de resguardo estructural
+                if (typeof cargarMisionesDelServidor === "function") {
+                    cargarMisionesDelServidor(); 
+                }
+            }, 3000); 
             return;
         }
 
         const totalSegundos = Math.floor(tiempoRestanteMs / 1000);
         const horas = Math.floor(totalSegundos / 3600);
-        const minutos = Math.floor((totalSegundos % 3600) / 60); // 🔥 FIX: Alineado a nomenclatura en español
+        const minutos = Math.floor((totalSegundos % 3600) / 60); 
         const segundos = totalSegundos % 60;
 
         const stringReloj = `${horas}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
-        elTimer.innerText = `🔄 REINICIO EN: ${stringReloj}`;
+        
+        // Usamos innerHTML para que respete si tenías algún emoji o estructura de Twemoji previa
+        elTimer.innerHTML = `🔄 REINICIO EN: ${stringReloj}`;
     }, 1000);
 }
 
