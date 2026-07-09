@@ -4540,6 +4540,7 @@ document.addEventListener("DOMContentLoaded", () => {
 let miSalaTokenPvP = null;
 let soyCreadorDeSalaPvP = false;
 let miSeleccionAsignada = "";
+let socketPvP = null;
 
 function conectarYPrenderEscuchasPvP() {
     if (socketPvP) return;
@@ -4673,32 +4674,43 @@ function conectarYPrenderEscuchasPvP() {
     });
 }
 
-// ==========================================
-// 🛠️ FUNCIONES CONTROLADORAS AUXILIARES
-// ==========================================
+// ========================================================================
+// 🛠️ ENGINE MULTIJUGADOR: FUNCIONES CONTROLADORAS AUXILIARES DEFINITIVAS
+// ========================================================================
 
 function unirseARoomDirecto(token) {
-    document.getElementById('token-unirse-manual').value = token;
+    const input = document.getElementById('token-unirse-manual');
+    if (input) input.value = token;
 }
 
 function unirseLobbyMundial() {
     if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
-    const token = document.getElementById('token-unirse-manual').value.trim();
-    const pass = document.getElementById('pass-unirse-manual').value;
+    
+    const tokenInput = document.getElementById('token-unirse-manual');
+    const token = tokenInput ? tokenInput.value.trim() : "";
+    
+    const passInput = document.getElementById('pass-unirse-manual');
+    const pass = passInput ? passInput.value : "";
 
-    if (!token) return alert("Por favor ingresá o seleccioná un código de sala.");
+    if (!token) return alert("❌ Por favor ingresá o seleccioná un código de sala.");
 
-    socketPvP.emit('unirseSalaTorneo', {
-        salaToken: token,
-        contrasenia: pass,
-        usuarioId: usuarioActual.id,
-        username: usuarioActual.username
-    });
+    if (socketPvP) {
+        socketPvP.emit('unirseSalaTorneo', {
+            salaToken: token,
+            contrasenia: pass,
+            usuarioId: usuarioActual.id,
+            username: usuarioActual.username
+        });
+    } else {
+        alert("❌ Error: No hay conexión activa con la Arena PvP.");
+    }
 }
 
 function lanzarEstructuraMundial() {
     if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
-    socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
+    if (socketPvP) {
+        socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
+    }
 }
 
 function renderizarArbolMundial(fixture) {
@@ -4706,35 +4718,32 @@ function renderizarArbolMundial(fixture) {
     if (!contenedor) return;
     contenedor.innerHTML = "";
 
-    // Mapeamos las fases para agruparlas visualmente en la UI
     const fases = ["octavos", "cuartos", "semi", "final"];
     
     fases.forEach(fase => {
         if (!fixture[fase] || fixture[fase].length === 0) return;
 
         const tituloFase = document.createElement('h5');
-        tituloFase.style.cssText = "color: var(--dorado); margin: 10px 0 5px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px;";
+        tituloFase.style.cssText = "color: var(--dorado); margin: 15px 0 8px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Oswald';";
         tituloFase.innerText = `⚔️ ${fase}`;
         contenedor.appendChild(tituloFase);
 
         fixture[fase].forEach(cruce => {
             const div = document.createElement('div');
             
-            // Si el partido ya concluyó, resaltamos el score final
             const estandarteColor = cruce.terminado ? "var(--verde-match)" : "var(--celeste)";
             const scoreTexto = cruce.terminado 
                 ? `${cruce.golesLocal} - ${cruce.golesVisitante}` 
                 : `${cruce.golesLocal} - ${cruce.golesVisitante} (En vivo)`;
 
-            div.style.cssText = `background:#1e293b; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid ${estandarteColor}; margin-bottom:6px; font-size: 0.9rem;`;
+            div.style.cssText = `background:#1e293b; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid ${estandarteColor}; margin-bottom:6px; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2);`;
             
-            // Resaltamos con negrita al ganador de la llave
             const localStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.local.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
             const visitanteStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.visitante.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
 
             div.innerHTML = `
                 <span style="${localStyle}">${cruce.local.seleccion} <small style="color:#64748b;">(${cruce.local.username})</small></span>
-                <span style="background:#020617; padding:3px 10px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem;">${scoreTexto}</span>
+                <span style="background:#020617; padding:3px 10px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem; font-family: monospace;">${scoreTexto}</span>
                 <span style="${visitanteStyle}">${cruce.visitante.seleccion} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
             `;
             contenedor.appendChild(div);
@@ -4747,21 +4756,25 @@ function finalizarYLimpiarEstadoPvP() {
     soyCreadorDeSalaPvP = false;
     miSeleccionAsignada = "";
 
-    // Limpiamos los inputs del setup
     const tInput = document.getElementById('token-unirse-manual');
     if (tInput) tInput.value = "";
     const pInput = document.getElementById('pass-unirse-manual');
     if (pInput) pInput.value = "";
 
-    // Restablecemos las vistas principales
-    document.getElementById('panel-setup-torneo').style.display = 'grid';
-    document.getElementById('panel-lobby-torneo').style.display = 'none';
-    document.getElementById('panel-fixture-mundial').style.display = 'none';
+    // Restablecemos las vistas principales con chequeo previo de existencia
+    const setupPanel = document.getElementById('panel-setup-torneo');
+    if (setupPanel) setupPanel.style.display = 'grid';
+    
+    const lobbyPanel = document.getElementById('panel-lobby-torneo');
+    if (lobbyPanel) lobbyPanel.style.display = 'none';
+    
+    const fixturePanel = document.getElementById('panel-fixture-mundial');
+    if (fixturePanel) fixturePanel.style.display = 'none';
 
-    // Reactivamos la barra de navegación del estadio
+    // Reactivamos la barra de navegación del estadio de forma segura
     const nav = document.querySelector(".nav-modulos-estadio");
     if (nav) nav.style.display = "flex";
 
-    // Pedimos refresco de las salas que quedaron libres
+    // Pedimos refresco limpio de salas públicas al servidor de Sockets
     if (socketPvP) socketPvP.emit('pedirSalasPublicas');
 }
