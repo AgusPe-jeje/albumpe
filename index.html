@@ -78,21 +78,25 @@
         <div class="menu-scroll-padre" style="width: 100%; max-width: 900px; margin: 25px auto; overflow-x: auto; overflow-y: hidden; padding: 10px 5px 18px 5px; box-sizing: border-box;">
             
             <nav class="nav-modulos-estadio" style="display: flex; flex-direction: row; flex-wrap: nowrap; gap: 15px; width: max-content; min-width: 100%; align-items: center;">
-                <button class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🛍️ TIENDA</button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">📖 MI ÁLBUM</button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-perfil', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-family: 'Oswald'; font-weight: bold; font-size: 1rem; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px; text-transform: uppercase;">
-                    👤 MI PERFIL
-                </button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">⚽ PENALES</button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🎰 TIMBA</button>
                 
-                <button type="button" class="btn-modulo-match" id="btn-nav-pvp" onclick="cambiarModulo('modulo-multijugador-pvp', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; border: 1px solid var(--celeste); color: var(--celeste); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">⚔️ ARENA PVP</button>
+                <button type="button" class="btn-modulo-match activo" onclick="cambiarModulo('modulo-sobres', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">🛍️ TIENDA</button>
+                
+                <button type="button" class="btn-modulo-match" onclick="cambiarModulo('modulo-album', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">📖 MI ÁLBUM</button>
+                
+                <button type="button" class="btn-modulo-match" onclick="cambiarModulo('modulo-perfil', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">👤 MI PERFIL</button>
+                
+                <button type="button" class="btn-modulo-match" onclick="cambiarModulo('modulo-penales', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">⚽ PENALES</button>
+                
+                <button type="button" class="btn-modulo-match" onclick="cambiarModulo('modulo-timba', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">🎰 TIMBA</button>
+                
+                <button type="button" class="btn-modulo-match" id="btn-nav-pvp" onclick="cambiarModulo('modulo-multijugador-pvp', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; border: 1px solid var(--celeste); display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">⚔️ ARENA PVP</button>
 
-                <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">💸 MERCADO</button>
-                <button class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)" style="flex: 0 0 140px; width: 140px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">🏆 MUNDIAL</button>
-                <button type="button" id="btn-nav-contratos" class="btn-modulo-match" onclick="cambiarModulo('modulo-contratos-sbc', this)" style="flex: 0 0 180px; width: 180px; height: 65px; padding: 0 15px; font-size: 1rem; box-sizing: border-box;">
-                    🦾 CONTRATOS BOT
-                </button>
+                <button type="button" class="btn-modulo-match" id="btn-nav-mercado" onclick="cambiarModulo('modulo-mercado-pases', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">💸 MERCADO</button>
+                
+                <button type="button" class="btn-modulo-match" onclick="cambiarModulo('modulo-minimundial', this)" style="flex: 0 0 140px; width: 140px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">🏆 MUNDIAL</button>
+                
+                <button type="button" class="btn-modulo-match" id="btn-nav-contratos" onclick="cambiarModulo('modulo-contratos-sbc', this)" style="flex: 0 0 180px; width: 180px; height: 65px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 5px; font-size: 0.9rem; font-weight: bold;">🦾 CONTRATOS BOT</button>
+                
             </nav>
         </div>
 
