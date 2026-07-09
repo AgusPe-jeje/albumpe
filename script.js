@@ -3873,38 +3873,56 @@ async function marcarCromoComoDestacado(id, nombre, fotoUrl, rareza) {
     if (!usuarioActual || !usuarioActual.id) return alert("⚠️ No se detectó una sesión activa.");
 
     try {
-        mostrarCarga("Actualizando tu jugador destacado...");
+        if (typeof mostrarCarga === "function") mostrarCarga("Actualizando tu jugador destacado...");
 
         const token = localStorage.getItem("token");
+        
+        // 🌟 Enviamos todo el paquete al servidor para que impacte la columna JSONB en Neon
         const res = await fetch(`${URL_BASE}/usuarios/destacar-cromo`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${token}`
             },
-            body: JSON.stringify({ fotoUrl: fotoUrl })
+            body: JSON.stringify({ 
+                fotoUrl: fotoUrl,
+                nombre: nombre,
+                rareza: rareza
+            })
         });
 
         const data = await res.json();
-        ocultarCarga();
+        if (typeof ocultarCarga === "function") ocultarCarga();
 
         if (data.ok) {
             alert(`🌟 ¡${nombre.toUpperCase()} destacado con éxito!`);
             
-            // 🔄 Sincronizamos la memoria local con la nueva columna separada
-            usuarioActual.cromo_destacado = fotoUrl;
+            // 🔄 Sincronizamos la memoria local con el objeto estructurado devuelto por Neon
+            usuarioActual.cromo_destacado = {
+                foto: fotoUrl,
+                nombre: nombre,
+                rareza: rareza
+            };
 
-            // 🎯 FORZAMOS EL REDIBUJADO VISUAL INMEDIATO DEL CROMO DESTACADO (Mi Perfil)
+            // 🎯 FORZAMOS EL REDIBUJADO VISUAL INMEDIATO CON SU ESTÉTICA Y BORDES
             const contenedorDestacado = document.getElementById("perfil-contenedor-destacado");
             if (contenedorDestacado) {
+                let colorBorde = "var(--celeste)";
+                const rarezaLower = rareza.toLowerCase();
+                if (rarezaLower === "epica" || rarezaLower === "épica") colorBorde = "#a855f7";
+                if (rarezaLower === "legendaria") colorBorde = "var(--dorado)";
+                if (rarezaLower === "comun" || rarezaLower === "común") colorBorde = "#475569";
+
                 contenedorDestacado.innerHTML = `
-                    <div class="carta-clash" style="width: 110px; height: 150px; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 0 auto;">
-                        <img src="${fotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                        <div class="carta-clash" style="width: 110px; height: 145px; background: #020617; border: 3px solid ${colorBorde}; border-radius: 8px; background-image: url('${fotoUrl}'); background-size: cover; background-position: center; box-shadow: 0 0 15px rgba(0,0,0,0.5); margin: 0 auto;"></div>
+                        <span style="color: #fff; font-family: 'Oswald'; font-size: 1rem; letter-spacing: 0.5px;">${nombre.toUpperCase()}</span>
+                        <span style="color: ${colorBorde}; font-size: 0.7rem; font-weight: bold; letter-spacing: 1px; text-transform: uppercase;">[${rareza}]</span>
                     </div>
                 `;
             }
             
-            // 🔄 Recargamos el perfil de fondo para actualizar estadísticas de ser necesario
+            // 🔄 Recargamos el perfil de fondo para actualizar estadísticas
             if (typeof actualizarMiPerfilUI === "function") {
                 await actualizarMiPerfilUI();
             }
@@ -3992,13 +4010,6 @@ async function procesarCambioFotoPerfil(fotoId) {
     } catch (err) {
         console.error("❌ Error al cambiar la foto de perfil:", err);
     }
-}
-
-// Guarda tu carta favorita en el almacenamiento local del juego
-function marcarCromoComoDestacado(id, nombre, foto, rareza) {
-    const cromo = { id, nombre, foto, rareza };
-    localStorage.setItem("cromo_destacado_perfil", JSON.stringify(cromo));
-    alert(`🌟 ¡${nombre.toUpperCase()} fue asignado como tu cromo insignia del vestuario!`);
 }
 
 // Inyecta el cromo seleccionado dentro de la caja de tu perfil
