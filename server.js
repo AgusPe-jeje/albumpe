@@ -956,15 +956,32 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 let gTu = Math.floor(Math.random() * 3); 
                 let gRiv = Math.floor(Math.random() * 3);
                 
-                // 🛠️ FIX REPARADO: Ahora evalúa de forma correcta usando la variable activa 'chanceVictoriaGrupo'
                 if (Math.random() <= Math.max(0.10, chanceVictoriaGrupo - llave.pen)) {
                     if (gTu <= gRiv) gTu = gRiv + 1;
-                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Ganaste ✅", gL: gTu, gV: gRiv, ganoUsuarioReal: true, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
+                    bitacoraPlayoffs.push({ 
+                        ronda: llave.ronda, 
+                        rival: llave.rival, 
+                        resultado: "Ganaste ✅", 
+                        gL: gTu, 
+                        gV: gRiv, 
+                        ganoUsuarioReal: true, // 🔥 Flag estricto
+                        minutosL: generarMinutosGolesFútbol(gTu), 
+                        minutosV: generarMinutosGolesFútbol(gRiv) 
+                    });
                 } else {
                     campeon = false; 
                     if (gRiv <= gTu) gRiv = gTu + 1;
-                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
-                    break;
+                    bitacoraPlayoffs.push({ 
+                        ronda: llave.ronda, 
+                        rival: llave.rival, 
+                        resultado: "Perdiste ❌", 
+                        gL: gTu, 
+                        gV: gRiv, 
+                        ganoUsuarioReal: false, // 🔥 Flag estricto
+                        minutosL: generarMinutosGolesFútbol(gTu), 
+                        minutosV: generarMinutosGolesFútbol(gRiv) 
+                    });
+                    break; // Corta el cálculo en el servidor
                 }
             }
         }
