@@ -45,7 +45,7 @@ const verificarToken = (req, res, next) => {
 };
 
 /* ========================================================================
-   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
+   🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS (CORREGIDO)
    ======================================================================== */
 const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
@@ -55,10 +55,12 @@ app.use((req, res, next) => {
         return next();
     }
 
+    // 1. Permitir siempre archivos estáticos del frontend
     if (req.method === 'GET' && (req.path === '/' || req.path.endsWith('.html') || req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.png') || req.path.endsWith('.jpg') || req.path.endsWith('.svg'))) {
         return next();
     }
 
+    // 2. Permitir el login si el usuario que intenta ingresar es tester
     if (req.path.startsWith('/api/login')) {
         const { username } = req.body;
         if (username && TESTERS_PERMITIDOS.includes(username.trim().toLowerCase())) {
@@ -70,6 +72,7 @@ app.use((req, res, next) => {
         });
     }
 
+    // 3. Bloquear registro siempre en mantenimiento
     if (req.path.startsWith('/api/registro')) {
         return res.status(503).json({ 
             ok: false,
@@ -77,6 +80,7 @@ app.use((req, res, next) => {
         });
     }
 
+    // 4. Endpoints públicos iniciales indispensables
     if (
         req.path.startsWith('/api/anuncio-actual') || 
         req.path.startsWith('/api/logout') ||
@@ -85,22 +89,24 @@ app.use((req, res, next) => {
         return next();
     }
 
+    // 🚀 🔥 REGLA DE ORO DE ACCESO TOTAL PARA TESTERS:
+    // Si la petición viene de cualquier otra sección del juego (rankings, perfiles, sbc, mundiales),
+    // interceptamos el token JWT. Si es un tester oficial, ¡le damos pase libre absoluto!
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
-        return next();
-    }
-
-    try {
-        const decodificado = jwt.verify(token, JWT_SECRET);
-        if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
-            return next(); 
+    if (token) {
+        try {
+            const decodificado = jwt.verify(token, JWT_SECRET);
+            if (decodificado && decodificado.username && TESTERS_PERMITIDOS.includes(decodificado.username.trim().toLowerCase())) {
+                return next(); // 😎 Es tester autorizado. Pase libre a toda la API.
+            }
+        } catch (err) {
+            console.warn("⚠️ Token inválido o expirado en modo mantenimiento.");
         }
-    } catch (err) {
-        console.warn("⚠️ Intento de bypass con token inválido en mantenimiento.");
     }
 
+    // ❌ Si llegó acá y no es un tester verificado, rebote total
     return res.status(503).json({ 
         ok: false,
         mantenimiento: true, 
@@ -535,7 +541,9 @@ app.post('/api/jugar-penal', verificarToken, async (req, res) => {
     }
 });
 
-app.get('/api/ranking', async (req, res) => {
+// Reemplazá estas dos rutas en tu servidor (Node.js):
+
+app.get('/api/ranking', verificarToken, async (req, res) => {
     try {
         const result = await pool.query("SELECT id, username, puntos_ranking FROM usuarios ORDER BY puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
@@ -544,7 +552,7 @@ app.get('/api/ranking', async (req, res) => {
     }
 });
 
-app.get('/api/ranking-mundiales', async (req, res) => {
+app.get('/api/ranking-mundiales', verificarToken, async (req, res) => {
     try {
         const result = await pool.query("SELECT id, username, copas_mundiales FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, puntos_ranking DESC LIMIT 10");
         return res.json({ ranking: result.rows });
@@ -1411,57 +1419,79 @@ app.delete('/api/firmas/borrar/:firmaId', verificarToken, async (req, res) => {
    🏆 MOTOR AUTOMÁTICO: RECOMPENSAS Y RESET SEMANAL DE RANKINGS (LUNES 00:00)
    ======================================================================== */
 async function procesarResetSemanalRankings() {
-    const client = await pool.connect();
     try {
         const ahora = new Date();
-        const formatterDia = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', weekday: 'short' });
-        const formatterFecha = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' });
         
-        const diaSemana = formatterDia.format(ahora); 
-        const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); 
-        const fechaHoyString = `${anio}-${mes}-${dia}`;
+        // 🇦🇷 Forzamos la fecha exacta mapeada a la zona horaria de Buenos Aires
+        const ahoraArgStr = ahora.toLocaleString("en-US", { timeZone: "America/Argentina/Buenos_Aires" });
+        const ahoraArg = new Date(ahoraArgStr);
 
-        // 🎯 Si no es lunes, salimos directamente. El bloque 'finally' se encarga de liberar el cliente de forma automática.
+        // Obtenemos el día abreviado ('Mon', 'Tue', etc.)
+        const diaSemana = ahoraArg.toLocaleString("en-US", { weekday: "short" });
+
+        // 🎯 CONTROL DE BASE 1: Si no es lunes, salimos volando de inmediato.
+        // ¡No pedimos conexión al pool de Neon para no saturar la base de datos de gusto!
         if (diaSemana !== 'Mon') {
             return;
         }
 
-        await client.query('BEGIN');
-        const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
+        // Armamos la fecha limpia en formato YYYY-MM-DD
+        const anio = ahoraArg.getFullYear();
+        const mes = String(ahoraArg.getMonth() + 1).padStart(2, '0');
+        const dia = String(ahoraArg.getDate()).padStart(2, '0');
+        const fechaHoyString = `${anio}-${mes}-${dia}`;
+
+        // 🚀 Recién ahora que confirmamos que es Lunes, abrimos una única conexión
+        const client = await pool.connect();
         
-        // Si ya se hizo el reset, tiramos un ROLLBACK preventivo y salimos
-        if (verificarReset.rows.length > 0) { 
-            await client.query('ROLLBACK'); 
-            return; 
+        try {
+            await client.query('BEGIN');
+            
+            // Comprobamos si el reset de este lunes en específico ya fue impactado
+            const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
+            
+            if (verificarReset.rows.length > 0) { 
+                await client.query('ROLLBACK'); 
+                return; 
+            }
+
+            console.log(`🚧 [Neon] ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
+
+            // 1. Premiación de Copas Mundiales (Top 3)
+            const topMundial = await client.query("SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3");
+            if (topMundial.rows.length > 0) {
+                if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]);
+                if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]);
+                if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);
+            }
+
+            // 2. Premiación de Tabla de Penales / Arena (Top 3)
+            const topPenales = await client.query("SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3");
+            if (topPenales.rows.length > 0) {
+                if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]);
+                if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]);
+                if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);
+            }
+
+            // 3. Reset total de marcadores semanales
+            await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
+            
+            // 4. Firmamos el registro para evitar bucles repetitivos el mismo lunes
+            await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
+
+            await client.query('COMMIT');
+            console.log("🏆 ¡Reset completado con éxito! Marcadores limpios en Neon.");
+
+        } catch (dbErr) {
+            try { await client.query('ROLLBACK'); } catch(e) {}
+            console.error("❌ Error en transacción de reset semanal:", dbErr.message);
+        } finally {
+            // Se libera la conexión de Neon al instante pase lo que pase adentro
+            client.release();
         }
 
-        console.log(`🚧 ¡Arrancando Reset Semanal de Rankings para la fecha ${fechaHoyString}!`);
-
-        const topMundial = await client.query("SELECT id FROM usuarios WHERE copas_mundiales > 0 ORDER BY copas_mundiales DESC, id ASC LIMIT 3");
-        if (topMundial.rows.length > 0) {
-            if (topMundial.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topMundial.rows[0].id]);
-            if (topMundial.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topMundial.rows[1].id]);
-            if (topMundial.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topMundial.rows[2].id]);
-        }
-
-        const topPenales = await client.query("SELECT id FROM usuarios WHERE puntos_ranking > 0 ORDER BY puntos_ranking DESC, id ASC LIMIT 3");
-        if (topPenales.rows.length > 0) {
-            if (topPenales.rows[0]) await client.query("UPDATE usuarios SET monedas = monedas + 2500 WHERE id = $1", [topPenales.rows[0].id]);
-            if (topPenales.rows[1]) await client.query("UPDATE usuarios SET monedas = monedas + 1000 WHERE id = $1", [topPenales.rows[1].id]);
-            if (topPenales.rows[2]) await client.query("UPDATE usuarios SET monedas = monedas + 500 WHERE id = $1", [topPenales.rows[2].id]);
-        }
-
-        await client.query("UPDATE usuarios SET copas_mundiales = 0, puntos_ranking = 0");
-        await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
-
-        await client.query('COMMIT');
-        console.log("🏆 ¡Reset completado con éxito! Marcadores limpios en Neon.");
     } catch (err) { 
-        try { await client.query('ROLLBACK'); } catch(e) {}
-        console.error("❌ Error crítico en reset semanal:", err.message); 
-    } finally { 
-        // 🚀 EL CONTROLADOR ÚNICO: JavaScript pasa por acá siempre, garantizando que el cliente se libere una sola vez
-        client.release(); 
+        console.error("❌ Error crítico en el motor de reset semanal:", err.message); 
     }
 }
 
