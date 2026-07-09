@@ -43,13 +43,18 @@ const LISTA_SELECCIONES_TIMBA = [
 
 var historialPartidosSimulados = [];
 
+// ⚔️ NUEVAS: Variables de Control de Estado para el Multijugador PvP
+let socketPvP = null;
+let miSalaTokenPvP = null;
+let soyCreadorDeSalaPvP = false
+
 /* ========================================================================
    🎛️ 2. CONTROLADORES INTERNOS DE LA UI, PANTALLAS DE CARGA Y MODALES
    ======================================================================== */
 
 function cambiarModulo(idModulo, botonPresionado) {
      // 🔥 CORREGIDO: Agregamos '#modulo-mercado-pases' y '#modulo-contratos-sbc' para que se oculten correctamente al navegar
-     document.querySelectorAll('.modulo-contenido, #modulo-mercado-pases, #modulo-contratos-sbc').forEach(mod => mod.style.display = 'none');
+     document.querySelectorAll('.modulo-contenido, #modulo-mercado-pases, #modulo-contratos-sbc, #modulo-multijugador-pvp').forEach(mod => mod.style.display = 'none');
      document.querySelectorAll('.tile-modulo-fifa, .btn-modulo-match').forEach(btn => btn.classList.remove('activo'));
      
      // Muestra el módulo clickeado
@@ -114,6 +119,10 @@ function cambiarModulo(idModulo, botonPresionado) {
      if (idModulo === 'modulo-perfil' && usuarioActual) { // 👈 Cambiá 'modulo-perfil' por el ID de tu sección
           actualizarMiPerfilUI();
           renderizarCromoDestacadoUI();
+     }
+
+     if (idModulo === 'modulo-multijugador-pvp' && usuarioActual) {
+          conectarYPrenderEscuchasPvP();
      }
 
 }
@@ -4527,3 +4536,172 @@ document.addEventListener("DOMContentLoaded", () => {
         }, { passive: false });
     }
 });
+
+/* ========================================================================
+   📡 11. ENGINE MULTIJUGADOR ONLINE EN VIVO (SOCKET.IO ARENA)
+   ======================================================================== */
+
+function conectarYPrenderEscuchasPvP() {
+    // Si ya existe la conexión, no duplicamos instancias
+    if (socketPvP) return;
+
+    // Inicializamos socket apuntando al mismo dominio de tu backend
+    socketPvP = io();
+
+    const btnBuscar = document.getElementById('btn-buscar-rival-pvp');
+    const txtEstado = document.getElementById('estado-matchmaking-pvp');
+    const panelMarcador = document.getElementById('marcador-pvp-live');
+    const txtScore = document.getElementById('score-pvp-live');
+    const txtReloj = document.getElementById('reloj-pvp-live');
+    const consolaRelatos = document.getElementById('consola-pvp-live');
+
+    if (btnBuscar) {
+        btnBuscar.onclick = () => {
+            if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
+            
+            txtEstado.innerText = "Buscando un rival digno en la Arena Global...";
+            btnBuscar.disabled = true;
+            btnBuscar.style.opacity = "0.5";
+
+            // Mandamos tus datos reales de la sesión al Matchmaker de Node
+            socketPvP.emit('buscarRival', { 
+                usuarioId: usuarioActual.id, 
+                username: usuarioActual.username 
+            });
+        };
+    }
+
+    // ==========================================
+    // 📥 RECEPCIÓN DE EVENTOS DESDE EL BACKEND
+    // ==========================================
+
+    socketPvP.on('salaCreada', ({ salaToken }) => {
+        miSalaTokenPvP = salaToken;
+        soyCreadorDeSalaPvP = true;
+        if (txtEstado) txtEstado.innerText = `Esperando retador... (Código Sala: ${salaToken})`;
+    });
+
+    socketPvP.on('rivalEncontrado', ({ salaToken, rivalName }) => {
+        miSalaTokenPvP = salaToken;
+        if (txtEstado) txtEstado.innerText = `⚔️ ¡PARTIDO ENCONTRADO! Rival: ${rivalName.toUpperCase()}`;
+        if (panelMarcador) panelMarcador.style.display = 'block';
+        
+        // Bloqueamos la barra de navegación para que nadie abandone haciendo trampa
+        const nav = document.querySelector(".nav-modulos-estadio");
+        if (nav) nav.style.display = "none";
+
+        // Avisamos que la UI del cliente cargó y estamos listos para el pitazo
+        socketPvP.emit('jugadorListo', { 
+            salaToken: miSalaTokenPvP, 
+            esCreador: soyCreadorDeSalaPvP 
+        });
+    });
+
+    socketPvP.on('comenzarPartidoPvP', () => {
+        if (consolaRelatos) consolaRelatos.innerText = "⚽ ¡Pitazo inicial! Arranca el partido en la Arena Online.";
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+        
+        // 🔥 DISPARADOR DE SIMULACIÓN PROPIA ONLINE: 
+        // Cada jugador empieza a fabricar sus jugadas de forma independiente
+        iniciarGeneradorGolesOnline();
+    });
+
+    socketPvP.on('tickRelojPvP', ({ minuto }) => {
+        if (txtReloj) txtReloj.innerText = `⏱️ MINUTO ${minuto.toString().padStart(2, '0')}:00`;
+    });
+
+    socketPvP.on('marcadorActualizadoPvP', ({ golesCreador, golesRival, relato }) => {
+        if (txtScore) {
+            // Acomodamos el marcador según quién sos vos en la sala
+            if (soyCreadorDeSalaPvP) {
+                txtScore.innerText = `${golesCreador} - ${golesRival}`;
+            } else {
+                txtScore.innerText = `${golesRival} - ${golesCreador}`;
+            }
+        }
+        if (consolaRelatos) consolaRelatos.innerText = relato;
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
+    });
+
+    socketPvP.on('rivalAbandono', ({ mensaje }) => {
+        if (consolaRelatos) consolaRelatos.innerText = mensaje;
+        alert("⚠️ El rival huyó del partido. ¡Te quedás con los puntos y el Oro por abandono!");
+        finalizarYLimpiarEstadoPvP();
+    });
+
+    socketPvP.on('partidoTerminadoPvP', ({ ganadorId, mensaje }) => {
+        if (consolaRelatos) consolaRelatos.innerText = mensaje;
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
+
+        setTimeout(async () => {
+            if (ganadorId === usuarioActual.id) {
+                alert("👑 ¡VICTORIA ONLINE! Sumaste 500 monedas de Oro a tu cuenta.");
+                // Sincronizamos las misiones de oro que ya programaste en tu script
+                if (typeof trackearProgresoMision === 'function') await trackearProgresoMision("acumular_oro", 500);
+            } else if (ganadorId === null) {
+                alert("🏁 Partido terminado en empate.");
+            } else {
+                alert("❌ Derrota en la Arena PvP. ¡A entrenar los cromos!");
+            }
+            
+            // Refrescamos tu base de datos local (Neon) con el saldo que modificó el backend
+            if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
+            finalizarYLimpiarEstadoPvP();
+        }, 1000);
+    });
+}
+
+// 🎰 SIMULADOR DE ACCIONES PROPIAS ONLINE
+let intervaloGolesPvP = null;
+
+function iniciarGeneradorGolesOnline() {
+    if (intervaloGolesPvP) clearInterval(intervaloGolesPvP);
+
+    // Cada 12 segundos reales, tu cliente tira una probabilidad de fabricar un gol
+    intervaloGolesPvP = setInterval(() => {
+        if (!miSalaTokenPvP) {
+            clearInterval(intervaloGolesPvP);
+            return;
+        }
+
+        // Calculamos tu poder promedio basado en tu pestaña de perfil/draft
+        const cartasElegidas = albumCompleto.filter(f => f.obtenido > 0).slice(0, 3);
+        const promedioPoder = cartasElegidas.length === 3 
+            ? cartasElegidas.reduce((acc, c) => acc + (MAPA_PUNTOS_RAREZA[c.rareza.toLowerCase()] || 60), 0) / 3
+            : 70; // Poder base si no tiene cartas configuradas
+
+        // Chance de gol escalada por la calidad de tu plantel colector
+        const probabilidadGol = 0.20 + (promedioPoder / 400); 
+
+        if (Math.random() <= probabilidadGol) {
+            const frasesGolesPvP = [
+                `¡Golazo de @${usuarioActual.username}! Impresionante bombazo combado desde afuera del área.`,
+                `⚽ ¡GOL! @${usuarioActual.username} trianguló en velocidad y definió sutil abajo del arquero.`,
+                `🔥 ¡GOOOL! Error en la salida defensiva rival que capitaliza @${usuarioActual.username} con un testazo.`
+            ];
+
+            const relatoElegido = frasesGolesPvP[Math.floor(Math.random() * frasesGolesPvP.length)];
+
+            // Le inyectamos el gol al servidor de Sockets de inmediato
+            socketPvP.emit('registrarGolPvP', {
+                salaToken: miSalaTokenPvP,
+                esCreador: soyCreadorDeSalaPvP,
+                relato: relatoElegido
+            });
+        }
+    }, 12000);
+}
+
+function finalizarYLimpiarEstadoPvP() {
+    if (intervaloGolesPvP) clearInterval(intervaloGolesPvP);
+    miSalaTokenPvP = null;
+    soyCreadorDeSalaPvP = false;
+
+    // Rehabilitamos el botón de búsqueda y la barra de navegación de la Arena
+    const btnBuscar = document.getElementById('btn-buscar-rival-pvp');
+    if (btnBuscar) {
+        btnBuscar.disabled = false;
+        btnBuscar.style.opacity = "1";
+    }
+    if (typeof liberarNavegacionArenaUI === 'function') liberarNavegacionArenaUI();
+}
