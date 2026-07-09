@@ -1421,19 +1421,17 @@ async function procesarResetSemanalRankings() {
         const [mes, dia, anio] = formatterFecha.format(ahora).split('/'); 
         const fechaHoyString = `${anio}-${mes}-${dia}`;
 
-        // 🚨 CORRECCIÓN 1: Si no es lunes, liberamos la conexión antes de salir
+        // 🎯 Si no es lunes, salimos directamente. El bloque 'finally' se encarga de liberar el cliente de forma automática.
         if (diaSemana !== 'Mon') {
-            client.release();
             return;
         }
 
         await client.query('BEGIN');
         const verificarReset = await client.query("SELECT 1 FROM registro_resets_semanales WHERE fecha_reset = $1", [fechaHoyString]);
         
-        // 🚨 CORRECCIÓN 2: Si ya se hizo el reset hoy, hacemos ROLLBACK y liberamos
+        // Si ya se hizo el reset, tiramos un ROLLBACK preventivo y salimos
         if (verificarReset.rows.length > 0) { 
             await client.query('ROLLBACK'); 
-            client.release();
             return; 
         }
 
@@ -1457,12 +1455,12 @@ async function procesarResetSemanalRankings() {
         await client.query("INSERT INTO registro_resets_semanales (fecha_reset) VALUES ($1)", [fechaHoyString]);
 
         await client.query('COMMIT');
-        console.log("🏆 ¡Reset completado con éxito! Monedas depositadas al Top 3 y marcadores vueltos a cero.");
+        console.log("🏆 ¡Reset completado con éxito! Marcadores limpios en Neon.");
     } catch (err) { 
         try { await client.query('ROLLBACK'); } catch(e) {}
         console.error("❌ Error crítico en reset semanal:", err.message); 
     } finally { 
-        // Este bloque se encarga de liberar el cliente si la ejecución llegó hasta acá
+        // 🚀 EL CONTROLADOR ÚNICO: JavaScript pasa por acá siempre, garantizando que el cliente se libere una sola vez
         client.release(); 
     }
 }
