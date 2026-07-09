@@ -4548,6 +4548,33 @@ function conectarYPrenderEscuchasPvP() {
     socketPvP = io();
 
     // ==========================================
+    // 🎨 INYECCIÓN DE ESTILOS: SCROLLBARS OSCURAS ANTI-WINDOWS
+    // ==========================================
+    const estiloScroll = document.createElement('style');
+    estiloScroll.innerHTML = `
+        #contenedor-render-cruces::-webkit-scrollbar, 
+        #lista-salas-disponibles::-webkit-scrollbar {
+            width: 8px;
+        }
+        #contenedor-render-cruces::-webkit-scrollbar-track, 
+        #lista-salas-disponibles::-webkit-scrollbar-track {
+            background: #020617;
+            border-radius: 4px;
+        }
+        #contenedor-render-cruces::-webkit-scrollbar-thumb, 
+        #lista-salas-disponibles::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+            border: 1px solid #1e293b;
+        }
+        #contenedor-render-cruces::-webkit-scrollbar-thumb:hover, 
+        #lista-salas-disponibles::-webkit-scrollbar-thumb:hover {
+            background: var(--celeste);
+        }
+    `;
+    document.head.appendChild(estiloScroll);
+
+    // ==========================================
     // 🎛️ LISTENERS DE INTERFAZ (100% DESACOPLADOS)
     // ==========================================
     
@@ -4569,7 +4596,6 @@ function conectarYPrenderEscuchasPvP() {
                 return alert("❌ Oro insuficiente. Tu saldo actual no cubre la apuesta fijada.");
             }
 
-            // 🎯 Enviamos el álbum al Backend para que calcule tu terna aleatoria libre
             socketPvP.emit('crearSalaTorneo', {
                 usuarioId: usuarioActual.id,
                 username: usuarioActual.username,
@@ -4596,7 +4622,6 @@ function conectarYPrenderEscuchasPvP() {
 
             if (!token) return alert("❌ Por favor ingresá o seleccioná un código de sala.");
 
-            // 🎯 Enviamos el álbum al Backend para calcular terna sin pisar las ocupadas
             socketPvP.emit('unirseSalaTorneo', {
                 salaToken: token,
                 contrasenia: pass,
@@ -4651,7 +4676,6 @@ function conectarYPrenderEscuchasPvP() {
         });
     });
 
-    // Recibimos las 3 opciones aleatorias calculadas por el Servidor
     socketPvP.on('salaCreadaExito', ({ salaToken, apuestaOro, opcionesDraft }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = true;
@@ -4685,7 +4709,6 @@ function conectarYPrenderEscuchasPvP() {
         renderizarArbolMundial(fixture);
     });
 
-    // 🛠️ CORREGIDO: partidoNumero con la "o" bien puesta para evitar congelamiento
     socketPvP.on('partidoEnFocoVivido', ({ fase, partidoNumero, totalPartidos, local, visitante }) => {
         const txtReloj = document.getElementById('reloj-pvp-live');
         if (txtReloj) txtReloj.innerText = `📺 TRANSMITIENDO: ${fase} (Partido ${partidoNumero}/${totalPartidos}) • ESPERANDO PITAZO`;
@@ -4740,7 +4763,6 @@ function prepararFaseDraftUI(opcionesDraft) {
     const selectPais = document.getElementById('select-pais-draft');
     if (!selectPais) return;
 
-    // Agrupamos tus cartas obtenidas por país
     const mapeoPaises = {};
     albumCompleto.filter(c => c.obtenido > 0).forEach(c => {
         if (!mapeoPaises[c.pais]) mapeoPaises[c.pais] = [];
@@ -4749,13 +4771,11 @@ function prepararFaseDraftUI(opcionesDraft) {
 
     selectPais.innerHTML = '<option value="">-- Seleccioná uno de tus 3 países asignados --</option>';
     
-    // 🎯 Inyectamos estrictamente las 3 opciones calculadas por el Backend
     opcionesDraft.forEach(pais => {
         const totalCromos = mapeoPaises[pais] ? mapeoPaises[pais].length : 0;
         selectPais.innerHTML += `<option value="${pais}">🌍 ${pais.toUpperCase()} (${totalCromos} cromos)</option>`;
     });
 
-    // Dibujar naipes sin checkboxes tradicionales
     selectPais.onchange = () => {
         const paisElegido = selectPais.value;
         const contenedorCartas = document.getElementById('contenedor-cartas-pais-draft');
@@ -4838,7 +4858,6 @@ function prepararFaseDraftUI(opcionesDraft) {
         });
     };
 
-    // Confirmar Draft definitivo y despachar al backend
     document.getElementById('btn-confirmar-draft-propio').onclick = () => {
         const paisElegido = selectPais.value;
         const seleccionados = document.querySelectorAll('input[name="cartas-draft-check"]:checked');
@@ -4875,7 +4894,7 @@ function prepararFaseDraftUI(opcionesDraft) {
 }
 
 // ========================================================================
-// 🎨 RENDERIZADOR MEJORADO CON SEÑAL DE IDENTIFICACIÓN [TÚ] ULTRA NEÓN
+// 🎨 RENDERIZADOR MEJORADO: JERARQUÍA COMPLETA [TÚ], [RIVAL] Y [JUGADOR]
 // ========================================================================
 function renderizarArbolMundial(fixture) {
     const contenedor = document.getElementById('contenedor-render-cruces');
@@ -4899,6 +4918,10 @@ function renderizarArbolMundial(fixture) {
             const eresVisitante = (typeof usuarioActual !== 'undefined' && cruce.visitante.usuarioId === usuarioActual.id);
             const esTuPartido = eresLocal || eresVisitante;
 
+            // Identificación nativa de Bots vs Humanos
+            const localEsBot = cruce.local.username.includes("Bot IA");
+            const visitanteEsBot = cruce.visitante.username.includes("Bot IA");
+
             const backgroundFila = esTuPartido ? "linear-gradient(90deg, #1e1b4b 0%, #0f172a 100%)" : "#1e293b";
             const borderFila = esTuPartido ? "2px solid var(--verde-match)" : "1px solid #334155";
             const sombraFila = esTuPartido ? "0 0 14px rgba(34, 197, 94, 0.25)" : "none";
@@ -4908,16 +4931,48 @@ function renderizarArbolMundial(fixture) {
 
             div.style.cssText = `background:${backgroundFila}; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${estandarteColor}; border:${borderFila}; box-shadow:${sombraFila}; margin-bottom:6px; font-size: 0.9rem; transition: all 0.3s ease;`;
             
-            const localStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.local.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
-            const visitanteStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.visitante.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
+            let localColor = "color:#fff;";
+            let visitanteColor = "color:#fff;";
 
-            const tagLocal = eresLocal ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
-            const tagVisitante = eresVisitante ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
+            if (cruce.ganador) {
+                if (cruce.ganador.usuarioId === cruce.local.usuarioId) localColor = "color:var(--verde-match); font-weight:bold;";
+                if (cruce.ganador.usuarioId === cruce.visitante.usuarioId) visitanteColor = "color:var(--verde-match); font-weight:bold;";
+            }
+
+            // Marcadores neón de las tarjetas
+            let tagLocal = "";
+            let tagVisitante = "";
+
+            if (eresLocal) {
+                localColor = "color:var(--verde-match); font-weight:bold;";
+                tagLocal = " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>";
+                
+                visitanteColor = "color:#f97316; font-weight:bold;"; 
+                tagVisitante = " <span style='color:#f97316; font-size:0.75rem; font-weight:bold; text-shadow:0 0 6px rgba(249,115,22,0.5);'>[RIVAL]</span>";
+            } 
+            else if (eresVisitante) {
+                visitanteColor = "color:var(--verde-match); font-weight:bold;";
+                tagVisitante = " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>";
+                
+                localColor = "color:#f97316; font-weight:bold;"; 
+                tagLocal = " <span style='color:#f97316; font-size:0.75rem; font-weight:bold; text-shadow:0 0 6px rgba(249,115,22,0.5);'>[RIVAL]</span>";
+            } 
+            else {
+                // Si no es tu versus, identificamos invitados humanos para darles mística celeste neón
+                if (!localEsBot) {
+                    localColor = "color:var(--celeste); font-weight:bold;";
+                    tagLocal = " <span style='color:var(--celeste); font-size:0.72rem; font-weight:bold; text-shadow:0 0 6px rgba(56,189,248,0.4);'>[JUGADOR]</span>";
+                }
+                if (!visitanteEsBot) {
+                    visitanteColor = "color:var(--celeste); font-weight:bold;";
+                    tagVisitante = " <span style='color:var(--celeste); font-size:0.72rem; font-weight:bold; text-shadow:0 0 6px rgba(56,189,248,0.4);'>[JUGADOR]</span>";
+                }
+            }
 
             div.innerHTML = `
-                <span style="${localStyle}">${cruce.local.seleccion}${tagLocal} <small style="color:#64748b;">(${cruce.local.username})</small></span>
+                <span style="${localColor}">${cruce.local.seleccion}${tagLocal} <small style="color:#64748b;">(${cruce.local.username})</small></span>
                 <span style="background:#020617; padding:3px 12px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem; font-family: monospace; border: 1px solid #1e293b;">${scoreTexto}</span>
-                <span style="${visitanteStyle}">${cruce.visitante.seleccion}${tagVisitante} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
+                <span style="${visitanteColor}">${cruce.visitante.seleccion}${tagVisitante} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
             `;
             contenedor.appendChild(div);
         });
