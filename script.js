@@ -3525,13 +3525,15 @@ function renderizarCartasElegiblesSBC() {
 
         cardBox.onclick = () => {
             const totalSeleccionadas = sbcJugadoresSeleccionados.length;
-            const index = sbcJugadoresSeleccionados.indexOf(carta.id);
+            
+            // Buscamos la ÚLTIMA ocurrencia agregada de esta carta para deseleccionarla limpiamente
+            const ultimoIndex = sbcJugadoresSeleccionados.lastIndexOf(carta.id);
 
-            // CASO 1: Si ya está seleccionada al menos una vez, el click remueve UNA instancia de esta carta
-            if (index > -1) {
-                sbcJugadoresSeleccionados.splice(index, 1);
+            // CASO 1: Si ya está seleccionada y el usuario quiere reducir el número o quitarla por completo
+            if (ultimoIndex > -1) {
+                sbcJugadoresSeleccionados.splice(ultimoIndex, 1);
             } 
-            // CASO 2: Si no alcanzó su límite de copias repetidas y hay cupo en la planilla, se agrega
+            // CASO 2: Si quiere agregar una unidad más de esta carta
             else {
                 if (totalSeleccionadas >= req.cantidad) {
                     return alert(`⚠️ Este contrato exige exactamente ${req.cantidad} jugadores.`);
@@ -3541,7 +3543,7 @@ function renderizarCartasElegiblesSBC() {
                 }
             }
 
-            // Refrescamos el contador en la interfaz y redibujamos la grilla
+            // Sincronizamos la interfaz de usuario con el estado del array local
             document.getElementById("sbc-contador-slots").innerText = `${sbcJugadoresSeleccionados.length} / ${req.cantidad}`;
             renderizarCartasElegiblesSBC();
         };
