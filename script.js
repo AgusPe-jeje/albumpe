@@ -1891,50 +1891,86 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             const estilos = document.createElement("style");
             estilos.id = "estilos-premium-mundial";
             estilos.innerHTML = `
+                /* 🎥 ANIMACIONES TRANSMISIÓN PREMIUM */
                 @keyframes screenShake {
                     0%, 100% { transform: translate(0, 0); }
-                    20%, 60% { transform: translate(-4px, 2px) rotate(-0.5deg); }
-                    40%, 80% { transform: translate(4px, -2px) rotate(0.5deg); }
+                    20%, 60% { transform: translate(-5px, 2px) rotate(-0.8deg); }
+                    40%, 80% { transform: translate(5px, -2px) rotate(0.8deg); }
                 }
                 @keyframes flashGlow {
-                    0% { background: rgba(255,255,255,0.8); }
-                    100% { background: transparent; }
+                    0% { background: radial-gradient(circle, rgba(255,255,255,0.85) 0%, transparent 75%); backdrop-filter: brightness(1.5) blur(1px); }
+                    100% { background: transparent; backdrop-filter: brightness(1) blur(0px); }
                 }
                 @keyframes glitchVar {
-                    0%, 100% { border-color: var(--dorado); box-shadow: 0 0 5px var(--dorado); }
-                    50% { border-color: var(--celeste); box-shadow: 0 0 5px var(--celeste); }
+                    0%, 100% { border-color: var(--dorado); box-shadow: 0 0 12px var(--dorado), inset 0 0 4px var(--dorado); filter: brightness(1.1); }
+                    50% { border-color: var(--celeste); box-shadow: 0 0 12px var(--celeste), inset 0 0 4px var(--celeste); filter: brightness(0.9); }
                 }
-                .efecto-shake { animation: screenShake 0.35s ease-in-out; }
-                .efecto-flash { position: fixed; top:0; left:0; width:100vw; height:100vh; background: transparent; z-index:9999; pointer-events:none; animation: flashGlow 0.4s ease-out; }
-                .badge-var-live { background: var(--dorado); color: #000; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-family: 'Oswald'; margin-left: 8px; animation: glitchVar 1s infinite; }
+                @keyframes fadinScale {
+                    0% { opacity: 0; transform: translateY(12px) scale(0.96); filter: blur(2px); }
+                    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.75; transform: scale(0.95); }
+                }
+
+                /* 🏁 CLASES DE IMPACTO VISUAL */
+                .efecto-shake { animation: screenShake 0.38s cubic-bezier(.36,.07,.19,.97) both; }
                 
-                /* Transición suave para el retroceso o avance del marcador */
-                .marcador-cambio { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+                .efecto-flash { 
+                    position: fixed; top:0; left:0; width:100vw; height:100vh; 
+                    background: transparent; z-index:9999; pointer-events:none; 
+                    animation: flashGlow 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; 
+                }
+                
+                .badge-var-live { 
+                    background: var(--dorado); color: #000; font-weight: 900; 
+                    padding: 3px 8px; border-radius: 4px; font-size: 0.72rem; 
+                    font-family: 'Oswald', sans-serif; letter-spacing: 0.5px; 
+                    margin-left: 8px; animation: glitchVar 1.2s infinite ease-in-out; 
+                }
+                
+                /* Transición física para el retroceso o avance del marcador de TV */
+                .marcador-cambio { 
+                    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+                }
             `;
             document.head.appendChild(estilos);
         }
 
         filaPartido.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; color:var(--dorado); border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:12px;">
-                <span style="text-transform: uppercase; font-family:'Oswald'; font-size: 1rem; letter-spacing: 0.5px;">📋 ${ronda}</span>
-                <span id="reloj-vivo-${idUnico}" style="font-weight:bold; color:var(--celeste); font-family: monospace; font-size: 0.9rem;">⏱️ MINUTO 00:00</span>
-            </div>
-            <div id="marcador-contenedor-${idUnico}" style="display:flex; justify-content:space-between; align-items:center; padding: 5px 0; transition: transform 0.2s;">
-                <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff;">
-                    ⚽ ${tuPais.toUpperCase()} <span id="boost-badge-${idUnico}" class="boost-badge-gaming oculto">MOTIVADO</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; color:var(--dorado); border-bottom:1px solid rgba(30, 41, 59, 0.5); padding-bottom:10px; margin-bottom:14px;">
+                <span style="text-transform: uppercase; font-family:'Oswald', sans-serif; font-size: 0.95rem; letter-spacing: 1px; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">
+                    📋 ${ronda}
                 </span>
-                <span id="score-vivo-${idUnico}" class="marcador-cambio" style="font-family:'Oswald'; font-size:1.9rem; background:#020617; padding:4px 18px; border-radius:8px; color:var(--verde-match); min-width:80px; text-align:center; border: 1px solid #1e293b;">0 - 0</span>
-                <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">
+                <span id="reloj-vivo-${idUnico}" style="font-weight:bold; color:var(--celeste); font-family: 'Courier New', monospace; font-size: 0.95rem; background: rgba(2, 6, 23, 0.6); padding: 3px 10px; border-radius: 4px; border: 1px solid rgba(56, 189, 248, 0.2); box-shadow: 0 0 10px rgba(56, 189, 248, 0.1);">
+                    ⏱️ MINUTO 00:00
+                </span>
+            </div>
+            
+            // MARCADOR PRINCIPAL: Estilo Marcador de TV
+            <div id="marcador-contenedor-${idUnico}" style="display:flex; justify-content:space-between; align-items:center; padding: 10px 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                <span style="width:40%; text-align:left; font-weight:bold; font-size:1.15rem; color: #fff; font-family:'Oswald', sans-serif; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
+                    ⚽ ${tuPais.toUpperCase()} <span id="boost-badge-${idUnico}" class="boost-badge-gaming oculto" style="font-size: 0.65rem; background: #e11d48; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 900; animation: pulse 1.5s infinite;">MOTIVADO</span>
+                </span>
+                
+                <span id="score-vivo-${idUnico}" class="marcador-cambio" style="font-family:'Oswald', sans-serif; font-size:2.2rem; background: linear-gradient(180deg, #020617 0%, #0f172a 100%); padding: 2px 24px; border-radius: 8px; color: var(--verde-match); min-width: 90px; text-align: center; border: 1px solid #334155; box-shadow: inset 0 0 12px rgba(0,0,0,0.9), 0 4px 12px rgba(0,0,0,0.5); font-weight: 700; letter-spacing: 1px;">
+                    0 - 0
+                </span>
+                
+                <span style="width:40%; text-align:right; font-weight:bold; font-size:1.15rem; color: #fff; font-family:'Oswald', sans-serif; letter-spacing: 0.5px;">
                     ${rival.toUpperCase()} 🤖
                 </span>
             </div>
-            <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px; line-height: 1.4; transition: background 0.3s, color 0.3s;">
+            
+            <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background: linear-gradient(90deg, #020617 0%, rgba(15,23,42,0.8) 100%); padding:14px; border-radius:8px; min-height:48px; color:#cbd5e1; font-size:0.9rem; border:1px solid rgba(30, 41, 59, 0.8); margin-top:14px; line-height: 1.5; transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);">
                 ⚽ El árbitro da la orden... ¡Comienzan los cruces de eliminacion directa!
             </div>
-            <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center; box-shadow: 0 0 15px rgba(255,177,0,0.15);">
-                <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald'; font-size:1.1rem; letter-spacing:0.5px;">🚨 JUGADA EN CURSO</h4>
-                <p id="evento-texto-${idUnico}" style="font-size:0.85rem; color:#cbd5e1; margin-bottom:12px; text-align:left;"></p>
-                <div id="evento-opciones-${idUnico}" style="display:flex; flex-direction:column; gap:8px;"></div>
+            
+            <div id="modulo-interactivo-${idUnico}" style="display:none; background: linear-gradient(135deg, rgba(15,23,42,0.98) 0%, rgba(2,6,23,0.99) 100%); border: 1px solid var(--dorado); border-radius: 12px; padding: 18px; margin-top: 14px; text-align: center; box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 20px rgba(255,177,0,0.15); animation: fadinScale 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;">
+                <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 10px 0; font-family:'Oswald', sans-serif; font-size:1.2rem; letter-spacing:1px; font-weight: 700; text-shadow: 0 0 8px rgba(255,177,0,0.3);">🚨 JUGADA EN CURSO</h4>
+                <p id="evento-texto-${idUnico}" style="font-size:0.88rem; color:#94a3b8; margin-bottom:16px; text-align:left; line-height: 1.5; border-left: 3px solid var(--dorado); padding-left: 10px;"></p>
+                <div id="evento-opciones-${idUnico}" style="display:flex; flex-direction:column; gap:10px;"></div>
             </div>
         `;
         contenedor.appendChild(filaPartido);
@@ -2019,17 +2055,47 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         }, 550);
 
         function dispararEstimulantesImpacto(relatoFinal) {
+            // 🌟 1. CREACIÓN DEL FLASH CINEMÁTICO EXTENDIDO
             const flash = document.createElement("div");
-            flash.className = "efecto-flash"; document.body.appendChild(flash);
-            setTimeout(() => flash.remove(), 400);
+            // Aplicamos estilos directamente para asegurar el desenfoque y la transición líquida de la luz
+            flash.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                background: radial-gradient(circle, rgba(255,255,255,0.85) 0%, transparent 80%);
+                backdrop-filter: brightness(1.6) blur(2px); z-index: 9999; pointer-events: none;
+                transition: opacity 0.45s ease-out; opacity: 1;
+            `;
+            document.body.appendChild(flash);
+            
+            // Transición suave de desaparición del destello
+            setTimeout(() => { flash.style.opacity = "0"; }, 50);
+            setTimeout(() => flash.remove(), 500);
+
+            // 🌟 2. IMPACTO FÍSICO EN LA TARJETA DEL PARTIDO
+            filaPartido.style.transition = "transform 0.05s ease-in-out";
             filaPartido.classList.add("efecto-shake");
             setTimeout(() => filaPartido.classList.remove("efecto-shake"), 350);
 
+            // 🌟 3. ACTUALIZACIÓN POTENCIADA DEL MARCADOR (GLOW & SCALE)
             const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
             scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-            scoreLbl.style.transform = "scale(1.25)"; scoreLbl.style.borderColor = "var(--verde-match)";
-            setTimeout(() => { scoreLbl.style.transform = "scale(1)"; scoreLbl.style.borderColor = "#1e293b"; }, 500);
+            
+            // Estilos dinámicos de impacto: Escala mayor, borde neón verde match y sombra de alta fidelidad
+            scoreLbl.style.transition = "all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            scoreLbl.style.transform = "scale(1.35)"; 
+            scoreLbl.style.borderColor = "var(--verde-match)";
+            scoreLbl.style.boxShadow = "0 0 25px var(--verde-match), inset 0 0 10px rgba(34,197,94,0.4)";
+            scoreLbl.style.background = "#04120a"; // Tinte verdoso sutil temporal de festejo
 
+            // Retorno suave del marcador al diseño original de TV
+            setTimeout(() => { 
+                scoreLbl.style.transition = "all 0.4s ease-out";
+                scoreLbl.style.transform = "scale(1)"; 
+                scoreLbl.style.borderColor = "#1e293b";
+                scoreLbl.style.boxShadow = "none";
+                scoreLbl.style.background = "#020617";
+            }, 600);
+
+            // 🌟 4. TEXTOS Y AUDIO MANTENIDOS INTACTOS
             document.getElementById(`consola-incidencias-${idUnico}`).innerText = relatoFinal;
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
         }
