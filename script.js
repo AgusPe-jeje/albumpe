@@ -4684,7 +4684,7 @@ function conectarYPrenderEscuchasPvP() {
     // Cambia el foco a un único partido en vivo (Simulación 1v1 Secuencial)
     socketPvP.on('partidoEnFocoVivido', ({ fase, partidoNumero, totalPartidos, local, visitante }) => {
         const txtReloj = document.getElementById('reloj-pvp-live');
-        if (txtReloj) txtReloj.innerText = `📺 TRANSMITIENDO: ${fase} (Partido ${partidNumero}/${totalPartidos}) • ESPERANDO PITAZO`;
+        if (txtReloj) txtReloj.innerText = `📺 TRANSMITIENDO: ${fase} (Partido ${partidoNumero}/${totalPartidos}) • ESPERANDO PITAZO`;
     });
 
     socketPvP.on('tickMinutoIndividual', ({ minuto, golesLocal, golesVisitante, fixture }) => {
