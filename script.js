@@ -1943,7 +1943,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
         // ⏱️ MOTOR ACELERADO: 550ms por minuto virtual (~50 Segundos por partido)
         const timer = setInterval(() => {
-            if (partidoPausado) return;
+            if (partidoPausado) return; // 🛑 Si el VAR está revisando, el motor se congela por completo
 
             segundoVirtual += 1;
             if (segundoVirtual > 90) segundoVirtual = 90;
@@ -1956,10 +1956,9 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 
                 // 🎲 35% de probabilidad de que tu gol pase por el VAR
                 if (Math.random() <= 0.35) {
-                    const seConvalida = Math.random() <= 0.50; // 50/50 de éxito o anulación
+                    const seConvalida = Math.random() <= 0.60; // 60% de que te lo cobren a favor
                     ejecutarMomentoVAR(true, seConvalida);
                 } else {
-                    // Gol limpio directo sin interrupción tecnológica
                     golesTuActuales++;
                     dispararEstimulantesImpacto(`⚽ ¡GOOOL DE ${tuPais.toUpperCase()}! Impresionante zapatazo que se clava en la red.`);
                 }
@@ -1969,37 +1968,24 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             if (cronogramaGolesRival.includes(segundoVirtual)) {
                 cronogramaGolesRival = cronogramaGolesRival.filter(m => m !== segundoVirtual);
 
-                // 🛡️ ANTI-SUPERPOSICIÓN DE CARTELERAS
-                const arrancaConDelay = partidoPausado; 
-
-                setTimeout(() => {
-                    const checkYDispararRival = () => {
-                        if (partidoPausado) {
-                            setTimeout(checkYDispararRival, 400);
-                        } else {
-                            // 🎲 35% de probabilidad de que el gol del bot pase por el VAR
-                            if (Math.random() <= 0.35) {
-                                const seConvalidaRival = Math.random() <= 0.50; // 50/50 igualitario
-                                ejecutarMomentoVAR(false, seConvalidaRival);
-                            } else {
-                                golesRivalActuales++;
-                                dispararEstimulantesImpacto(`💥 Gol de ${rival.toUpperCase()}. El delantero define cruzado e inalcanzable.`);
-                            }
-                        }
-                    };
-                    checkYDispararRival();
-                }, arrancaConDelay ? 2500 : 0);
+                // 🎲 35% de probabilidad de que el gol del bot pase por el VAR
+                if (Math.random() <= 0.35) {
+                    const seConvalidaRival = Math.random() <= 0.40; // Al bot lo castigamos un poco más (40% convalidado)
+                    ejecutarMomentoVAR(false, seConvalidaRival);
+                } else {
+                    golesRivalActuales++;
+                    dispararEstimulantesImpacto(`💥 Gol de ${rival.toUpperCase()}. El delantero define cruzado e inalcanzable.`);
+                }
             }
 
-            // Frases de ambiente contextuales
+            // Frases de ambiente...
             if (segundoVirtual % 15 === 0 && !partidoPausado && segundoVirtual < 90) {
                 const ambiente = esPartidoDefensivo 
-                    ? ["Tu defensa resiste replegada. El bot presiona con intensidad.", "Se traba el partido en mitad de cancha. Juego muy físico."]
-                    : ["Tu selección rota rápido el balón buscando profundidad.", "¡Qué buena jugada colectiva! El estadio empuja con cantos."];
+                    ? ["Tu defense resiste replegada. El bot presiona con intensidad.", "Se traba el partido en mitad de cancha."]
+                    : ["Tu selección rota rápido el balón buscando profundidad.", "¡Qué buena jugada colectiva!"];
                 document.getElementById(`consola-incidencias-${idUnico}`).innerText = `🏃 ${ambiente[Math.floor(Math.random() * ambiente.length)]}`;
             }
 
-            // FINALIZACIÓN DE LOS 90 MINUTOS
             if (segundoVirtual >= 90) {
                 clearInterval(timer);
                 if (golesTuActuales === golesRivalActuales) {
