@@ -872,7 +872,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 let min = Math.floor(Math.random() * 29) * 3 + 3;
                 if (!minutos.includes(min) && min !== 45 && min !== 90) minutos.push(min);
             }
-            return minutes.sort((a, b) => a - b);
+            return minutos.sort((a, b) => a - b);
         }
 
         function simularMatchCompleto(eq1, eq2, esUsuario) {
@@ -963,7 +963,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 } else {
                     campeon = false; 
                     if (gRiv <= gTu) gRiv = gTu + 1;
-                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutesL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
+                    bitacoraPlayoffs.push({ ronda: llave.ronda, rival: llave.rival, resultado: "Perdiste ❌", gL: gTu, gV: gRiv, ganoUsuarioReal: false, minutosL: generarMinutosGolesFútbol(gTu), minutosV: generarMinutosGolesFútbol(gRiv) });
                     break;
                 }
             }
