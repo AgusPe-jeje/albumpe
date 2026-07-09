@@ -4637,11 +4637,19 @@ function conectarYPrenderEscuchasPvP() {
         btnStart.addEventListener('click', () => {
             if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
             
-            // 🔒 CONGELAMOS EL BOTÓN AL INSTANTE PARA EVITAR DOBLE CLICK
+            // 🔒 BLINDAJE INSTANTÁNEO: Congelamos el botón y cambiamos estilos
             btnStart.disabled = true;
             btnStart.style.opacity = "0.5";
-            btnStart.innerText = "⚽ GENERANDO FIXTURE...";
+            btnStart.style.cursor = "default";
+            btnStart.style.boxShadow = "none";
             
+            // Cambiamos el texto manteniendo la mística de los emojis estáticos que usás
+            btnStart.innerHTML = `
+                <img draggable="false" class="emoji" alt="⚽" src="https://twemoji.maxcdn.com/v/14.0.2/svg/26bd.svg"> 
+                GENERANDO FIXTURE...
+            `;
+            
+            // Despachamos la orden única al servidor
             socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
         });
     }
