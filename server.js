@@ -911,7 +911,7 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         bitacoraGrupo.push({ 
             fecha: 3, 
             local: seleccionElegida, visitante: rivalGrupo3, gL: f3_m1.goles1, gV: f3_m1.goles2, minutosL: f3_m1.minutosEq1, minutosV: f3_m1.minutosEq2, 
-            botL: rivalGrupo1, botV: rivalGrupo2, gBL: f3_m2.goles1, gBV: f3_m2.goles2, minutosBL: f3_m2.minutosEq1, minutesBV: f3_m2.minutosEq2 
+            botL: rivalGrupo1, botV: rivalGrupo2, gBL: f3_m2.goles1, gBV: f3_m2.goles2, minutosBL: f3_m2.minutosEq1, minutosBV: f3_m2.minutosEq2 
         });
 
         let tablaPuntos = {}; 
