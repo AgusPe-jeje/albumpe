@@ -1228,44 +1228,43 @@ function arrancarCronometroTimbaVisual(milisegundos) {
 
 async function actualizarTimbasRestantesUI() {
     if (!usuarioActual) return;
+    
     try {
-        // 🔥 FIX: Mandamos el token para que el server sepa qué tester pide la energía
+        // Fetch blindado con cabecera de Tester para saltear el maintenance mode
         const res = await fetch(`${URL_BASE}/timbas-restantes/${usuarioActual.id}`, {
             method: "GET",
             headers: obtenerHeadersSeguros()
         });
-        const data = await res.json();
-          
-          // 🔥 CORREGIDO: Usamos la variable global correcta del loop de la timba
-          if (intervaloCronometroTimba) {
-               clearInterval(intervaloCronometroTimba);
-          }
-          
-          // 2. Pintamos el estado actual de tus apuestas
-          if (datos.timbas <= 0) {
-               lblCronometro.style.borderColor = 'var(--rojo)';
-               lblCronometro.style.color = 'var(--rojo)';
-               lblCronometro.innerText = '❌ SIN ENERGÍA PARA TIMBEAR ⏱️';
-          } else {
-               lblCronometro.style.borderColor = 'var(--dorado)';
-               lblCronometro.style.color = 'var(--dorado)';
-               lblCronometro.innerText = '🎰 Apuestas disponibles: ' + datos.timbas + '/10';
-          }
+        
+        // 🎯 DEFINICIÓN UNIFICADA: Guardamos la respuesta en 'datos' para que coincida con tu código de abajo
+        const datos = await res.json();
+        
+        // Resguardo preventivo por si el server responde un 503 o estructura corrupta
+        if (datos.timbas === undefined) return;
 
-          // 🔥 3. AGUANTAR EL MUNDO POR 5 SEGUNDOS
-          if (datos.siguienteIn > 0 && datos.timbas < 10) {
-               const TIEMPO_CONGELADO_MS = 5000; // ⏱️ Se queda fijo 5 segundos enteros
+        // 🎰 Actualizamos los indicadores en la UI de tu ruleta
+        const lblTimbasContador = document.getElementById("perfil-txt-timba-jugadas") 
+            || document.getElementById("timbas-restantes-contador"); // Selector de respaldo
+            
+        const lblRuletaTimer = document.getElementById("timer-ruleta-energia")
+            || document.getElementById("perfil-txt-timba-efectividad");
 
-               setTimeout(() => {
-                    // Pasados los 5 segundos, recalculamos el tiempo restante y reactivamos tu loop dinámico
-                    const tiempoTranscurrido = TIEMPO_CONGELADO_MS;
-                    const tiempoAjustado = datos.siguienteIn - tiempoTranscurrido;
-                    
-                    arrancarCronometroTimbaVisual(tiempoAjustado > 0 ? tiempoAjustado : datos.siguienteIn);
-               }, TIEMPO_CONGELADO_MS);
-          }
-     } catch (err) {
-        console.error("Error al traer timbas restantes:", err);
+        // Inyectamos los datos reales que mandó el controlador
+        if (lblTimbasContador) {
+            // Nota: Podés ajustar este string al formato que más te guste para la caja
+            lblTimbasContador.innerText = `🔋 Giros Disponibles: ${datos.timbas} / 10`;
+        }
+
+        if (lblRuletaTimer && datos.siguienteIn > 0) {
+            const minutos = Math.floor(datos.siguienteIn / 60000);
+            const segundos = Math.floor((datos.siguienteIn % 60000) / 1000);
+            lblRuletaTimer.innerText = `⏱️ Próximo en: ${minutos}:${segundos.toString().padStart(2, '0')}`;
+        } else if (lblRuletaTimer) {
+            lblRuletaTimer.innerText = `🔋 ¡Energía al Máximo!`;
+        }
+
+    } catch (err) {
+        console.error("❌ Error al traer timbas restantes:", err);
     }
 }
 
