@@ -4713,32 +4713,61 @@ function conectarYPrenderEscuchasPvP() {
         listaDiv.innerHTML = `<h5 style="margin:10px 0 12px; color:var(--celeste); font-family:'Oswald'; text-transform: uppercase; letter-spacing: 0.5px;">Participantes Confirmados (${jugadores.length}/16):</h5>`;
         
         jugadores.forEach((j, idx) => {
-            // 🛡️ BLINDAJE DE VARIABLES: Soportamos múltiples nomenclaturas del objeto jugador
             const seleccionElegida = j.seleccion || j.seleccionElegida || null;
             const estrellasSquad = j.estrellas || j.estrellasAsignadas || j.poderInmueble || null;
 
             let badgeEstrellas = "";
-            if (seleccionElegida && estrellasSquad) {
+            let textoSeleccion = "";
+
+            // 🎯 Clasificamos el estado para saber si mostramos el badge premium al lado del nombre
+            if (!seleccionElegida) {
+                textoSeleccion = '<span style="color:#64748b; font-style:italic;">Eligiendo...</span>';
+                badgeEstrellas = '<span style="color:#64748b; font-size:0.8rem; font-style:italic; margin-left:8px;">⏳ En preparativo</span>';
+            } else if (seleccionElegida && !estrellasSquad) {
+                textoSeleccion = `<span style="color:#fff; font-weight:bold;">${seleccionElegida.toUpperCase()}</span>`;
+                badgeEstrellas = '<span style="color:var(--celeste); font-family:\'Oswald\'; font-size:0.8rem; font-weight:bold; background:rgba(56,189,248,0.1); padding:2px 6px; border-radius:4px; border:1px solid rgba(56,189,248,0.2); margin-left:8px; letter-spacing:0.3px;">📋 DRAFTING...</span>';
+            } else {
+                textoSeleccion = `<span style="color:#fff; font-weight:bold;">${seleccionElegida.toUpperCase()}</span>`;
+                
+                // 💎 EL BADGE EXACTO DE TU FOTO: Al lado de la barra "/" y pegado al nombre
                 badgeEstrellas = `
-                    <span style="color: var(--dorado); font-family: 'Oswald'; font-weight: bold; font-size: 0.8rem; background: rgba(234, 179, 8, 0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(234, 179, 8, 0.2); margin-left: 8px; letter-spacing: 0.3px;">
-                        ⭐ ${estrellasSquad} ESTRELLAS
-                    </span>
+                    <span style="color: #64748b; margin: 0 4px;">/</span>
+                    <div style="
+                        display: inline-flex; 
+                        align-items: center; 
+                        background: #090d16; 
+                        border: 1px solid var(--dorado); 
+                        box-shadow: 0 0 8px rgba(234, 179, 8, 0.25); 
+                        padding: 1px 6px; 
+                        border-radius: 4px; 
+                        font-family: 'Oswald'; 
+                        font-weight: bold; 
+                        font-size: 0.7rem; 
+                        letter-spacing: 0.5px;
+                        line-height: 1;
+                        vertical-align: middle;
+                    ">
+                        <span style="color: #94a3b8; text-transform: uppercase; margin-right: 4px;">SQUAD:</span>
+                        <span style="color: var(--dorado); font-size: 0.75rem;">⭐ ${estrellasSquad}</span>
+                    </div>
                 `;
             }
 
-            const textoSeleccion = seleccionElegida === null 
-                ? '<span style="color:#64748b; font-style:italic;">Eligiendo...</span>' 
-                : `<span style="color:#fff; font-weight:bold;">${seleccionElegida.toUpperCase()}</span>`;
-
-            // Creamos una estructura limpia en forma de fila regular
+            // Creamos el párrafo de la lista
             const p = document.createElement('p');
-            p.style.cssText = "margin: 6px 0; font-size: 0.9rem; color: #94a3b8; display: flex; align-items: center; flex-wrap: wrap; background: #111827; padding: 6px 12px; border-radius: 6px; border: 1px solid #1f2937;";
+            // Usamos una alineación flex básica sin forzar extremos para que todo lo de la izquierda quede junto
+            p.style.cssText = "margin: 6px 0; font-size: 0.9rem; color: #94a3b8; display: flex; align-items: center; background: #111827; padding: 6px 12px; border-radius: 6px; border: 1px solid #1f2937; min-height: 38px; box-sizing: border-box;";
             
             p.innerHTML = `
-                <span style="margin-right: 5px;">📋 ${idx + 1}.</span> 
-                <strong style="color: #fff; margin-right: 5px;">${j.username}</strong> 
-                <span style="margin-left: auto; display: inline-flex; align-items: center;">
-                    Equipo: ${textoSeleccion} ${badgeEstrellas}
+                <span style="margin-right: 6px;">📋 ${idx + 1}.</span> 
+                <strong style="color: #fff; margin-right: 2px;">${j.username}</strong> 
+                
+                <span style="display: inline-flex; align-items: center;">
+                    ${badgeEstrellas}
+                </span>
+                
+                <span style="margin-left: auto; color: #94a3b8;">
+                    Equipo: ${textoSeleccion}
                 </span>
             `;
             
