@@ -4235,57 +4235,73 @@ async function equiparAvatarDesdeTienda(fotoId) {
 
 async function cargarFirmasDelPerfil(perfilId) {
     if (!perfilId) return;
+    
+    const contenedorFirmas = document.getElementById("contenedor-lista-firmas") 
+        || document.getElementById("bloque-firmas-muro"); // Resguardo por si cambia el ID en tu HTML
+
     try {
-        // 🔥 FIX: Le agregamos los headers para que pase el modo mantenimiento
+        // 🎯 DEFINICIÓN ATÓMICA DE LA VARIABLE:
+        // Evaluamos numéricamente si el ID del perfil que estamos mirando es el de nuestra sesión
+        const esMiMuro = usuarioActual && Number(perfilId) === Number(usuarioActual.id);
+
+        // Fetch seguro enviando los headers de Tester para saltear el 503
         const res = await fetch(`${URL_BASE}/firmas/${perfilId}`, {
             method: "GET",
             headers: obtenerHeadersSeguros() 
         });
+        
         const data = await res.json();
-
-        if (!data.ok || data.firmas.length === 0) {
-            if (esMiMuro) {
-                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó tu vestuario todavía. ¡Hacete notar en las tablas para que vengan! 📋</p>";
-            } else {
-                contenedor.innerHTML = "<p style='color: #475569; text-align: center; font-size: 0.9rem; padding: 15px;'>Nadie firmó este muro todavía. ¡Sé el primero en dejar tu marca! 🚀</p>";
+        
+        if (!data.ok || !data.firmas) {
+            if (contenedorFirmas) {
+                contenedorFirmas.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem; padding: 15px;">Aún no hay firmas en este libro. ¡Sé el primero!</p>`;
             }
             return;
         }
 
-        contenedor.innerHTML = "";
-        data.firmas.forEach(f => {
-            const divFirma = document.createElement("div");
-            divFirma.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left;";
-            
-            const fechaOriginal = new Date(f.creado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
-            let flagFecha = `<span style="color: #475569; font-size: 0.75rem;">${fechaOriginal}</span>`;
-            
-            if (f.editado_en) {
-                const fechaEdit = new Date(f.editado_en).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
-                flagFecha = `<span style="color: var(--dorado); font-size: 0.75rem;" title="Original: ${fechaOriginal}">✏️ Editado el ${fechaEdit}</span>`;
+        if (contenedorFirmas) {
+            contenedorFirmas.innerHTML = ""; // Limpiamos la visual anterior
+
+            if (data.firmas.length === 0) {
+                contenedorFirmas.innerHTML = `<p style="color: #64748b; text-align: center; font-size: 0.85rem; padding: 15px;">Aún no hay firmas en este libro. ¡Sé el primero!</p>`;
+                return;
             }
 
-            const esMio = usuarioActual && usuarioActual.id === f.autor_id;
-            const botonera = esMio ? `
-                <div style="display: flex; gap: 8px; margin-top: 5px; justify-content: flex-end;">
-                    <button onclick="dispararEditarFirma(${f.id}, '${f.mensaje}', ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #334155;">Editar</button>
-                    <button onclick="ejecutarBorrarFirma(${f.id}, ${perfilId})" class="btn-estadio" style="padding: 2px 8px; font-size: 0.7rem; background: #ef4444; color: #fff;">Borrar</button>
-                </div>
-            ` : '';
+            // Recorremos las firmas que nos devolvió Neon
+            data.firmas.forEach(firma => {
+                const divFirma = document.createElement("div");
+                divFirma.className = "tarjeta-firma-libro";
+                divFirma.style.cssText = "background: rgba(15,23,42,0.6); padding: 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #1e293b; position: relative;";
 
-            divFirma.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong style="color: var(--celeste); font-size: 0.9rem;">@${f.username}</strong>
-                    ${flagFecha}
-                </div>
-                <p id="texto-firma-${f.id}" style="margin: 4px 0; color: #cbd5e1; font-size: 0.9rem; word-break: break-word;">${f.mensaje}</p>
-                ${botonera}
-            `;
-            contenedor.appendChild(divFirma);
-        });
+                // Validamos si la firma le pertenece al usuario logueado en esta sesión
+                const esAutorDeLaFirma = usuarioActual && Number(firma.autor_id) === Number(usuarioActual.id);
 
+                // 🗑️ LÓGICA DE BORRADO INTEGRADA: 
+                // Se puede borrar si el dueño del muro quiere limpiarlo O si el que la escribió se arrepintió
+                const mostrarBotonBorrar = esMiMuro || esAutorDeLaFirma;
+
+                divFirma.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <span style="color: var(--celeste); font-weight: bold; font-size: 0.85rem;">✍️ ${firma.username.toUpperCase()}</span>
+                        <span style="color: #475569; font-size: 0.7rem;">${new Date(firma.creado_en).toLocaleDateString()}</span>
+                    </div>
+                    <p style="color: #cbd5e1; font-size: 0.85rem; margin: 0; padding-right: 25px; word-break: break-word;">${firma.mensaje}</p>
+                    ${mostrarBotonBorrar ? `
+                        <button onclick="eliminarFirmaLocal(${firma.id}, ${perfilId})" 
+                                style="position: absolute; top: 8px; right: 8px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 0.85rem; padding: 2px 6px;" 
+                                title="Eliminar firma">
+                            ❌
+                        </button>
+                    ` : ""}
+                `;
+                contenedorFirmas.appendChild(divFirma);
+            });
+        }
     } catch (err) {
-        console.error("Error al cargar firmas:", err);
+        console.error("❌ Error al cargar firmas:", err);
+        if (contenedorFirmas) {
+            contenedorFirmas.innerHTML = `<p style="color: var(--rojo); text-align: center; font-size: 0.85rem;">Fallo de red al conectar con el libro de firmas.</p>`;
+        }
     }
 }
 
