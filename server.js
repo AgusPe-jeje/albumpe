@@ -128,7 +128,7 @@ async function inicializarTablas() {
             ultimo_giro_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             timbas_hoy INTEGER DEFAULT 10,
             copas_mundiales INTEGER DEFAULT 0, 
-            ultimo_mundial_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+            ultima_timba_mundial TIMESTAMP WITH TIME ZONE DEFAULT NULL,
             ultimo_reset_misiones VARCHAR(10) DEFAULT NULL,
             racha_login INTEGER DEFAULT 0,
             ultimo_login_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NULL,
@@ -808,17 +808,17 @@ app.get('/api/mundial/estado', verificarToken, async (req, res) => {
         client.release(); 
     }
 });
-
+ultima_timba_mundial
 app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
     const usuario_id = req.usuarioLogueado.id;
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const userCheck = await client.query("SELECT monedas, ultimo_mundial_timestamp FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
+        const userCheck = await client.query("SELECT monedas, ultima_timba_mundial FROM usuarios WHERE id = $1 FOR UPDATE", [usuario_id]);
         if (userCheck.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ ok: false, mensaje: "Usuario inválido." }); }
 
         const usuario = userCheck.rows[0];
-        if (usuario.ultimo_mundial_timestamp && (new Date() - new Date(usuario.ultimo_mundial_timestamp) < COOLDOWN_MUNDIAL_MS)) {
+        if (usuario.ultima_timba_mundial && (new Date() - new Date(usuario.ultima_timba_mundial) < COOLDOWN_MUNDIAL_MS)) {
             await client.query('ROLLBACK'); return res.json({ ok: false, elVestuarioEstaCerrado: true, mensaje: `⏳ Cooldown activo en el vestuario.` });
         }
 
@@ -830,7 +830,7 @@ app.post('/api/mundial/preparar', verificarToken, async (req, res) => {
         if (paisesCandidatos.length === 0) { await client.query('ROLLBACK'); return res.json({ ok: false, mensaje: "❌ Necesitás al menos 3 jugadores del mismo país desbloqueados." }); }
 
         const nuevoOro = usuario.monedas - 1500;
-        await client.query("UPDATE usuarios SET monedas = $1, ultimo_mundial_timestamp = NOW() WHERE id = $2", [nuevoOro, usuario_id]);
+        await client.query("UPDATE usuarios SET monedas = $1, ultima_timba_mundial = NOW() WHERE id = $2", [nuevoOro, usuario_id]);
 
         const ternaFiltrada = mezclarArray([...paisesCandidatos]).slice(0, 3);
         let rivalClasificacion = SELECCIONES_BOTS[Math.floor(Math.random() * SELECCIONES_BOTS.length)];
@@ -928,9 +928,9 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         const ahora = new Date();
         if (campeon) {
-            await client.query("UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultimo_mundial_timestamp = $1 WHERE id = $2", [ahora, usuario_id]);
+            await client.query("UPDATE usuarios SET monedas = monedas + 5000, copas_mundiales = copas_mundiales + 1, puntos_ranking = puntos_ranking + 50, ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
         } else {
-            await client.query("UPDATE usuarios SET ultimo_mundial_timestamp = $1 WHERE id = $2", [ahora, usuario_id]);
+            await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
         }
 
         const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales FROM usuarios WHERE id = $1", [usuario_id]);
@@ -977,7 +977,7 @@ app.post('/api/album/comerciar-bot', verificarToken, async (req, res) => {
                 await pool.query("UPDATE usuarios SET tiros_hoy = 10 WHERE id = $1", [usuario_id]);
                 eventoActivado = "⚡ ¡EL BOT SE COPÓ! Tenés 10 penales disponibles al toque.";
             } else {
-                await pool.query("UPDATE usuarios SET ultimo_mundial_timestamp = NOW() - INTERVAL '4 hours' WHERE id = $1", [usuario_id]);
+                await pool.query("UPDATE usuarios SET ultima_timba_mundial = NOW() - INTERVAL '4 hours' WHERE id = $1", [usuario_id]);
                 eventoActivado = "⏳ ¡CONTRABANDO TÁCTICO! El Bot alteró los papeles del vestuario. ¡Mundial disponible YA!";
             }
         }
