@@ -142,105 +142,93 @@ function cerrarModalAyuda() {
 }
 
 async function autenticarUsuario(accion) {
-     const username = document.getElementById("input-usuario").value.trim();
-     const password = document.getElementById("input-pass").value;
-     
-     if (!username || !password) return alert("❌ Completá los datos.");
+    const username = document.getElementById("input-usuario").value.trim();
+    const password = document.getElementById("input-pass").value;
+    
+    if (!username || !password) return alert("❌ Completá los datos.");
 
-     // 🛡️ SECURITY FIX: Buscamos el botón usando su clase real del HTML para evitar el crash por null
-     const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
-     if (btnAuth) btnAuth.disabled = true;
+    const btnAuth = document.querySelector(accion === 'login' ? '.btn-login-match' : '.btn-registro-match');
+    if (btnAuth) btnAuth.disabled = true;
 
-     const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
-     const endpointFinal = accion === 'login' ? 'login' : 'registro';
+    const textoSpinner = accion === 'login' ? "Iniciando sesión..." : "Creando tu cuenta en la Arena...";
+    const endpointFinal = accion === 'login' ? 'login' : 'registro';
 
-     mostrarCarga(textoSpinner);
+    mostrarCarga(textoSpinner);
 
-     try {
-          const res = await fetch(`${URL_BASE}/${endpointFinal}`, {
-               method: 'POST',
-               headers: { 'Content-Type': 'application/json' },
-               body: JSON.stringify({ username, password })
-          });
-          
-          // 🛡️ SECURITY FIX: Si el servidor responde con un estado de error (401, 403, 500, 503), frenamos
-          if (!res.ok) {
-               ocultarCarga();
-               if (btnAuth) btnAuth.disabled = false;
-               
-               try {
-                    const errorData = await res.json();
-                    return alert(errorData.error || `❌ Error del servidor (Código ${res.status})`);
-               } catch {
-                    return alert(`🚧 Error inesperado en la infraestructura de la Arena (Código ${res.status}).`);
-               }
-          }
-          
-          const data = await res.json();
-          ocultarCarga();
+    try {
+        const res = await fetch(`${URL_BASE}/${endpointFinal}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        
+        if (!res.ok) {
+            ocultarCarga();
+            if (btnAuth) btnAuth.disabled = false;
+            try {
+                const errorData = await res.json();
+                return alert(errorData.error || `❌ Error del servidor (Código ${res.status})`);
+            } catch {
+                return alert(`🚧 Error inesperado en la infraestructura de la Arena (Código ${res.status}).`);
+            }
+        }
+        
+        const data = await res.json();
+        ocultarCarga();
 
-          if (data.error) {
-               alert(data.error);
-               if (btnAuth) btnAuth.disabled = false;
-          } else {
-               // 1️⃣ PRIMERO: Guardamos el token con la clave unificada "token"
-               if (data.token) {
-                    localStorage.setItem("token", data.token);
-               }
+        if (data.error) {
+            alert(data.error);
+            if (btnAuth) btnAuth.disabled = false;
+        } else {
+            if (data.token) localStorage.setItem("token", data.token);
 
-               // 2️⃣ SEGUNDO: Inicializamos el estado del usuario en memoria global
-               usuarioActual = data.usuario;
-               
-               // 3️⃣ TERCERO: Transición limpia de la interfaz visual
-               document.getElementById("seccion-login").style.display = "none";
-               
-               const interfazJuego = document.getElementById("interfaz-juego");
-               if (interfazJuego) {
-                    interfazJuego.style.removeProperty("display");
-                    interfazJuego.classList.add("mostrar");
-               }
-               
-               // 4️⃣ CUARTO: Ahora que el token y el user existen, llamamos secuencialmente a las APIs
-               await cargarMisionesDelServidor();
-               
-               if (typeof iniciarCronometroResetMisiones === 'function') {
-                    iniciarCronometroResetMisiones();
-               }
-               
-               // Flujo de anuncios o racha diaria
-               if (typeof iniciarControladorAnunciosSeguro === 'function') {
-                    setTimeout(iniciarControladorAnunciosSeguro, 1000); 
-               } else if (typeof verificarRecompensaDiaria === 'function') {
-                    setTimeout(verificarRecompensaDiaria, 1000);
-               }
-               
-               filtroEstadoActual = 'todas';
-               filtroRarezaActual = 'todas';
-               
-               actualizarInterfazUI();
-               cargarAlbumLocal();
-               iniciarCronometroResetRanking();
-               if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
-               
-               if (typeof verificarAvatarInicial === 'function') {
-                    verificarAvatarInicial();
-               }
+            // 1️⃣ Inicializamos estado
+            usuarioActual = data.usuario;
+            
+            // 2️⃣ LIMPIEZA INMEDIATA: Ocultar login y mostrar interfaz
+            document.getElementById("seccion-login").style.display = "none";
+            const interfazJuego = document.getElementById("interfaz-juego");
+            if (interfazJuego) {
+                interfazJuego.style.removeProperty("display");
+                interfazJuego.classList.add("mostrar");
+            }
+            
+            // 3️⃣ RENDERIZADO INSTANTÁNEO: Actualizamos los labels antes del alert
+            // Esto asegura que el nombre real se pinte en el DOM antes del bloqueo del alert
+            document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
+            document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
+            
+            // 4️⃣ Cargamos datos asíncronos
+            await cargarMisionesDelServidor();
+            if (typeof iniciarCronometroResetMisiones === 'function') iniciarCronometroResetMisiones();
+            
+            // Flujos adicionales
+            if (typeof iniciarControladorAnunciosSeguro === 'function') setTimeout(iniciarControladorAnunciosSeguro, 1000); 
+            else if (typeof verificarRecompensaDiaria === 'function') setTimeout(verificarRecompensaDiaria, 1000);
+            
+            filtroEstadoActual = 'todas';
+            filtroRarezaActual = 'todas';
+            
+            cargarAlbumLocal();
+            iniciarCronometroResetRanking();
+            if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
+            if (typeof verificarAvatarInicial === 'function') verificarAvatarInicial();
 
-               // ⏱️ CONTROL ASÍNCRO: Postergamos los alerts para permitir el repintado del DOM
-               setTimeout(() => {
-                    if (accion === 'login') {
-                         alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
-                    } else {
-                         alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
-                    }
-               }, 0);
-          }
-     } catch (err) {
-          console.error("❌ Fallo crítico de red o código en autenticación:", err);
-          ocultarCarga();
-          if (btnAuth) btnAuth.disabled = false;
-          alert("📡 Error de conexión. No se pudo establecer contacto con los servidores centrales de la Arena.");
-     }
+            // 5️⃣ Alert final retardado para garantizar repintado
+            setTimeout(() => {
+                 if (accion === 'login') {
+                     alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
+                 } else {
+                     alert(`🎉 ¡Cuenta creada con éxito! Bienvenido a la Arena, ${usuarioActual.username}. Empezás con 200 monedas.`);
+                 }
+            }, 50);
+        }
+    } catch (err) {
+        console.error("❌ Fallo crítico de red:", err);
+        ocultarCarga();
+        if (btnAuth) btnAuth.disabled = false;
+        alert("📡 Error de conexión con los servidores centrales de la Arena.");
+    }
 }
 
 function obtenerHeadersSeguros() {
