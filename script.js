@@ -4842,14 +4842,14 @@ function prepararFaseDraftUI(opcionesDraft) {
             const rarezaClean = c.rareza ? c.rareza.toLowerCase() : 'comun';
 
             // 🎯 PALETA DE COLORES FIEL A TU ÁLBUM PANINI
-            let colorRareza = "#00ebd5"; // Común por defecto (Verde agua/Turquesa)
+            let colorRareza = "#00ebd5"; // Común (Verde agua)
             let shadowRareza = "0 0 8px rgba(0, 235, 213, 0.6)";
 
             if (rarezaClean.includes('legendaria') || rarezaClean.includes('icon') || rarezaClean.includes('mítica')) {
-                colorRareza = "#bc00ff"; // Violeta Legendario
-                shadowRareza = "0 0 10px rgba(188, 0, 255, 0.7)";
+                colorRareza = "var(--dorado)"; // ¡Ajustado a Dorado!
+                shadowRareza = "0 0 12px rgba(234, 179, 8, 0.7)"; // Resplandor dorado
             } else if (rarezaClean.includes('epica') || rarezaClean.includes('special')) {
-                colorRareza = "#ff007c"; // Rosa/Magenta Épico
+                colorRareza = "#ff007c"; // Rosa Épico
                 shadowRareza = "0 0 10px rgba(255, 0, 124, 0.7)";
             } else if (rarezaClean.includes('rara') || rarezaClean.includes('oro')) {
                 colorRareza = "#009aff"; // Celeste Raro
