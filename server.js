@@ -875,15 +875,23 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
             return minutos.sort((a, b) => a - b);
         }
 
+        // ⚽ SIMULACIÓN CALIBRADA: Resultados más cerrados y realistas para fase de grupos
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            let g1 = Math.floor(Math.random() * 4); 
-            let g2 = Math.floor(Math.random() * 4);
+            // Distribución de goles realistas: más chances de 0, 1 o 2 goles de base, raro un 3.
+            const distribucionGoles = [0, 0, 1, 1, 2, 3];
+            let g1 = distribucionGoles[Math.floor(Math.random() * distribucionGoles.length)];
+            let g2 = distribucionGoles[Math.floor(Math.random() * distribucionGoles.length)];
             
             if (esUsuario) {
+                // Si el destino decide que gana el usuario según sus estrellas
                 if (Math.random() <= chanceVictoriaGrupo) {
-                    if (g1 <= g2) g1 = g2 + Math.floor(Math.random() * 2) + 1;
+                    // Si iba empatando o perdiendo, le damos una ventaja mínima y realista de +1 gol
+                    if (g1 <= g2) g1 = g2 + 1;
                 } else {
-                    if (g1 > g2) g2 = g1 + Math.floor(Math.random() * 2);
+                    // El bot le gana o le empata al usuario. Si el usuario iba ganando, el bot empata o saca +1
+                    if (g1 > g2) {
+                        g2 = Math.random() <= 0.40 ? g1 : g1 + 1; // 40% chance de empatarlo, 60% de ganarlo por la mínima
+                    }
                 }
             }
             return { goles1: g1, goles2: g2, minutosEq1: generarMinutosGolesFútbol(g1), minutosEq2: generarMinutosGolesFútbol(g2) };
