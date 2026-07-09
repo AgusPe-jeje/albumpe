@@ -1913,7 +1913,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 </span>
             </div>
             <div id="consola-incidencias-${idUnico}" class="consola-incidencias-tv" style="background:#020617; padding:12px; border-radius:6px; min-height:45px; color:#cbd5e1; font-size:0.9rem; border:1px solid #1e293b; margin-top:10px; line-height: 1.4; transition: background 0.3s, color 0.3s;">
-                ⚽ El árbitro da la orden... ¡Comienzan los cruces de elimination directa!
+                ⚽ El árbitro da la orden... ¡Comienzan los cruces de eliminacion directa!
             </div>
             <div id="modulo-interactivo-${idUnico}" style="display:none; background:rgba(15,23,42,0.95); border:1px solid var(--dorado); border-radius:8px; padding:15px; margin-top:12px; text-align:center; box-shadow: 0 0 15px rgba(255,177,0,0.15);">
                 <h4 id="evento-titulo-${idUnico}" style="color:var(--dorado); margin:0 0 8px 0; font-family:'Oswald'; font-size:1.1rem; letter-spacing:0.5px;">🚨 JUGADA EN CURSO</h4>
@@ -1933,7 +1933,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         let golesRivalActuales = 0;
         let segundoVirtual = 0;
         let partidoPausado = false;
-        let ganoUsuarioFinalEfectivo = ganoUsuario; // Permite mutar dinámicamente el resultado si el VAR anula
+        let ganoUsuarioFinalEfectivo = ganoUsuario;
 
         const cartasElegidas = albumCompleto.filter(f => jugadoresSeleccionadosDraft.includes(f.id));
         const promedioDraft = cartasElegidas.reduce((acc, c) => acc + MAPA_PUNTOS_RAREZA[c.rareza.toLowerCase()], 0) / 3;
@@ -1947,7 +1947,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
             document.getElementById(`reloj-vivo-${idUnico}`).innerText = `⏱️ MINUTO ${segundoVirtual.toString().padStart(2,'0')}:00`;
 
-            // 🎯 EVENTOS INTERACTIVOS (Reintegrados de forma segura sin pisar goles vacíos)
+            // 🎯 EVENTOS INTERACTIVOS DIARIOS (Frecuencia corregida)
             if (segundoVirtual % 11 === 0 && segundoVirtual < 85 && Math.random() <= 0.35 && !cronogramaGolesTu.includes(segundoVirtual) && !cronogramaGolesRival.includes(segundoVirtual)) {
                 const esAtaqueFavor = Math.random() <= 0.50;
                 if (esAtaqueFavor) {
@@ -1959,7 +1959,7 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 }
             }
 
-            // ⚽ PROCESAMIENTO GOL TUYO (Con filtro estricto de VAR)
+            // ⚽ PROCESAMIENTO GOL TUYO
             if (cronogramaGolesTu.includes(segundoVirtual)) {
                 cronogramaGolesTu = cronogramaGolesTu.filter(m => m !== segundoVirtual);
                 if (Math.random() <= 0.35) {
@@ -2112,6 +2112,9 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 : (ganoUsuarioFinalEfectivo ? "🏁 FINAL DE LOS 90' - AVANZAS ✅" : "🏁 FINAL DE LOS 90' - ELIMINADO ❌");
             
             filaPartido.appendChild(finLabel);
+            
+            // 🚨 FIX MAESTRO: Acá cerramos de forma oficial la Promesa del partido actual
+            // Esto destraba el hilo principal para que el flujo avance o libere la navegación del vestuario.
             resolve();
         }
     });
