@@ -1308,31 +1308,24 @@ app.put('/api/usuarios/seleccionar-avatar-inicial', verificarToken, async (req, 
 });
 
 app.post('/api/usuarios/destacar-cromo', verificarToken, async (req, res) => {
-    const { fotoUrl, nombre, rareza } = req.body;
+    const { fotoUrl } = req.body;
 
-    // Validamos que al menos venga la foto que es lo crítico
+    // Validamos que venga la URL/Ruta, que es lo único que Neon necesita registrar
     if (!fotoUrl) {
         return res.status(400).json({ ok: false, mensaje: "⚠️ Falta la URL de la foto del cromo." });
     }
 
     try {
-        // Armamos el objeto estructurado para la vitrina del perfil
-        const cromoData = {
-            foto: fotoUrl,
-            nombre: nombre || "Cromo Insignia",
-            rareza: rareza || "comun"
-        };
-
-        // Guardamos todo el paquete como JSON en Neon
+        // Guardamos estrictamente la cadena de texto plana (ej: 'fotos/aus_degenek.jpg')
         await pool.query(
             'UPDATE usuarios SET cromo_destacado = $1 WHERE id = $2', 
-            [JSON.stringify(cromoData), req.usuarioLogueado.id]
+            [fotoUrl, req.usuarioLogueado.id]
         );
 
         res.json({ 
             ok: true, 
-            mensaje: "🌟 ¡Cromo lucido en la vitrina con toda su info!",
-            cromo_destacado: cromoData
+            mensaje: "🌟 ¡Cromo lucido en la vitrina!",
+            cromo_destacado: fotoUrl
         });
 
     } catch (err) { 
