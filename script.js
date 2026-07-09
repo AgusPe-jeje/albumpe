@@ -3835,15 +3835,15 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas con Penales (Blindado con Fallbacks)
-        const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
-        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
+        // 3. ⚽ Bloque B: Estadísticas de Juego Sincronizadas (Combinación Blindada de IDs antiguos y nuevos)
+        const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad") || document.getElementById("perfil-txt-timba-efectividad");
+        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas") || document.getElementById("perfil-txt-timba-jugadas");
 
-        // Captura los datos tanto si vienen agrupados como si vienen en la raíz del objeto perfil de Neon
+        // Captura la data de penales directo de Neon
         const totales = perfil.estadisticasPenales?.jugadas ?? perfil.penales_jugados ?? 0;
         const ganados = perfil.estadisticasPenales?.ganadas ?? perfil.penales_ganados ?? 0;
         
-        // Calculamos la efectividad acá en el cliente para asegurar consistencia visual
+        // Calculamos la efectividad real en base al 11 y 10 de tu Neon
         const porcentaje = totales > 0 ? Math.round((ganados / totales) * 100) : 0;
 
         if (txtPenalesEfectividad) {
