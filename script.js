@@ -4547,6 +4547,70 @@ function conectarYPrenderEscuchasPvP() {
 
     socketPvP = io();
 
+    // ==========================================
+    // 🎛️ LISTENERS DE INTERFAZ (100% DES ACOPLADOS DEL HTML)
+    // ==========================================
+    
+    const btnCrear = document.getElementById('btn-crear-sala-mundial');
+    if (btnCrear) {
+        btnCrear.addEventListener('click', () => {
+            if (typeof usuarioActual === 'undefined' || !usuarioActual) {
+                return alert("❌ Debés iniciar sesión en tu cuenta para acceder a la Arena.");
+            }
+
+            const apuestaInput = document.getElementById('apuesta-oro-pvp');
+            const apuesta = apuestaInput ? parseInt(apuestaInput.value) || 0 : 0;
+            
+            const passInput = document.getElementById('pass-sala-pvp');
+            const pass = passInput ? passInput.value : "";
+            const esPrivada = pass.length > 0;
+
+            if (usuarioActual.monedas < apuesta) {
+                return alert("❌ Oro insuficiente. Tu saldo actual no cubre la apuesta fijada.");
+            }
+
+            socketPvP.emit('crearSalaTorneo', {
+                usuarioId: usuarioActual.id,
+                username: usuarioActual.username,
+                esPrivada,
+                contrasenia: pass,
+                apuestaOro: apuesta
+            });
+        });
+    }
+
+    const btnUnirse = document.getElementById('btn-unirse-sala-mundial');
+    if (btnUnirse) {
+        btnUnirse.addEventListener('click', () => {
+            if (typeof usuarioActual === 'undefined' || !usuarioActual) {
+                return alert("❌ Debés iniciar sesión.");
+            }
+            
+            const tokenInput = document.getElementById('token-unirse-manual');
+            const token = tokenInput ? tokenInput.value.trim() : "";
+            
+            const passInput = document.getElementById('pass-unirse-manual');
+            const pass = passInput ? passInput.value : "";
+
+            if (!token) return alert("❌ Por favor ingresá o seleccioná un código de sala.");
+
+            socketPvP.emit('unirseSalaTorneo', {
+                salaToken: token,
+                contrasenia: pass,
+                usuarioId: usuarioActual.id,
+                username: usuarioActual.username
+            });
+        });
+    }
+
+    const btnStart = document.getElementById('btn-start-mundial');
+    if (btnStart) {
+        btnStart.addEventListener('click', () => {
+            if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
+            socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
+        });
+    }
+
     // Al conectarse, pedimos las salas públicas activas para llenar la lista
     socketPvP.emit('pedirSalasPublicas');
 
@@ -4554,7 +4618,6 @@ function conectarYPrenderEscuchasPvP() {
     // 📥 RECEPCIÓN DE EVENTOS (BACKEND -> CLIENTE)
     // ==========================================
 
-    // Escucha la actualización de salas públicas en tiempo real
     socketPvP.on('listaSalasPublicas', (salas) => {
         const contenedor = document.getElementById('lista-salas-disponibles');
         if (!contenedor) return;
@@ -4567,16 +4630,25 @@ function conectarYPrenderEscuchasPvP() {
         contenedor.innerHTML = "";
         salas.forEach(sala => {
             const div = document.createElement('div');
-            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:6px 10px; margin-bottom:5px; border-radius:4px; border-left:2px solid var(--celeste);";
-            div.innerHTML = `
-                <span><strong>${sala.creador}</strong> (💰${sala.apuesta}) [${sala.cupos}/16]</span>
-                <button type="button" onclick="unirseARoomDirecto('${sala.token}')" style="background:var(--celeste); color:#000; border:none; padding:2px 8px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.75rem;">UNIRSE</button>
-            `;
+            div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:6px 10px; margin-bottom:5px; border-radius:4px; border-left:2px solid var(--celeste); font-size: 0.85rem;";
+            div.innerHTML = `<span><strong>${sala.creador}</strong> (💰${sala.apuesta}) [${sala.cupos}/16]</span>`;
+            
+            // Botón inyectado con listener nativo y limpio
+            const btnUnirseFila = document.createElement('button');
+            btnUnirseFila.type = "button";
+            btnUnirseFila.innerText = "UNIRSE";
+            btnUnirseFila.style.cssText = "background:var(--celeste); color:#000; border:none; padding:2px 8px; font-weight:bold; border-radius:4px; cursor:pointer; font-size:0.75rem;";
+            
+            btnUnirseFila.addEventListener('click', () => {
+                const input = document.getElementById('token-unirse-manual');
+                if (input) input.value = sala.token;
+            });
+
+            div.appendChild(btnUnirseFila);
             contenedor.appendChild(div);
         });
     });
 
-    // Éxito al crear la sala (Creador)
     socketPvP.on('salaCreadaExito', ({ salaToken, seleccion, apuestaOro }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = true;
@@ -4587,17 +4659,15 @@ function conectarYPrenderEscuchasPvP() {
         document.getElementById('titulo-sala-token').innerText = `SALA DE SELECCIÓN: ${salaToken}`;
         document.getElementById('seleccion-asignada-pills').innerText = `🌍 TU PAÍS: ${seleccion.toUpperCase()}`;
 
-        // Calculamos las estrellas reales de tu álbum y se las enviamos al Servidor
         const misEstrellas = calcularEstrellasDesdeAlbum();
         document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
         
         socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
-        document.getElementById('btn-start-mundial').style.display = 'block'; // Solo el host ve este botón
+        document.getElementById('btn-start-mundial').style.display = 'block'; 
 
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= apuestaOro; 
     });
 
-    // Éxito al unirse a la sala (Invitados)
     socketPvP.on('unionExitosaTorneo', ({ salaToken, seleccion, salaInfo }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = false;
@@ -4612,62 +4682,54 @@ function conectarYPrenderEscuchasPvP() {
         document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
         
         socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
-        document.getElementById('btn-start-mundial').style.display = 'none'; // Invitados esperan al Host
+        document.getElementById('btn-start-mundial').style.display = 'none'; 
 
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= salaInfo.apuestaOro;
     });
 
-    // Actualización de los aspirantes en el Lobby
     socketPvP.on('jugadorSeUnioLobby', ({ jugadores }) => {
         const listaDiv = document.getElementById('lista-participantes-lobby');
         if (!listaDiv) return;
 
-        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste);">Participantes Confirmados (${jugadores.length}/16):</h5>`;
+        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste); font-family:'Oswald';">Participantes Confirmados (${jugadores.length}/16):</h5>`;
         jugadores.forEach((j, idx) => {
             listaDiv.innerHTML += `<p style="margin:3px 0; font-size:0.9rem; color:#94a3b8;">📋 ${idx + 1}. <strong>${j.username}</strong> - Selección: <span style="color:#fff;">${j.seleccion}</span></p>`;
         });
     });
 
-    // El mundial arrancó: se bloquea navegación y se abre el Fixture
     socketPvP.on('mundialComenzado', ({ fixture, pozoTotal }) => {
         document.getElementById('panel-fixture-mundial').style.display = 'block';
         
         const nav = document.querySelector(".nav-modulos-estadio");
-        if (nav) nav.style.display = "none"; // Bloqueo anti-escape
+        if (nav) nav.style.display = "none"; 
 
         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
         renderizarArbolMundial(fixture);
     });
 
-    // El servidor procesó minutos y goles con el peso de tus estrellas
     socketPvP.on('actualizacionMinutoMundial', ({ fase, minuto, fixture }) => {
-        const txtReloj = document.getElementById('reloj-pvp-live'); // Asegurate de tenerlo en tu HUD
+        const txtReloj = document.getElementById('reloj-pvp-live'); 
         if (txtReloj) txtReloj.innerText = `⏱️ ${fase} - MINUTO ${minuto}:00`;
         
         renderizarArbolMundial(fixture);
     });
 
-    // Finalizó una ronda (ej: terminaron los Octavos)
     socketPvP.on('faseMundialConcluida', ({ fixture }) => {
         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
         renderizarArbolMundial(fixture);
     });
 
-    // Errores de saldo, contraseñas o salas inexistentes
     socketPvP.on('errorPvp', ({ mensaje }) => {
         alert(mensaje);
         finalizarYLimpiarEstadoPvP();
     });
 
-    // Cierre del mundial con entrega del botín
     socketPvP.on('mundialFinalizadoCompleto', ({ ganadorId, username, mensaje, fixture }) => {
         renderizarArbolMundial(fixture);
         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
         setTimeout(async () => {
             alert(mensaje);
-            
-            // Recargamos el estado local/monedas reflejando lo modificado por Postgres
             if (typeof cargarAlbumLocal === 'function') await cargarAlbumLocal();
             finalizarYLimpiarEstadoPvP();
         }, 1500);
@@ -4675,43 +4737,8 @@ function conectarYPrenderEscuchasPvP() {
 }
 
 // ========================================================================
-// 🛠️ ENGINE MULTIJUGADOR: FUNCIONES CONTROLADORAS AUXILIARES DEFINITIVAS
+// 🛠️ ENGINE MULTIJUGADOR: DETALLES DE RENDERIZADO Y LIMPIEZA
 // ========================================================================
-
-function unirseARoomDirecto(token) {
-    const input = document.getElementById('token-unirse-manual');
-    if (input) input.value = token;
-}
-
-function unirseLobbyMundial() {
-    if (!usuarioActual) return alert("❌ Debés iniciar sesión.");
-    
-    const tokenInput = document.getElementById('token-unirse-manual');
-    const token = tokenInput ? tokenInput.value.trim() : "";
-    
-    const passInput = document.getElementById('pass-unirse-manual');
-    const pass = passInput ? passInput.value : "";
-
-    if (!token) return alert("❌ Por favor ingresá o seleccioná un código de sala.");
-
-    if (socketPvP) {
-        socketPvP.emit('unirseSalaTorneo', {
-            salaToken: token,
-            contrasenia: pass,
-            usuarioId: usuarioActual.id,
-            username: usuarioActual.username
-        });
-    } else {
-        alert("❌ Error: No hay conexión activa con la Arena PvP.");
-    }
-}
-
-function lanzarEstructuraMundial() {
-    if (!miSalaTokenPvP || !soyCreadorDeSalaPvP) return;
-    if (socketPvP) {
-        socketPvP.emit('lanzarMinimundial', { salaToken: miSalaTokenPvP });
-    }
-}
 
 function renderizarArbolMundial(fixture) {
     const contenedor = document.getElementById('contenedor-render-cruces');
@@ -4761,7 +4788,6 @@ function finalizarYLimpiarEstadoPvP() {
     const pInput = document.getElementById('pass-unirse-manual');
     if (pInput) pInput.value = "";
 
-    // Restablecemos las vistas principales con chequeo previo de existencia
     const setupPanel = document.getElementById('panel-setup-torneo');
     if (setupPanel) setupPanel.style.display = 'grid';
     
@@ -4771,10 +4797,36 @@ function finalizarYLimpiarEstadoPvP() {
     const fixturePanel = document.getElementById('panel-fixture-mundial');
     if (fixturePanel) fixturePanel.style.display = 'none';
 
-    // Reactivamos la barra de navegación del estadio de forma segura
     const nav = document.querySelector(".nav-modulos-estadio");
     if (nav) nav.style.display = "flex";
 
-    // Pedimos refresco limpio de salas públicas al servidor de Sockets
     if (socketPvP) socketPvP.emit('pedirSalasPublicas');
+}
+
+// ========================================================================
+// 📊 MOTOR DE PODER: CÁLCULO DE ESTRELLAS DE TU ÁLBUM
+// ========================================================================
+function calcularEstrellasDesdeAlbum() {
+    if (typeof albumCompleto === 'undefined' || !albumCompleto || albumCompleto.length === 0) return 1;
+    
+    const misCartas = albumCompleto.filter(c => c.obtenido > 0);
+    if (misCartas.length === 0) return 1; 
+
+    let sumaPoder = 0;
+    misCartas.forEach(c => {
+        const rarezaClean = c.rareza ? c.rareza.toLowerCase() : 'comun';
+        if (rarezaClean.includes('legendaria') || rarezaClean.includes('icon') || rarezaClean.includes('mítica')) {
+            sumaPoder += 5;
+        } else if (rarezaClean.includes('epica') || rarezaClean.includes('oro') || rarezaClean.includes('special')) {
+            sumaPoder += 3;
+        } else {
+            sumaPoder += 1;
+        }
+    });
+
+    if (sumaPoder > 60) return 5;
+    if (sumaPoder > 35) return 4;
+    if (sumaPoder > 15) return 3;
+    if (sumaPoder > 5) return 2;
+    return 1;
 }
