@@ -1883,51 +1883,29 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
         filaPartido.className = "partido-simulado-card";
         const idUnico = ronda.replace(/ /g,'') + Math.floor(Math.random() * 1000);
 
-        // 🎥 CAPA VISUAL PURA: Estilos de transmisión de TV y transiciones extendidas
         if (!document.getElementById("estilos-premium-mundial")) {
             const estilos = document.createElement("style");
             estilos.id = "estilos-premium-mundial";
             estilos.innerHTML = `
                 @keyframes screenShake {
                     0%, 100% { transform: translate(0, 0); }
-                    20%, 60% { transform: translate(-6px, 3px) rotate(-1deg); }
-                    40%, 80% { transform: translate(6px, -3px) rotate(1deg); }
+                    20%, 60% { transform: translate(-4px, 2px) rotate(-0.5deg); }
+                    40%, 80% { transform: translate(4px, -2px) rotate(0.5deg); }
                 }
-                @keyframes flashGlowPremium {
-                    0% { background: rgba(255,255,255,0.9); backdrop-filter: brightness(2) blur(4px); }
-                    30% { background: rgba(255,255,255,0.4); backdrop-filter: brightness(1.5) blur(2px); }
-                    100% { background: transparent; backdrop-filter: brightness(1) blur(0px); }
+                @keyframes flashGlow {
+                    0% { background: rgba(255,255,255,0.8); }
+                    100% { background: transparent; }
                 }
                 @keyframes glitchVar {
-                    0%, 100% { border-color: var(--dorado); box-shadow: 0 0 12px var(--dorado); }
-                    50% { border-color: var(--celeste); box-shadow: 0 0 12px var(--celeste); }
+                    0%, 100% { border-color: var(--dorado); box-shadow: 0 0 5px var(--dorado); }
+                    50% { border-color: var(--celeste); box-shadow: 0 0 5px var(--celeste); }
                 }
-                
-                /* Animaciones aplicadas por clases visuales */
-                .efecto-shake { animation: screenShake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-                
-                /* Duración de transición de gol extendida a un ritmo cinematográfico */
-                .efecto-flash-premium { 
-                    position: fixed; top:0; left:0; width:100vw; height:100vh; 
-                    background: transparent; z-index:9999; pointer-events:none; 
-                    animation: flashGlowPremium 0.9s ease-out; 
-                }
-                
+                .efecto-shake { animation: screenShake 0.35s ease-in-out; }
+                .efecto-flash { position: fixed; top:0; left:0; width:100vw; height:100vh; background: transparent; z-index:9999; pointer-events:none; animation: flashGlow 0.4s ease-out; }
                 .badge-var-live { background: var(--dorado); color: #000; font-weight: bold; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; font-family: 'Oswald'; margin-left: 8px; animation: glitchVar 1s infinite; }
                 
-                /* Suavizado milimétrico para cambios físicos en el marcador */
-                .marcador-cambio { 
-                    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
-                }
-                
-                /* Estilizado premium del zócalo del marcador tipo transmisión en vivo */
-                .marcador-tv-style {
-                    font-family: 'Oswald', sans-serif; font-size: 2.1rem !important;
-                    background: linear-gradient(180deg, #020617 0%, #0f172a 100%) !important;
-                    padding: 4px 22px !important; border-radius: 8px !important;
-                    color: var(--verde-match) !important; min-width: 90px; text-align: center;
-                    border: 1px solid #334155 !important; box-shadow: inset 0 0 12px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.4);
-                }
+                /* Transición suave para el retroceso o avance del marcador */
+                .marcador-cambio { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
             `;
             document.head.appendChild(estilos);
         }
@@ -1938,11 +1916,11 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 <span id="reloj-vivo-${idUnico}" style="font-weight:bold; color:var(--celeste); font-family: monospace; font-size: 0.9rem;">⏱️ MINUTO 00:00</span>
             </div>
             <div id="marcador-contenedor-${idUnico}" style="display:flex; justify-content:space-between; align-items:center; padding: 5px 0; transition: transform 0.2s;">
-                <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff; font-family:'Oswald'; letter-spacing:0.3px;">
+                <span style="width:42%; text-align:left; font-weight:bold; font-size:1.1rem; color: #fff;">
                     ⚽ ${tuPais.toUpperCase()} <span id="boost-badge-${idUnico}" class="boost-badge-gaming oculto">MOTIVADO</span>
                 </span>
-                <span id="score-vivo-${idUnico}" class="marcador-cambio marcador-tv-style">0 - 0</span>
-                <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff; font-family:'Oswald'; letter-spacing:0.3px;">
+                <span id="score-vivo-${idUnico}" class="marcador-cambio" style="font-family:'Oswald'; font-size:1.9rem; background:#020617; padding:4px 18px; border-radius:8px; color:var(--verde-match); min-width:80px; text-align:center; border: 1px solid #1e293b;">0 - 0</span>
+                <span style="width:42%; text-align:right; font-weight:bold; font-size:1.1rem; color: #fff;">
                     ${rival.toUpperCase()} 🤖
                 </span>
             </div>
@@ -2036,44 +2014,36 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
             }
         }, 550);
 
-        // Visual del gol: Inyección de transición extendida y sacudida de cámara premium
         function dispararEstimulantesImpacto(relatoFinal) {
             const flash = document.createElement("div");
-            flash.className = "efecto-flash-premium"; // Usamos la nueva clase extendida
-            document.body.appendChild(flash);
-            setTimeout(() => flash.remove(), 900); // Sostenido por 900ms totales
-
+            flash.className = "efecto-flash"; document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 400);
             filaPartido.classList.add("efecto-shake");
-            setTimeout(() => filaPartido.classList.remove("efecto-shake"), 400);
+            setTimeout(() => filaPartido.classList.remove("efecto-shake"), 350);
 
             const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
             scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-            
-            // Animación física del marcador de TV
-            scoreLbl.style.transform = "scale(1.35)"; 
-            scoreLbl.style.borderColor = "var(--verde-match)";
-            scoreLbl.style.boxShadow = "0 0 20px rgba(34,197,94,0.6)";
-            
-            setTimeout(() => { 
-                scoreLbl.style.transform = "scale(1)"; 
-                scoreLbl.style.borderColor = "#334155"; 
-                scoreLbl.style.boxShadow = "inset 0 0 12px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.4)";
-            }, 600);
+            scoreLbl.style.transform = "scale(1.25)"; scoreLbl.style.borderColor = "var(--verde-match)";
+            setTimeout(() => { scoreLbl.style.transform = "scale(1)"; scoreLbl.style.borderColor = "#1e293b"; }, 500);
 
             document.getElementById(`consola-incidencias-${idUnico}`).innerText = relatoFinal;
             if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
         }
 
+        // 🖥️ SUB-MOTOR DE CONTROL DE VAR REAL (Efecto Inmediato + Transición de Anulación)
         function ejecutarMomentoVAR(esAtaqueFavor, seConvalidaGol) {
             partidoPausado = true;
             const consola = document.getElementById(`consola-incidencias-${idUnico}`);
             const scoreLbl = document.getElementById(`score-vivo-${idUnico}`);
             const equipoQueMarcaba = esAtaqueFavor ? tuPais.toUpperCase() : rival.toUpperCase();
 
+            // 1. SUBIMOS EL MARCADOR DE PREPO PARA HACER EL AMAGUE
             if (esAtaqueFavor) golesTuActuales++; else golesRivalActuales++;
             
+            // Forzamos el feedback visual del gol instantáneo
             dispararEstimulantesImpacto(`⚽ ¡GOOOLAZO DE ${equipoQueMarcaba}! Tremenda definición... ¡Estalla la Arena!`);
 
+            // 2. A LOS 1.8 SEGUNDOS, EL ÁRBITRO ENTRA EN DUDA Y PAUSA TODO
             setTimeout(() => {
                 consola.style.background = "#451a03"; 
                 consola.style.color = "#fff";
@@ -2085,16 +2055,19 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 consola.innerText = "🖥️ Los asistentes trazan las líneas digitales de fuera de juego en la cabina de transmisión..."; 
             }, 3800);
 
+            // 3. RESOLUCIÓN FINAL DE LA JUGADA (MINUTO 6.0)
             setTimeout(() => {
                 if (seConvalidaGol) {
+                    // Si se convalida, el marcador queda igual. Sólamente avisamos
                     consola.style.background = "rgba(34, 197, 94, 0.15)"; 
                     consola.style.color = "var(--verde-match)";
                     consola.innerText = `🏁 ¡GOL CONFIRMADO! El VAR certifica la posición habilitada de ${equipoQueMarcaba}. ¡Sube legalmente al tablero!`;
                     
-                    scoreLbl.style.transform = "scale(1.15)";
+                    scoreLbl.style.transform = "scale(1.1)";
                     scoreLbl.style.borderColor = "var(--verde-match)";
-                    setTimeout(() => { scoreLbl.style.transform = "scale(1)"; scoreLbl.style.borderColor = "#334155"; }, 450);
+                    setTimeout(() => { scoreLbl.style.transform = "scale(1)"; scoreLbl.style.borderColor = "#1e293b"; }, 400);
                 } else {
+                    // ❌ SI SE ANULA: Aplicamos la transición de retroceso del marcador
                     if (esAtaqueFavor) golesTuActuales--; else golesRivalActuales--;
                     
                     consola.style.background = "rgba(239, 68, 68, 0.15)"; 
@@ -2103,19 +2076,17 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                     
                     if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
 
-                    // Transición puramente visual de desintegración en rojo del marcador
-                    scoreLbl.style.transform = "scale(0.85) rotate(-3deg)";
+                    // Transición visual agresiva en rojo para denotar que el gol desaparece
+                    scoreLbl.style.transform = "scale(0.8) rotate(-2deg)";
                     scoreLbl.style.borderColor = "var(--rojo)";
-                    scoreLbl.style.boxShadow = "0 0 25px rgba(239,68,68,0.7)";
                     scoreLbl.style.background = "#1c0c0c";
                     
                     setTimeout(() => {
                         scoreLbl.innerText = `${golesTuActuales} - ${golesRivalActuales}`;
                         scoreLbl.style.transform = "scale(1) rotate(0deg)";
-                        scoreLbl.style.borderColor = "#334155";
-                        scoreLbl.style.background = "linear-gradient(180deg, #020617 0%, #0f172a 100%)";
-                        scoreLbl.style.boxShadow = "inset 0 0 12px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.4)";
-                    }, 500);
+                        scoreLbl.style.borderColor = "#1e293b";
+                        scoreLbl.style.background = "#020617";
+                    }, 400);
                 }
 
                 setTimeout(() => { 
