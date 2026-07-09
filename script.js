@@ -4800,6 +4800,7 @@ function prepararFaseDraftUI(opcionesDraft) {
 
         if (!paisElegido) {
             contenedorCartas.innerHTML = `<p style="color: #64748b; font-style: italic; margin: auto; grid-column: span 3; font-size: 0.85rem;">Seleccioná un país arriba para ver tus cromos disponibles...</p>`;
+            document.getElementById('txt-estrellas-calculadas').innerText = "⭐ DRAFT PENDIENTE";
             return;
         }
 
@@ -4808,6 +4809,23 @@ function prepararFaseDraftUI(opcionesDraft) {
 
         mapeoPaises[paisElegido].forEach(c => {
             const urlImagen = c.foto || 'img/default-card.png';
+            const rarezaClean = c.rareza ? c.rareza.toLowerCase() : 'comun';
+
+            // 🎨 SISTEMA DE COLORES NEÓN PARA LAS PILLS SEGÚN RAREZA
+            let colorRareza = "#cbd5e1"; // Común (Blanco/Gris)
+            let shadowRareza = "none";
+
+            if (rarezaClean.includes('legendaria') || rarezaClean.includes('icon') || rarezaClean.includes('mítica')) {
+                colorRareza = "#a855f7"; // Violeta Mítico
+                shadowRareza = "0 0 8px rgba(168, 85, 247, 0.6)";
+            } else if (rarezaClean.includes('epica') || rarezaClean.includes('special')) {
+                colorRareza = "var(--dorado)"; // Épico Dorado
+                shadowRareza = "0 0 8px rgba(234, 179, 8, 0.6)";
+            } else if (rarezaClean.includes('rara') || rarezaClean.includes('oro')) {
+                colorRareza = "var(--celeste)"; // Raro Celeste
+                shadowRareza = "0 0 8px rgba(56, 189, 248, 0.6)";
+            }
+
             const label = document.createElement('label');
             
             label.style.cssText = `
@@ -4833,7 +4851,10 @@ function prepararFaseDraftUI(opcionesDraft) {
                     <img src="${urlImagen}" alt="${c.nombre}" style="width: 100%; height: auto; object-fit: contain; pointer-events: none; border-radius: 4px;">
                 </div>
                 <span style="font-size: 0.9rem; font-weight: bold; line-height: 1.2; display: block; margin-top: 4px; font-family: 'Oswald'; text-transform: uppercase; letter-spacing: 0.3px;">${c.nombre}</span>
-                <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold;">${c.rareza}</small>
+                
+                <small style="color: ${colorRareza}; font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold; text-shadow: ${shadowRareza}; background: rgba(0,0,0,0.4); padding: 2px 8px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05);">
+                    ${c.rareza}
+                </small>
             `;
             
             const checkboxInterno = label.querySelector('input[type="checkbox"]');
@@ -4851,6 +4872,9 @@ function prepararFaseDraftUI(opcionesDraft) {
                     label.style.background = "#111827";
                     if (imgContainer) imgContainer.style.transform = "scale(1)";
                 }
+
+                // 📊 Disparar recuento instantáneo de estrellas
+                actualizarEstrellasDraftEnVivo();
             });
 
             contenedorCartas.appendChild(label);
@@ -4869,10 +4893,39 @@ function prepararFaseDraftUI(opcionesDraft) {
                     labelPadre.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
                     labelPadre.style.background = "#111827";
                     if (imgContainer) imgContainer.style.transform = "scale(1)";
+                    
+                    actualizarEstrellasDraftEnVivo();
                 }
             });
         });
+
+        // Inicializar el cartel en 0 cuando se cambia de país
+        actualizarEstrellasDraftEnVivo();
     };
+
+    // ⚡ FUNCIÓN INTERNA PARA CALCULAR ESTRELLAS MIENTRAS SE SELECCIONA
+    function actualizarEstrellasDraftEnVivo() {
+        const seleccionados = document.querySelectorAll('input[name="cartas-draft-check"]:checked');
+        const txtEstrellas = document.getElementById('txt-estrellas-calculadas');
+        if (!txtEstrellas) return;
+
+        if (seleccionados.length === 0) {
+            txtEstrellas.innerText = "⭐ SELECCIONÁ REFUERZOS (0/3)";
+            return;
+        }
+
+        let poderInmueble = 0;
+        seleccionados.forEach(box => {
+            const rareza = box.getAttribute('data-rareza').toLowerCase();
+            if (rareza.includes('legendaria') || rareza.includes('icon') || rareza.includes('mítica')) poderInmueble += 5;
+            else if (rareza.includes('epica') || rareza.includes('special')) poderInmueble += 3;
+            else if (rareza.includes('rara') || rareza.includes('oro')) poderInmueble += 2;
+            else poderInmueble += 1;
+        });
+
+        const estrellasAsignadas = poderInmueble >= 13 ? 5 : poderInmueble >= 9 ? 4 : poderInmueble >= 5 ? 3 : 2;
+        txtEstrellas.innerText = `⭐ ESTRELLAS DE SQUAD: ${estrellasAsignadas} (${seleccionados.length}/3 cartas)`;
+    }
 
     document.getElementById('btn-confirmar-draft-propio').onclick = () => {
         const paisElegido = selectPais.value;
@@ -4887,6 +4940,7 @@ function prepararFaseDraftUI(opcionesDraft) {
             const rareza = box.getAttribute('data-rareza').toLowerCase();
             if (rareza.includes('legendaria') || rareza.includes('icon') || rareza.includes('mítica')) poderInmueble += 5;
             else if (rareza.includes('epica') || rareza.includes('oro') || rareza.includes('special')) poderInmueble += 3;
+            else if (rareza.includes('rara') || rareza.includes('oro')) poderInmueble += 2;
             else poderInmueble += 1;
         });
 
