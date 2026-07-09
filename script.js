@@ -4713,19 +4713,22 @@ function conectarYPrenderEscuchasPvP() {
         listaDiv.innerHTML = `<h5 style="margin:10px 0 12px; color:var(--celeste); font-family:'Oswald'; text-transform: uppercase; letter-spacing: 0.5px;">Participantes Confirmados (${jugadores.length}/16):</h5>`;
         
         jugadores.forEach((j, idx) => {
-            // 🛡️ Si el jugador ya confirmó su draft, preparamos las estrellas, sino queda en "Eligiendo..."
+            // 🛡️ BLINDAJE DE VARIABLES: Soportamos múltiples nomenclaturas del objeto jugador
+            const seleccionElegida = j.seleccion || j.seleccionElegida || null;
+            const estrellasSquad = j.estrellas || j.estrellasAsignadas || j.poderInmueble || null;
+
             let badgeEstrellas = "";
-            if (j.seleccion && j.estrellas) {
+            if (seleccionElegida && estrellasSquad) {
                 badgeEstrellas = `
                     <span style="color: var(--dorado); font-family: 'Oswald'; font-weight: bold; font-size: 0.8rem; background: rgba(234, 179, 8, 0.1); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(234, 179, 8, 0.2); margin-left: 8px; letter-spacing: 0.3px;">
-                        ⭐ ${j.estrellas} ESTRELLAS
+                        ⭐ ${estrellasSquad} ESTRELLAS
                     </span>
                 `;
             }
 
-            const textoSeleccion = j.seleccion === null 
+            const textoSeleccion = seleccionElegida === null 
                 ? '<span style="color:#64748b; font-style:italic;">Eligiendo...</span>' 
-                : `<span style="color:#fff; font-weight:bold;">${j.seleccion.toUpperCase()}</span>`;
+                : `<span style="color:#fff; font-weight:bold;">${seleccionElegida.toUpperCase()}</span>`;
 
             // Creamos una estructura limpia en forma de fila regular
             const p = document.createElement('p');
