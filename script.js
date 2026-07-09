@@ -1948,7 +1948,6 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
                 </span>
             </div>
             
-            // MARCADOR PRINCIPAL: Estilo Marcador de TV
             <div id="marcador-contenedor-${idUnico}" style="display:flex; justify-content:space-between; align-items:center; padding: 10px 0; transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
                 <span style="width:40%; text-align:left; font-weight:bold; font-size:1.15rem; color: #fff; font-family:'Oswald', sans-serif; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
                     ⚽ ${tuPais.toUpperCase()} <span id="boost-badge-${idUnico}" class="boost-badge-gaming oculto" style="font-size: 0.65rem; background: #e11d48; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 900; animation: pulse 1.5s infinite;">MOTIVADO</span>
