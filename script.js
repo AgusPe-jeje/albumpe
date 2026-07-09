@@ -4791,11 +4791,10 @@ function prepararFaseDraftUI() {
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             `;
             
-            // Estructura: Imagen del cromo completa + Textos limpios abajo
+            // Estructura: Ocultamos el input por completo con display:none e interactuamos con el click del label
             label.innerHTML = `
-                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="position: absolute; top: 18px; left: 18px; accent-color: var(--verde-match); width: 18px; height: 18px; cursor: pointer; z-index: 2;">
+                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="display: none;">
                 
-                <!-- Contenedor del cromo sin fondos que lo tapen -->
                 <div style="width: 100%; height: auto; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 6px; overflow: hidden; transition: transform 0.2s ease;">
                     <img src="${urlImagen}" alt="${c.nombre}" style="width: 100%; height: auto; object-fit: contain; pointer-events: none; border-radius: 4px;">
                 </div>
@@ -4804,14 +4803,14 @@ function prepararFaseDraftUI() {
                 <small style="color: var(--dorado); font-family: 'Oswald'; font-size: 0.75rem; text-transform: uppercase; margin-top: 6px; letter-spacing: 0.5px; font-weight: bold;">${c.rareza}</small>
             `;
             
-            // ⚡ EFECTO HOVER Y SELECCIÓN NEÓN
+            // ⚡ EFECTO EXCLUSIVO DE SELECCIÓN EN TODA LA TARJETA
             const checkboxInterno = label.querySelector('input[type="checkbox"]');
             const imgContainer = label.querySelector('div');
 
             checkboxInterno.addEventListener('change', () => {
                 if (checkboxInterno.checked) {
                     label.style.border = "2px solid var(--verde-match)";
-                    label.style.boxShadow = "0 0 16px rgba(34, 197, 94, 0.4)";
+                    label.style.boxShadow = "0 0 16px rgba(34, 197, 94, 0.5)";
                     label.style.background = "#142236";
                     if (imgContainer) imgContainer.style.transform = "scale(1.03)";
                 } else {
