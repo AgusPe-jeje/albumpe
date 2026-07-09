@@ -3490,7 +3490,6 @@ function renderizarCartasElegiblesSBC() {
     grid.innerHTML = "";
     const req = contrato.requisitos;
     const miAlbum = window.albumCompleto || [];
-    const totalSeleccionadas = sbcJugadoresSeleccionados.length;
 
     const elegibles = miAlbum.filter(carta => {
         const copias = carta.obtenido !== undefined ? carta.obtenido : (carta.cantidad || 0);
@@ -3508,6 +3507,8 @@ function renderizarCartasElegiblesSBC() {
         const cardBox = document.createElement("div");
         const copias = carta.obtenido !== undefined ? carta.obtenido : (carta.cantidad || 0);
         const maxRepetidasDisponibles = copias - 1;
+        
+        // Calculamos cuántas veces se seleccionó ESTA carta específica en el pool actual
         const vecesElegido = sbcJugadoresSeleccionados.filter(id => id === carta.id).length;
         const estaElegida = vecesElegido > 0;
 
@@ -3523,13 +3524,24 @@ function renderizarCartasElegiblesSBC() {
         `;
 
         cardBox.onclick = () => {
-            if (vecesElegido < maxRepetidasDisponibles) {
-                if (totalSeleccionadas >= req.cantidad) return alert(`⚠️ Este contrato exige ${req.cantidad} jugadores.`);
-                sbcJugadoresSeleccionados.push(carta.id);
-            } else {
-                const index = sbcJugadoresSeleccionados.indexOf(carta.id);
-                if (index > -1) sbcJugadoresSeleccionados.splice(index, 1);
+            const totalSeleccionadas = sbcJugadoresSeleccionados.length;
+            const index = sbcJugadoresSeleccionados.indexOf(carta.id);
+
+            // CASO 1: Si ya está seleccionada al menos una vez, el click remueve UNA instancia de esta carta
+            if (index > -1) {
+                sbcJugadoresSeleccionados.splice(index, 1);
+            } 
+            // CASO 2: Si no alcanzó su límite de copias repetidas y hay cupo en la planilla, se agrega
+            else {
+                if (totalSeleccionadas >= req.cantidad) {
+                    return alert(`⚠️ Este contrato exige exactamente ${req.cantidad} jugadores.`);
+                }
+                if (vecesElegido < maxRepetidasDisponibles) {
+                    sbcJugadoresSeleccionados.push(carta.id);
+                }
             }
+
+            // Refrescamos el contador en la interfaz y redibujamos la grilla
             document.getElementById("sbc-contador-slots").innerText = `${sbcJugadoresSeleccionados.length} / ${req.cantidad}`;
             renderizarCartasElegiblesSBC();
         };
