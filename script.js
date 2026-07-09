@@ -4548,7 +4548,7 @@ function conectarYPrenderEscuchasPvP() {
     socketPvP = io();
 
     // ==========================================
-    // 🎛️ LISTENERS DE INTERFAZ (100% DES ACOPLADOS DEL HTML)
+    // 🎛️ LISTENERS DE INTERFAZ (100% DESACOPLADOS)
     // ==========================================
     
     const btnCrear = document.getElementById('btn-crear-sala-mundial');
@@ -4633,7 +4633,6 @@ function conectarYPrenderEscuchasPvP() {
             div.style.cssText = "display:flex; justify-content:space-between; align-items:center; background:#1e293b; padding:6px 10px; margin-bottom:5px; border-radius:4px; border-left:2px solid var(--celeste); font-size: 0.85rem;";
             div.innerHTML = `<span><strong>${sala.creador}</strong> (💰${sala.apuesta}) [${sala.cupos}/16]</span>`;
             
-            // Botón inyectado con listener nativo y limpio
             const btnUnirseFila = document.createElement('button');
             btnUnirseFila.type = "button";
             btnUnirseFila.innerText = "UNIRSE";
@@ -4649,41 +4648,17 @@ function conectarYPrenderEscuchasPvP() {
         });
     });
 
-    socketPvP.on('salaCreadaExito', ({ salaToken, seleccion, apuestaOro }) => {
+    socketPvP.on('salaCreadaExito', ({ salaToken, apuestaOro }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = true;
-        miSeleccionAsignada = seleccion;
-
-        document.getElementById('panel-setup-torneo').style.display = 'none';
-        document.getElementById('panel-lobby-torneo').style.display = 'block';
-        document.getElementById('titulo-sala-token').innerText = `SALA DE SELECCIÓN: ${salaToken}`;
-        document.getElementById('seleccion-asignada-pills').innerText = `🌍 TU PAÍS: ${seleccion.toUpperCase()}`;
-
-        const misEstrellas = calcularEstrellasDesdeAlbum();
-        document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
-        
-        socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
-        document.getElementById('btn-start-mundial').style.display = 'block'; 
-
+        prepararFaseDraftUI();
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= apuestaOro; 
     });
 
-    socketPvP.on('unionExitosaTorneo', ({ salaToken, seleccion, salaInfo }) => {
+    socketPvP.on('unionExitosaTorneo', ({ salaToken, salaInfo }) => {
         miSalaTokenPvP = salaToken;
         soyCreadorDeSalaPvP = false;
-        miSeleccionAsignada = seleccion;
-
-        document.getElementById('panel-setup-torneo').style.display = 'none';
-        document.getElementById('panel-lobby-torneo').style.display = 'block';
-        document.getElementById('titulo-sala-token').innerText = `SALA DE SELECCIÓN: ${salaToken}`;
-        document.getElementById('seleccion-asignada-pills').innerText = `🌍 TU PAÍS: ${seleccion.toUpperCase()}`;
-
-        const misEstrellas = calcularEstrellasDesdeAlbum();
-        document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ${misEstrellas} Estrellas de Plantel`;
-        
-        socketPvP.emit('enviarEstrellasPoder', { salaToken, estrellas: misEstrellas });
-        document.getElementById('btn-start-mundial').style.display = 'none'; 
-
+        prepararFaseDraftUI();
         if (typeof usuarioActual !== 'undefined') usuarioActual.monedas -= salaInfo.apuestaOro;
     });
 
@@ -4691,15 +4666,14 @@ function conectarYPrenderEscuchasPvP() {
         const listaDiv = document.getElementById('lista-participantes-lobby');
         if (!listaDiv) return;
 
-        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste); font-family:'Oswald';">Participantes Confirmados (${jugadores.length}/16):</h5>`;
+        listaDiv.innerHTML = `<h5 style="margin:10px 0 5px; color:var(--celeste); font-family:'Oswald'; text-transform: uppercase;">Participantes Confirmados (${jugadores.length}/16):</h5>`;
         jugadores.forEach((j, idx) => {
-            listaDiv.innerHTML += `<p style="margin:3px 0; font-size:0.9rem; color:#94a3b8;">📋 ${idx + 1}. <strong>${j.username}</strong> - Selección: <span style="color:#fff;">${j.seleccion}</span></p>`;
+            listaDiv.innerHTML += `<p style="margin:3px 0; font-size:0.9rem; color:#94a3b8;">📋 ${idx + 1}. <strong>${j.username}</strong> - Equipo: <span style="color:#fff; font-weight:bold;">${j.seleccion === null ? 'Eligiendo...' : j.seleccion.toUpperCase()}</span></p>`;
         });
     });
 
-    socketPvP.on('mundialComenzado', ({ fixture, pozoTotal }) => {
+    socketPvP.on('mundialComenzado', ({ fixture }) => {
         document.getElementById('panel-fixture-mundial').style.display = 'block';
-        
         const nav = document.querySelector(".nav-modulos-estadio");
         if (nav) nav.style.display = "none"; 
 
@@ -4707,14 +4681,29 @@ function conectarYPrenderEscuchasPvP() {
         renderizarArbolMundial(fixture);
     });
 
-    socketPvP.on('actualizacionMinutoMundial', ({ fase, minuto, fixture }) => {
+    // Cambia el foco a un único partido en vivo (Simulación 1v1 Secuencial)
+    socketPvP.on('partidoEnFocoVivido', ({ fase, partidoNumero, totalPartidos, local, visitante }) => {
+        const txtReloj = document.getElementById('reloj-pvp-live');
+        if (txtReloj) txtReloj.innerText = `📺 TRANSMITIENDO: ${fase} (Partido ${partidNumero}/${totalPartidos}) • ESPERANDO PITAZO`;
+    });
+
+    socketPvP.on('tickMinutoIndividual', ({ minuto, golesLocal, golesVisitante, fixture }) => {
         const txtReloj = document.getElementById('reloj-pvp-live'); 
-        if (txtReloj) txtReloj.innerText = `⏱️ ${fase} - MINUTO ${minuto}:00`;
-        
+        if (txtReloj) {
+            const faseActual = fixture.cuartos.length === 0 ? "OCTAVOS" : fixture.semi.length === 0 ? "CUARTOS" : fixture.final.length === 0 ? "SEMI" : "FINAL";
+            txtReloj.innerText = `⏱️ ${faseActual} • MINUTO ${minuto}:00`;
+        }
         renderizarArbolMundial(fixture);
     });
 
-    socketPvP.on('faseMundialConcluida', ({ fixture }) => {
+    socketPvP.on('partidoIndividualConcluido', ({ fixture }) => {
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('gol');
+        renderizarArbolMundial(fixture);
+    });
+
+    socketPvP.on('nuevaFaseAlcanzada', ({ fase, fixture }) => {
+        const txtReloj = document.getElementById('reloj-pvp-live');
+        if (txtReloj) txtReloj.innerText = `🏆 AVANZANDO A ${fase}...`;
         if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('pitazo');
         renderizarArbolMundial(fixture);
     });
@@ -4737,9 +4726,105 @@ function conectarYPrenderEscuchasPvP() {
 }
 
 // ========================================================================
-// 🛠️ ENGINE MULTIJUGADOR: DETALLES DE RENDERIZADO Y LIMPIEZA
+// 🎲 LÓGICA DE DRAFT INTERACTIVO: ESCANEO DE CARTAS DESBLOQUEADAS
 // ========================================================================
+function prepararFaseDraftUI() {
+    document.getElementById('panel-setup-torneo').style.display = 'none';
+    document.getElementById('panel-lobby-torneo').style.display = 'block';
+    document.getElementById('titulo-sala-token').innerText = `LOBBY DEL TORNEO: ${miSalaTokenPvP}`;
 
+    const selectPais = document.getElementById('select-pais-draft');
+    if (!selectPais) return;
+
+    // Agrupamos tus cartas obtenidas por país
+    const mapeoPaises = {};
+    albumCompleto.filter(c => c.obtenido > 0).forEach(c => {
+        if (!mapeoPaises[c.pais]) mapeoPaises[c.pais] = [];
+        mapeoPaises[c.pais].push(c);
+    });
+
+    selectPais.innerHTML = '<option value="">-- Seleccioná un país --</option>';
+    
+    // Filtro estricto: Solo aparecen países donde tengas al menos 3 cromos pegados
+    Object.keys(mapeoPaises).forEach(pais => {
+        if (mapeoPaises[pais].length >= 3) {
+            selectPais.innerHTML += `<option value="${pais}">🌍 ${pais.toUpperCase()} (${mapeoPaises[pais].length} cromos)</option>`;
+        }
+    });
+
+    // Dibujar naipes dinámicamente cuando cambias el select
+    selectPais.onchange = () => {
+        const paisElegido = selectPais.value;
+        const contenedorCartas = document.getElementById('contenedor-cartas-pais-draft');
+        if (!contenedorCartas) return;
+        contenedorCartas.innerHTML = "";
+
+        if (!paisElegido) {
+            contenedorCartas.innerHTML = `<p style="color: #64748b; font-style: italic; margin: auto; grid-column: span 3; font-size: 0.85rem;">Seleccioná un país arriba para ver tus cromos disponibles...</p>`;
+            return;
+        }
+
+        mapeoPaises[paisElegido].forEach(c => {
+            const label = document.createElement('label');
+            label.style.cssText = "background:#1e293b; padding:8px; border-radius:6px; font-size:0.8rem; display:flex; align-items:center; gap:8px; color:#fff; border:1px solid #334155; cursor:pointer; user-select:none;";
+            label.innerHTML = `
+                <input type="checkbox" name="cartas-draft-check" value="${c.id}" data-rareza="${c.rareza}" style="accent-color:var(--celeste); cursor:pointer;">
+                <span><strong>${c.nombre}</strong><br><small style="color:var(--dorado);">${c.rareza.toUpperCase()}</small></span>
+            `;
+            contenedorCartas.appendChild(label);
+        });
+
+        // Evento limitador: Máximo 3 cajas seleccionadas a la vez
+        const checkboxes = document.querySelectorAll('input[name="cartas-draft-check"]');
+        checkboxes.forEach(box => {
+            box.addEventListener('change', () => {
+                const checked = document.querySelectorAll('input[name="cartas-draft-check"]:checked');
+                if (checked.length > 3) box.checked = false;
+            });
+        });
+    };
+
+    // Confirmar Draft definitivo y despachar al backend
+    document.getElementById('btn-confirmar-draft-propio').onclick = () => {
+        const paisElegido = selectPais.value;
+        const seleccionados = document.querySelectorAll('input[name="cartas-draft-check"]:checked');
+
+        if (!paisElegido || seleccionados.length !== 3) {
+            return alert("❌ Configuración incompleta: Debés elegir la Selección y marcar exactamente 3 cartas de refuerzo.");
+        }
+
+        // Ponderación de estrellas según la rareza de las 3 cartas marcadas
+        let poderInmueble = 0;
+        seleccionados.forEach(box => {
+            const rareza = box.getAttribute('data-rareza').toLowerCase();
+            if (rareza.includes('legendaria') || rareza.includes('icon') || rareza.includes('mítica')) poderInmueble += 5;
+            else if (rareza.includes('epica') || rareza.includes('oro') || rareza.includes('special')) poderInmueble += 3;
+            else poderInmueble += 1;
+        });
+
+        // Escala matemática del Draft
+        const estrellasAsignadas = poderInmueble >= 13 ? 5 : poderInmueble >= 9 ? 4 : poderInmueble >= 5 ? 3 : 2;
+
+        document.getElementById('txt-estrellas-calculadas').innerText = `⭐ ESTRELLAS DE SQUAD: ${estrellasAsignadas}`;
+        document.getElementById('draft-seleccion-manager').style.opacity = "0.4";
+        document.getElementById('btn-confirmar-draft-propio').disabled = true;
+        selectPais.disabled = true;
+
+        miSeleccionAsignada = paisElegido;
+
+        socketPvP.emit('confirmarDraftJugador', {
+            salaToken: miSalaTokenPvP,
+            seleccionElegida: paisElegido,
+            estrellas: estrellasAsignadas
+        });
+
+        if (soyCreadorDeSalaPvP) document.getElementById('btn-start-mundial').style.display = 'block';
+    };
+}
+
+// ========================================================================
+// 🎨 RENDERIZADOR MEJORADO CON SEÑAL DE IDENTIFICACIÓN [TÚ] ULTRA NEÓN
+// ========================================================================
 function renderizarArbolMundial(fixture) {
     const contenedor = document.getElementById('contenedor-render-cruces');
     if (!contenedor) return;
@@ -4751,27 +4836,39 @@ function renderizarArbolMundial(fixture) {
         if (!fixture[fase] || fixture[fase].length === 0) return;
 
         const tituloFase = document.createElement('h5');
-        tituloFase.style.cssText = "color: var(--dorado); margin: 15px 0 8px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Oswald';";
+        tituloFase.style.cssText = "color: var(--dorado); margin: 15px 0 8px; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 1px; font-family: 'Oswald'; border-bottom: 1px solid #1e293b; padding-bottom: 4px;";
         tituloFase.innerText = `⚔️ ${fase}`;
         contenedor.appendChild(tituloFase);
 
         fixture[fase].forEach(cruce => {
             const div = document.createElement('div');
             
-            const estandarteColor = cruce.terminado ? "var(--verde-match)" : "var(--celeste)";
-            const scoreTexto = cruce.terminado 
-                ? `${cruce.golesLocal} - ${cruce.golesVisitante}` 
-                : `${cruce.golesLocal} - ${cruce.golesVisitante} (En vivo)`;
+            // Verificamos si vos sos dueño de alguno de los dos equipos
+            const eresLocal = (typeof usuarioActual !== 'undefined' && cruce.local.usuarioId === usuarioActual.id);
+            const eresVisitante = (typeof usuarioActual !== 'undefined' && cruce.visitante.usuarioId === usuarioActual.id);
+            const esTuPartido = eresLocal || eresVisitante;
 
-            div.style.cssText = `background:#1e293b; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid ${estandarteColor}; margin-bottom:6px; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(0,0,0,0.2);`;
+            // ⚡ ESTILO DISTINTIVO: Gradiente violeta/neón si jugás vos, azul opaco neutro si es partido simulado de la IA
+            const backgroundFila = esTuPartido ? "linear-gradient(90deg, #1e1b4b 0%, #0f172a 100%)" : "#1e293b";
+            const borderFila = esTuPartido ? "2px solid var(--verde-match)" : "1px solid #334155";
+            const sombraFila = esTuPartido ? "0 0 14px rgba(34, 197, 94, 0.25)" : "none";
+
+            const estandarteColor = cruce.terminado ? "var(--verde-match)" : "var(--celeste)";
+            const scoreTexto = cruce.terminado ? `${cruce.golesLocal} - ${cruce.golesVisitante}` : `${cruce.golesLocal} - ${cruce.golesVisitante} (En vivo)`;
+
+            div.style.cssText = `background:${backgroundFila}; padding:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${estandarteColor}; border:${borderFila}; box-shadow:${sombraFila}; margin-bottom:6px; font-size: 0.9rem; transition: all 0.3s ease;`;
             
             const localStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.local.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
             const visitanteStyle = cruce.ganador && cruce.ganador.usuarioId === cruce.visitante.usuarioId ? "color:var(--verde-match); font-weight:bold;" : "color:#fff;";
 
+            // Inyección del tag fosforescente [TÚ]
+            const tagLocal = eresLocal ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
+            const tagVisitante = eresVisitante ? " <span style='color:var(--verde-match); font-size:0.75rem; font-weight:bold; letter-spacing:0.5px; text-shadow:0 0 6px rgba(34,197,94,0.5);'>[TÚ]</span>" : "";
+
             div.innerHTML = `
-                <span style="${localStyle}">${cruce.local.seleccion} <small style="color:#64748b;">(${cruce.local.username})</small></span>
-                <span style="background:#020617; padding:3px 10px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem; font-family: monospace;">${scoreTexto}</span>
-                <span style="${visitanteStyle}">${cruce.visitante.seleccion} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
+                <span style="${localStyle}">${cruce.local.seleccion}${tagLocal} <small style="color:#64748b;">(${cruce.local.username})</small></span>
+                <span style="background:#020617; padding:3px 12px; border-radius:4px; color:var(--dorado); font-weight:bold; font-size:0.85rem; font-family: monospace; border: 1px solid #1e293b;">${scoreTexto}</span>
+                <span style="${visitanteStyle}">${cruce.visitante.seleccion}${tagVisitante} <small style="color:#64748b;">(${cruce.visitante.username})</small></span>
             `;
             contenedor.appendChild(div);
         });
@@ -4788,6 +4885,23 @@ function finalizarYLimpiarEstadoPvP() {
     const pInput = document.getElementById('pass-unirse-manual');
     if (pInput) pInput.value = "";
 
+    const selectPais = document.getElementById('select-pais-draft');
+    if (selectPais) {
+        selectPais.disabled = false;
+        selectPais.value = "";
+    }
+    const manager = document.getElementById('draft-seleccion-manager');
+    if (manager) {
+        manager.style.opacity = "1";
+        const content = document.getElementById('contenedor-cartas-pais-draft');
+        if (content) content.innerHTML = `<p style="color: #64748b; font-style: italic; margin: auto; grid-column: span 3; font-size: 0.85rem;">Seleccioná un país arriba para ver tus cromos disponibles...</p>`;
+    }
+    const btnConf = document.getElementById('btn-confirmar-draft-propio');
+    if (btnConf) btnConf.disabled = false;
+
+    const txtEstrellas = document.getElementById('txt-estrellas-calculadas');
+    if (txtEstrellas) txtEstrellas.innerText = "⭐ DRAFT PENDIENTE";
+
     const setupPanel = document.getElementById('panel-setup-torneo');
     if (setupPanel) setupPanel.style.display = 'grid';
     
@@ -4801,32 +4915,4 @@ function finalizarYLimpiarEstadoPvP() {
     if (nav) nav.style.display = "flex";
 
     if (socketPvP) socketPvP.emit('pedirSalasPublicas');
-}
-
-// ========================================================================
-// 📊 MOTOR DE PODER: CÁLCULO DE ESTRELLAS DE TU ÁLBUM
-// ========================================================================
-function calcularEstrellasDesdeAlbum() {
-    if (typeof albumCompleto === 'undefined' || !albumCompleto || albumCompleto.length === 0) return 1;
-    
-    const misCartas = albumCompleto.filter(c => c.obtenido > 0);
-    if (misCartas.length === 0) return 1; 
-
-    let sumaPoder = 0;
-    misCartas.forEach(c => {
-        const rarezaClean = c.rareza ? c.rareza.toLowerCase() : 'comun';
-        if (rarezaClean.includes('legendaria') || rarezaClean.includes('icon') || rarezaClean.includes('mítica')) {
-            sumaPoder += 5;
-        } else if (rarezaClean.includes('epica') || rarezaClean.includes('oro') || rarezaClean.includes('special')) {
-            sumaPoder += 3;
-        } else {
-            sumaPoder += 1;
-        }
-    });
-
-    if (sumaPoder > 60) return 5;
-    if (sumaPoder > 35) return 4;
-    if (sumaPoder > 15) return 3;
-    if (sumaPoder > 5) return 2;
-    return 1;
 }
