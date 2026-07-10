@@ -193,11 +193,15 @@ async function autenticarUsuario(accion) {
                 interfazJuego.classList.add("mostrar");
             }
             
-            // 3️⃣ RENDERIZADO INSTANTÁNEO: Actualizamos los labels antes del alert
-            // Esto asegura que el nombre real se pinte en el DOM antes del bloqueo del alert
+            // 3️⃣ RENDERIZADO INSTANTÁNEO CORREGIDO:
+            // Seteamos el ranking al instante junto con el nombre y el oro para evitar el flicker en 0
             document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
             document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
+            document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking || 0; 
             
+            // Forzamos la actualización completa del HUD (incluyendo copas mundiales) de inmediato
+            actualizarInterfazUI();
+
             // 4️⃣ Cargamos datos asíncronos
             await cargarMisionesDelServidor();
             if (typeof iniciarCronometroResetMisiones === 'function') iniciarCronometroResetMisiones();
@@ -214,7 +218,7 @@ async function autenticarUsuario(accion) {
             if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
             if (typeof verificarAvatarInicial === 'function') verificarAvatarInicial();
 
-            // 5️⃣ Alert final retardado para garantizar repintado
+            // 5️⃣ Alert final retardado para garantizar repintado del DOM
             setTimeout(() => {
                  if (accion === 'login') {
                      alert(`⚔️ ¡Bienvenido de vuelta, ${usuarioActual.username}!`);
@@ -232,7 +236,6 @@ async function autenticarUsuario(accion) {
 }
 
 function obtenerHeadersSeguros() {
-    // 🔥 CORREGIDO: Apunta a "token" de forma sincronizada con el login
     const token = localStorage.getItem("token");
     return {
         'Content-Type': 'application/json',
@@ -247,12 +250,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const manejarEnterLogin = (event) => {
         if (event.key === "Enter") {
-            event.preventDefault(); // Evita cualquier recarga de página molesta
+            event.preventDefault(); 
             autenticarUsuario('login');
         }
     };
 
-    // Asignamos el evento a ambos campos para máxima comodidad
     if (inputUser) inputUser.addEventListener("keydown", manejarEnterLogin);
     if (inputPass) inputPass.addEventListener("keydown", manejarEnterLogin);
 });
@@ -261,7 +263,7 @@ function actualizarInterfazUI() {
      if (!usuarioActual) return;
      document.getElementById("lbl-usuario").innerText = usuarioActual.username.toUpperCase();
      document.getElementById("lbl-monedas").innerText = usuarioActual.monedas;
-     document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking;
+     document.getElementById("lbl-ranking").innerText = usuarioActual.puntos_ranking || 0;
      
      const lblMundiales = document.getElementById("lbl-copas-mundiales");
      if (lblMundiales) {
@@ -293,8 +295,6 @@ async function cerrarSesionLocal() {
      document.getElementById("input-usuario").value = "";
      document.getElementById("input-pass").value = "";
 
-     // 🛠️ REHABILITACIÓN MANUAL DE BOTONES DE ACCESO
-     // Forzamos a que recuperen su facha original y queden 100% cliqueables al volver al Login
      const btnLogin = document.querySelector('.btn-login-match');
      const btnRegistro = document.querySelector('.btn-registro-match');
 
