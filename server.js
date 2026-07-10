@@ -25,6 +25,14 @@ app.use(cors());
 app.use(express.json());
 
 /* ========================================================================
+   🔄 ENDPOINT DE MANTENIMIENTO: ANTI-SLEEP (KEEP ALIVE)
+   ======================================================================== */
+app.get('/api/ping', (req, res) => {
+    // Respuesta ultra liviana de 2 bytes para que el cron jamás sature el buffer
+    res.status(200).send("OK");
+});
+
+/* ========================================================================
    🛡️ MIDDLEWARE CORE: VERIFICACIÓN DE TOKEN JWT
    ======================================================================== */
 const verificarToken = (req, res, next) => {
@@ -52,6 +60,11 @@ const TESTERS_PERMITIDOS = ["aguspe", "evepro"];
 
 app.use((req, res, next) => {
     if (!MODO_MANTENIMIENTO) {
+        return next();
+    }
+
+   // ⚡ EXCEPCIÓN INTEGRADA: Permitimos el ping técnico y los estáticos libres de logs
+    if (req.path === '/api/ping') {
         return next();
     }
 
