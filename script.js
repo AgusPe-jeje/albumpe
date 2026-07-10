@@ -1103,6 +1103,25 @@ async function ejecutarPenalLocal(direccionElegida) {
      }
      direccionGanadora = "";
 
+     // 🚀 INYECCIÓN EN VIVO: Guardamos el tiro recién pateado en el historial de sesión local
+     if (usuarioActual) {
+          let historialReal = [];
+          try {
+               historialReal = JSON.parse(localStorage.getItem(`historial_penales_${usuarioActual.id}`)) || [];
+          } catch(e) { 
+               historialReal = []; 
+          }
+
+          // Metemos el nuevo resultado al principio de la lista
+          historialReal.unshift(esGol); 
+
+          // Recortamos para conservar únicamente los últimos 5 tiros
+          if (historialReal.length > 5) historialReal.pop();
+
+          // Guardamos en el navegador
+          localStorage.setItem(`historial_penales_${usuarioActual.id}`, JSON.stringify(historialReal));
+     }
+
      try {
           const res = await fetch(`${URL_BASE}/jugar-penal`, {
                method: 'POST',
@@ -1148,21 +1167,27 @@ async function ejecutarPenalLocal(direccionElegida) {
                body: JSON.stringify({ ganoPartido: esGol })
           });
 
-          // 🔄 ACTUALIZACIÓN DEL PERFIL: Forzamos el renderizado inmediato con la data fresca de Neon
+          // 🔄 RE-RENDERIZADO AUTOMÁTICO DE LAS STATS:
+          // Consultamos el perfil para levantar los contadores globales y repintar el HUD inferior izquierdo
+          fetch(`${URL_BASE}/usuarios/perfil/${usuarioActual.id}`)
+              .then(r => r.json())
+              .then(perfilData => {
+                  if (perfilData.ok && typeof actualizarHUDStatsPenales === "function") {
+                      actualizarHUDStatsPenales(perfilData.perfil);
+                  }
+              })
+              .catch(err => console.error("Error al actualizar HUD tras disparo:", err));
+
+          // 🔄 ACTUALIZACIÓN DEL PERFIL (SI ESTÁ ABIERTO EN OTRA PESTAÑA)
           if (typeof actualizarMiPerfilUI === "function") {
                await actualizarMiPerfilUI();
           }
 
           // 🟢 SECTOR MISIONES API: Trackeo en plural sincronizado con el backend
           if (typeof trackearProgresoMision === 'function') {
-               // 1. Sumamos el tiro a la tanda de penales jugada
                await trackearProgresoMision("penales", 1);
-               
-               // 2. Si terminó en gol, impactamos también el contador de goles anotados
                if (esGol) {
                     await trackearProgresoMision("goles_penales", 1);
-
-                    // 🔥 NUEVO DISPARADOR: Sumamos las 100 monedas de oro al objetivo de acumular oro
                     await trackearProgresoMision("acumular_oro", 100);
                }
           }
@@ -1187,16 +1212,19 @@ function actualizarHUDStatsPenales(perfil) {
     document.getElementById("stat-efectividad").innerText = `${efectividad}%`;
     document.getElementById("stat-ganados").innerText = `${ganados} / ${jugados}`;
 
-    // 3. Renderizar el historial de forma visual (esferas de estado)
-    // Nota: Como no guardamos una tabla entera de historial de tiros particulares para no saturar Neon, 
-    // podemos simular las últimas tendencias según su efectividad o rellenarlo cuando juega en vivo.
+    // 3. Renderizar el historial basado en tus jugadas reales (localStorage)
     const esferasDiv = document.getElementById("stat-historial-esferas");
     if (esferasDiv) {
         esferasDiv.innerHTML = "";
         
-        // Armamos un mini historial realista basado en su winrate histórico
-        for (let i = 0; i < 5; i++) {
-            const esVictoria = i === 0 || Math.random() * 100 <= efectividad;
+        // Recuperamos el array real guardado del usuario (o vacío si es nuevo)
+        let historialReal = [];
+        try {
+            historialReal = JSON.parse(localStorage.getItem(`historial_penales_${perfil.id}`)) || [];
+        } catch(e) { historialReal = []; }
+
+        // Dibujamos las pelotitas que correspondan a tus últimos tiros
+        historialReal.forEach(esVictoria => {
             const bola = document.createElement("span");
             bola.style.cssText = `
                 width: 12px; 
@@ -1207,7 +1235,7 @@ function actualizarHUDStatsPenales(perfil) {
                 box-shadow: 0 0 6px ${esVictoria ? 'rgba(34,197,94,0.6)' : 'rgba(239,68,68,0.6)'};
             `;
             esferasDiv.appendChild(bola);
-        }
+        });
     }
 }
 
