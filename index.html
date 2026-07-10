@@ -284,7 +284,7 @@
                 </div>
             </div>
 
-            <div id="modulo-penales" class="modulo-contenido">
+<div id="modulo-penales" class="modulo-contenido">
                 <div class="contenedor-penales-layout-estadio">
                     <div class="caja-modulo-estadio juego-penales-principal">
                         <div class="banner-modulo-imagen banner-penales">
@@ -310,17 +310,40 @@
                         <h3 id="resultado-penal" class="marcador-alerta-tv">¡PREPARÁ EL DISPARO!</h3>
                         <p id="cronometro-tiros" class="badge-reloj-energia"></p>
                         <button class="btn-estadio btn-next-shot" onclick="iniciarDueloLocal()">⚽ PRÓXIMO TIRO</button>
+
+                        <div id="hud-stats-penales" style="margin-top: 25px; background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); font-family: 'Oswald', sans-serif; box-sizing: border-box;">
+                            <h5 style="margin: 0 0 12px 0; color: var(--celeste); text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.95rem; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                                📊 RENDIMIENTO EN LA ARENA
+                            </h5>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                                <div style="background: #0f172a; border: 1px solid #334155; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <span style="color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">EFECTIVIDAD</span>
+                                    <strong id="stat-efectividad" style="color: #fff; font-size: 1.4rem; font-weight: bold; display: block; margin-top: 2px;">0%</strong>
+                                </div>
+                                <div style="background: #0f172a; border: 1px solid #334155; padding: 10px; border-radius: 8px; text-align: center;">
+                                    <span style="color: #64748b; font-size: 0.75rem; display: block; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">DUELOS GANADOS</span>
+                                    <strong id="stat-ganados" style="color: var(--dorado); font-size: 1.4rem; font-weight: bold; display: block; margin-top: 2px;">0</strong>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: #070a12; padding: 10px 12px; border-radius: 8px; border: 1px solid #1e293b;">
+                                <span style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;">ÚLTIMOS ENCUENTROS:</span>
+                                <div id="stat-historial-esferas" style="display: flex; gap: 8px; align-items: center;">
+                                    </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="panel-lateral-ranking-tv">
                         <div style="background: rgba(2, 6, 23, 0.6); border: 1px solid var(--dorado); border-radius: 12px; padding: 12px; margin-bottom: 15px; text-align: center; font-family: 'Oswald', sans-serif; box-sizing: border-box;">
                             <div style="color: var(--dorado); font-size: 1rem; letter-spacing: 1px; display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 3px; font-weight: bold;">
-                                 👑 PREMIOS DE TEMPORADA 👑
+                                👑 PREMIOS DE TEMPORADA 👑
                             </div>
                             <p style="color: #94a3b8; font-size: 0.8rem; margin: 0 0 8px 0;">🥇 2,500 Oro | 🥈 1,000 Oro | 🥉 500 Oro</p>
                             
                             <div id="timer-ranking-semanal" style="color: var(--celeste); font-size: 1.05rem; font-family: monospace; font-weight: bold; background: rgba(15, 23, 42, 0.8); display: inline-block; padding: 4px 12px; border-radius: 6px; border: 1px solid #1e293b; width: 100%; box-sizing: border-box;">
-                                 ⏳ CALCULANDO LIGA...
+                                ⏳ CALCULANDO LIGA...
                             </div>
                         </div>
 
