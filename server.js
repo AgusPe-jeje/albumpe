@@ -1682,20 +1682,24 @@ async function procesarResetSemanalRankings() {
 }
 
 /* ========================================================================
-   🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL
+   🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL (TEMPORADA 2.0)
    ======================================================================== */
 const CONFIG_ANUNCIO_SERVIDOR = {
-    activo: true, tipo: "video", titulo: "¡ACTUALIZACIÓN DE TEMPORADA!",
-    texto: "Prendete a los nuevos torneos en vivo. Calibramos el MiniMundial para que sea más justo, lanzamos el Mercado P2P y habilitamos la cartelera de objetivos diarios. ¡Mirá el video, crack!",
-    urlImagen: "https://albumpe.onrender.com/assets/novedad.png", urlVideo: "https://www.youtube.com/embed/Nl_tZ2StsSs",
+    activo: true, 
+    tipo: "video", 
+    titulo: "⚡ ¡BIENVENIDOS A LA ARENA TEMPORADA 2.0! ⚡",
+    texto: "¡Se pudrió todo, pa! Reiniciamos la Arena por completo para arrancar la nueva temporada oficial desde 0. Prepará tus mejores tiros, completá los objetivos del día y salí a dominar el mercado de pases. ¡Mirá los detalles en el video!",
+    urlImagen: "https://albumpe.onrender.com/assets/novedad.png", 
+    urlVideo: "https://www.youtube.com/embed/MWeL2xmV6tU",
     informe: {
-        version: "v2.5.0-Arena", fecha: "Julio 2026",
+        version: "v2.5.0-Arena", 
+        fecha: "Julio 2026",
         cambios: [
-            "🏆 **Mini-Mundial Atómico:** Formato Single Player optimizado contra bots de IA calibrados con penalizaciones justas según vayas trepando fases, con enfriamientos resguardados en Neon.",
-            "💸 **Mercado de Pases P2P:** Vitrina internacional activa. Las ofertas duran 24 horas y devuelven el cromo automáticamente si nadie compra.",
-            "🎯 **Objetivos Diarios:** Añadida cartelera de misiones diarias con reinicio atómico sincronizado a la medianoche (GMT-3) de Buenos Aires.",
-            "🛡️ **Control de Rachas & Servidor:** Corregido el desfasaje ISO en el login diario forzando la hora local de Argentina para evitar bloqueos falsos al reclamar tu recompensa.",
-            "📖 **Guía Actualizada:** Renovado el modal de reglas con las mecánicas del Bot Comerciante, contratos y el funcionamiento real de las arenas."
+            "🔥 **Gran Reinicio de Temporada:** ¡Cuentas limpias y todos arrancan desde cero! Volvimos a las 200 monedas base para ver quién es el verdadero rey de la Arena en igualdad de condiciones.",
+            "📊 **Nuevo HUD de Rendimiento:** Ahora podés mirar tus estadísticas reales en vivo dentro del sector de Penales. ¡Hacé un seguimiento de tu efectividad y lucí tu racha de los últimos 5 partidos con esferas neón!",
+            "🎯 **Misiones Diarias Renovadas:** Una cartelera con 3 objetivos que cambian cada medianoche para juntar Oro extra al toque abriendo sobres, tradeando o jugando el Mundial.",
+            "💸 **Mercado de Pases Activo:** Comprá y vendé tus cartas repetidas con otros jugadores reales en una vitrina internacional de 24 horas. ¡Si nadie la compra, tu carta vuelve sola a casa!",
+            "🛡️ **Sistema de Recompensas Seguro:** Corregimos los bugs de horarios al reclamar el premio diario. Ahora tu racha se registra al instante y sin bloqueos raros según la hora de Argentina."
         ]
     }
 };
