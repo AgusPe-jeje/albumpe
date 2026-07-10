@@ -575,7 +575,30 @@ async function comprarSobreEspecifico(tipoCofre) {
           actualizarInterfazUI();
 
           if (typeof AudioArena !== 'undefined' && AudioArena.play) AudioArena.play('monedas');
+          
+          // 🎯 SECTOR MISIONES: 1. Sumamos el sobre abierto
           if (typeof trackearProgresoMision === 'function') await trackearProgresoMision("sobres", 1);
+
+          // 🎯 SECTOR MISIONES: 2. Escaneamos rarezas para la misión "Rara o superior"
+          if (typeof trackearProgresoMision === 'function' && data.sobre && Array.isArray(data.sobre)) {
+               let conteoRarosOSuperior = 0;
+
+               data.sobre.forEach(carta => {
+                    // Ignoramos si por azar tocó un avatar en el sobre, solo contamos jugadores
+                    if (carta.es_foto_perfil) return;
+
+                    const rarezaClean = (carta.rareza || '').toLowerCase();
+                    // Si cumple con los requisitos del objetivo, sumamos al contador
+                    if (rarezaClean === 'rara' || rarezaClean === 'epica' || rarezaClean === 'legendaria') {
+                         conteoRarosOSuperior++;
+                    }
+               });
+
+               // Si el pack trajo cartas de nivel, mandamos la ráfaga al backend de una sola vez
+               if (conteoRarosOSuperior > 0) {
+                    await trackearProgresoMision("jugadores_raros", conteoRarosOSuperior);
+               }
+          }
 
           // Guardamos el sobre completo real en la caché para la grilla del final
           sobreAbiertoCompletoCache = data.sobre;
