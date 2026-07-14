@@ -890,20 +890,16 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         // ⚽ SIMULACIÓN CALIBRADA: Resultados más cerrados y realistas para fase de grupos
         function simularMatchCompleto(eq1, eq2, esUsuario) {
-            // Distribución de goles realistas: más chances de 0, 1 o 2 goles de base, raro un 3.
             const distribucionGoles = [0, 0, 1, 1, 2, 3];
             let g1 = distribucionGoles[Math.floor(Math.random() * distribucionGoles.length)];
             let g2 = distribucionGoles[Math.floor(Math.random() * distribucionGoles.length)];
             
             if (esUsuario) {
-                // Si el destino decide que gana el usuario según sus estrellas
                 if (Math.random() <= chanceVictoriaGrupo) {
-                    // Si iba empatando o perdiendo, le damos una ventaja mínima y realista de +1 gol
                     if (g1 <= g2) g1 = g2 + 1;
                 } else {
-                    // El bot le gana o le empata al usuario. Si el usuario iba ganando, el bot empata o saca +1
                     if (g1 > g2) {
-                        g2 = Math.random() <= 0.40 ? g1 : g1 + 1; // 40% chance de empatarlo, 60% de ganarlo por la mínima
+                        g2 = Math.random() <= 0.40 ? g1 : g1 + 1;
                     }
                 }
             }
@@ -962,8 +958,13 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         let posicionUsuario = tablaOrdenada.findIndex(r => r.pais === seleccionElegida) + 1;
         let clasificaALlaves = posicionUsuario <= 2; 
 
-        let bitacoraPlayoffs = []; let campeon = false; let faseAlcanzada = "Fase de Grupos";
+        let bitacoraPlayoffs = []; 
+        let campeon = false; // El campeon de playoffs ahora se decidirá post-torneo en la UI o en llamadas dinámicas
+        let faseAlcanzada = "Fase de Grupos";
 
+        // 🏆 PLAYOFFS DE CÁLCULO DINÁMICO:
+        // El servidor propone la base neutra de goles de cada partido y sus minutos,
+        // pero la victoria real la decretará el transcurso del partido vivo en el frontend.
         if (clasificaALlaves) {
             const llaves = [
                 { ronda: "Octavos de Final", rival: botsDisponibles[3] }, 
@@ -972,12 +973,12 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
                 { ronda: "Gran Final del Mundo", rival: botsDisponibles[6] }
             ];
             
-            // Generamos partidos de ida y vuelta o eliminación directa basados en puro azar futbolístico base.
-            // La decisión real de quién avanza se tomará en el frontend según el juego vivo.
             for (let llave of llaves) {
                 faseAlcanzada = llave.ronda;
-                let gTu = Math.floor(Math.random() * 3); // Goles base tuyos
-                let gRiv = Math.floor(Math.random() * 3); // Goles base del rival
+                
+                // Generamos un caudal de goles base cerrado pero equilibrado (de 0 a 2 goles)
+                let gTu = Math.floor(Math.random() * 3); 
+                let gRiv = Math.floor(Math.random() * 3); 
                 
                 bitacoraPlayoffs.push({ 
                     ronda: llave.ronda, 
@@ -991,29 +992,63 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
         }
 
         const ahora = new Date();
-        if (campeon) {
-            await client.query(`
-                UPDATE usuarios 
-                SET monedas = monedas + 5000, 
-                    copas_mundiales = copas_mundiales + 1, 
-                    torneos_ganados = torneos_ganados + 1,
-                    puntos_ranking = puntos_ranking + 50, 
-                    ultima_timba_mundial = $1 
-                WHERE id = $2`, [ahora, usuario_id]);
-        } else {
-            await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
-        }
+        // NOTA: Como la copa_mundial se reclama tras ganar la final de verdad en vivo, 
+        // actualizamos la marca de timba del mundial para controlar enfriamientos de forma normal.
+        await client.query("UPDATE usuarios SET ultima_timba_mundial = $1 WHERE id = $2", [ahora, usuario_id]);
 
         const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales, torneos_ganados FROM usuarios WHERE id = $1", [usuario_id]);
         await client.query('COMMIT');
 
-        return res.json({ ok: true, progreso: { integrantesGrupo, bitacoraGrupo, clasifico: clasificaALlaves, posicionFinalGrupo: posicionUsuario, campeon, faseAlcanzada, bitacoraPlayoffs }, datosActualizados: userFinal.rows[0] });
+        return res.json({ 
+            ok: true, 
+            progreso: { 
+                integrantesGrupo, 
+                bitacoraGrupo, 
+                clasifico: clasificaALlaves, 
+                posicionFinalGrupo: posicionUsuario, 
+                campeon, 
+                faseAlcanzada, 
+                bitacoraPlayoffs 
+            }, 
+            datosActualizados: userFinal.rows[0] 
+        });
     } catch (err) { 
         await client.query('ROLLBACK'); 
         console.error("❌ Error estructural en /api/mundial/jugar:", err);
         return res.status(500).json({ ok: false, error: "Fallo estructural en la Arena." }); 
     } finally { 
         client.release(); 
+    }
+});
+
+// =========================================================================
+// 🎁 ENDPOINT SEGURO PARA ACREDITAR LA COPA GANADA EN CALIENTE
+// =========================================================================
+app.post('/api/mundial/reclamar-copa', verificarToken, async (req, res) => {
+    const usuario_id = req.usuarioLogueado.id;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        // Le sumamos las 5000 monedas, la copa, el torneo ganado y los 50 pts de ranking de una sola vez
+        await client.query(`
+            UPDATE usuarios 
+            SET monedas = monedas + 5000, 
+                copas_mundiales = copas_mundiales + 1, 
+                torneos_ganados = torneos_ganados + 1,
+                puntos_ranking = puntos_ranking + 50
+            WHERE id = $1`, [usuario_id]);
+
+        const userFinal = await client.query("SELECT monedas, puntos_ranking, copas_mundiales, torneos_ganados FROM usuarios WHERE id = $1", [usuario_id]);
+        await client.query('COMMIT');
+
+        return res.json({ success: true, datosActualizados: userFinal.rows[0] });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Error acreditando copa:", err);
+        return res.status(500).json({ success: false, error: "No se pudo acreditar el premio." });
+    } finally {
+        client.release();
     }
 });
 
