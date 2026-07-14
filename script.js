@@ -1877,9 +1877,6 @@ async function ejecutarTorneoMundial() {
 
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
             const partido = data.progreso.bitacoraPlayoffs[i];
-            
-            // 📡 [CONSOLE CHECK] Monitoreamos qué goles base propuso el servidor
-            console.log(`⏱️ Jugando ${partido.ronda}: ${window.mundialSeleccionUsuario} vs ${partido.rival}. Goles base propuestos: User ${partido.gL} - Bot ${partido.gV}`);
 
             // 1. Mandamos a jugar en vivo. Capturamos el veredicto final real de la simulación.
             const veredictoVivo = await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, null, partido);
