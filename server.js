@@ -966,44 +966,27 @@ app.post('/api/mundial/jugar', verificarToken, async (req, res) => {
 
         if (clasificaALlaves) {
             const llaves = [
-                { ronda: "Octavos de Final", rival: botsDisponibles[3], pen: 0 }, 
-                { ronda: "Cuartos de Final", rival: botsDisponibles[4], pen: 0.08 },
-                { ronda: "Semifinal", rival: botsDisponibles[5], pen: 0.16 }, 
-                { ronda: "Gran Final del Mundo", rival: botsDisponibles[6], pen: 0.24 }
+                { ronda: "Octavos de Final", rival: botsDisponibles[3] }, 
+                { ronda: "Cuartos de Final", rival: botsDisponibles[4] },
+                { ronda: "Semifinal", rival: botsDisponibles[5] }, 
+                { ronda: "Gran Final del Mundo", rival: botsDisponibles[6] }
             ];
-            campeon = true;
+            
+            // Generamos partidos de ida y vuelta o eliminación directa basados en puro azar futbolístico base.
+            // La decisión real de quién avanza se tomará en el frontend según el juego vivo.
             for (let llave of llaves) {
                 faseAlcanzada = llave.ronda;
-                let gTu = Math.floor(Math.random() * 3); 
-                let gRiv = Math.floor(Math.random() * 3);
+                let gTu = Math.floor(Math.random() * 3); // Goles base tuyos
+                let gRiv = Math.floor(Math.random() * 3); // Goles base del rival
                 
-                if (Math.random() <= Math.max(0.10, chanceVictoriaGrupo - llave.pen)) {
-                    if (gTu <= gRiv) gTu = gRiv + 1;
-                    bitacoraPlayoffs.push({ 
-                        ronda: llave.ronda, 
-                        rival: llave.rival, 
-                        resultado: "Ganaste ✅", 
-                        gL: gTu, 
-                        gV: gRiv, 
-                        ganoUsuarioReal: true, // 🔥 Flag estricto
-                        minutosL: generarMinutosGolesFútbol(gTu), 
-                        minutosV: generarMinutosGolesFútbol(gRiv) 
-                    });
-                } else {
-                    campeon = false; 
-                    if (gRiv <= gTu) gRiv = gTu + 1;
-                    bitacoraPlayoffs.push({ 
-                        ronda: llave.ronda, 
-                        rival: llave.rival, 
-                        resultado: "Perdiste ❌", 
-                        gL: gTu, 
-                        gV: gRiv, 
-                        ganoUsuarioReal: false, // 🔥 Flag estricto
-                        minutosL: generarMinutosGolesFútbol(gTu), 
-                        minutosV: generarMinutosGolesFútbol(gRiv) 
-                    });
-                    break; // Corta el cálculo en el servidor
-                }
+                bitacoraPlayoffs.push({ 
+                    ronda: llave.ronda, 
+                    rival: llave.rival, 
+                    gL: gTu, 
+                    gV: gRiv, 
+                    minutosL: generarMinutosGolesFútbol(gTu), 
+                    minutosV: generarMinutosGolesFútbol(gRiv) 
+                });
             }
         }
 
