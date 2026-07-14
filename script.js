@@ -3901,8 +3901,11 @@ function iniciarCronometroResetRanking() {
             if (timerMundial) timerMundial.innerText = msgReset;
             if (timerSBC) timerSBC.innerText = msgReset;
             
-            // 🏆 Mostramos el podio de campeones en caliente (Solo una vez al resetear)
-            mostrarCuadroDeCampeones();
+            // =========================================================================
+            // 🏆 INYECCIÓN DE CAMPEONES AL LLEGAR A CERO (EN CALIENTE)
+            // =========================================================================
+            // Pasamos "true" para forzar que salte en vivo a todos los conectados
+            mostrarCuadroDeCampeones(true);
 
             setTimeout(() => {
                 if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
@@ -3930,7 +3933,6 @@ function iniciarCronometroResetRanking() {
 
     // Ejecutamos una vez al instante para ganarle al delay del primer segundo
     calcularYRenderizar();
-    mostrarCuadroDeCampeones(true);
 
     // Arrancamos el bucle limpio
     intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
