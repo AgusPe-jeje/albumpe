@@ -3945,8 +3945,7 @@ async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
     // Si ya hay un modal abierto en pantalla, no hacemos nada
     if (document.getElementById("modal-campeones-reset")) return;
 
-    // 📅 Generamos un identificador ISO ultra-preciso (Año + Número de Semana)
-    // Esto garantiza que el ID sea idéntico toda la semana, no importa qué día u hora loguee el usuario.
+    // 📅 Generamos el identificador ISO preciso (Año + Número de Semana)
     const ahora = new Date();
     const d = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
     const dayNum = d.getUTCDay() || 7;
@@ -3955,7 +3954,18 @@ async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
     const numeroSemana = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
     const idSemanaActual = `reset_semana_${d.getUTCFullYear()}_${numeroSemana}`;
 
-    // Si no estamos forzando (inicio de sesión pasivo) y ya guardamos que la vio esta semana, salimos
+    // =========================================================================
+    // 🛡️ FILTRO DE INICIO DIFERIDO (Mística para el primer reset real)
+    // =========================================================================
+    // Si el usuario inicia sesión y la clave no existe en su navegador, 
+    // asumimos que todavía no llegó el lunes de reset. Marcamos como "visto" 
+    // de forma silenciosa para que NO le salte ahora, sino recién en el próximo lunes real.
+    if (localStorage.getItem(idSemanaActual) === null && !forzarVisualizacion) {
+        localStorage.setItem(idSemanaActual, "visto");
+        return; 
+    }
+
+    // Si no estamos forzando y ya está marcado como visto, salimos silenciosamente
     if (!forzarVisualizacion && localStorage.getItem(idSemanaActual) === "visto") {
         return; 
     }
@@ -4011,7 +4021,7 @@ async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
             AudioArena.play('pitazo');
         }
 
-        // 💾 Guardamos inmediatamente en localStorage que este usuario ya vio el podio de esta semana
+        // Guardamos que ya fue visto
         localStorage.setItem(idSemanaActual, "visto");
 
         document.getElementById("btn-cerrar-campeones").onclick = () => {
