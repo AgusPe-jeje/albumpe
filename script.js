@@ -1898,7 +1898,6 @@ async function ejecutarTorneoMundial() {
             console.log(`⏱️ Jugando ${partido.ronda}: ${window.mundialSeleccionUsuario} vs ${partido.rival}. Goles base propuestos: User ${partido.gL} - Bot ${partido.gV}`);
 
             // 1. Mandamos a jugar en vivo. Capturamos el veredicto final real de la simulación.
-            // La promesa de la simulación nos resolverá un objeto con el marcador final físico de la pantalla.
             const veredictoVivo = await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, null, partido);
             
             // Evaluamos si ganaste legítimamente el partido en vivo (ya sea en los 90' o penales)
@@ -1920,7 +1919,10 @@ async function ejecutarTorneoMundial() {
             }
         }
 
-        if (data.progreso.campeon) {
+        // =========================================================================
+        // 🏆 CORRECCIÓN: VALIDACIÓN Y RECLAMO DE PREMIO CAMPEÓN EN CALIENTE
+        // =========================================================================
+        if (!quedoEliminadoMundial && data.progreso.bitacoraPlayoffs.length > 0) {
              const corona = document.createElement("div");
              corona.style.cssText = "text-align:center; margin-top:20px; color:var(--dorado); font-size:1.4rem; font-weight:bold;";
              corona.innerText = "🏆 ¡CAMPEÓN DEL MUNDO! 🏆\n🎁 ¡Premio de 5.000 de Oro depositado!";
@@ -1930,15 +1932,34 @@ async function ejecutarTorneoMundial() {
              if (typeof trackearProgresoMision === 'function') {
                   await trackearProgresoMision("acumular_oro", 5000);
              }
+
+             // 📡 Avisamos al backend que ganamos la final en vivo para que nos sume la copa en la DB
+             try {
+                 const resRecompensa = await fetch(`${URL_BASE}/mundial/reclamar-copa`, {
+                     method: 'POST',
+                     headers: obtenerHeadersSeguros()
+                 });
+                 const recompensaData = await resRecompensa.json();
+                 if (recompensaData.success) {
+                     usuarioActual.monedas = recompensaData.datosActualizados.monedas;
+                     usuarioActual.puntos_ranking = recompensaData.datosActualizados.puntos_ranking;
+                     usuarioActual.copas_mundiales = recompensaData.datosActualizados.copas_mundiales;
+                     actualizarInterfazUI();
+                 }
+             } catch (errPremio) {
+                 console.error("Error reclamando copa del mundo:", errPremio);
+             }
         }
 
-        if (data.datosActualizados) {
+        // Si no saliste campeón pero de igual manera hay que actualizar datos base (por ejemplo, monedas previas)
+        if (data.datosActualizados && quedoEliminadoMundial) {
              usuarioActual.monedas = data.datosActualizados.monedas;
              usuarioActual.puntos_ranking = data.datosActualizados.puntos_ranking;
              usuarioActual.copas_mundiales = data.datosActualizados.copas_mundiales;
              actualizarInterfazUI(); 
              if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
         }
+        
         chequearEstadoMundialServer(); 
         liberarNavegacionArenaUI();
     } catch (err) { 
