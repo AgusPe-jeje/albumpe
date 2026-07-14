@@ -1889,25 +1889,34 @@ async function ejecutarTorneoMundial() {
         }
 
         // 🏆 REPRODUCCIÓN DE LOS PLAYOFFS (SI CLASIFICASTE)
+        let quedoEliminadoMundial = false;
+
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
             const partido = data.progreso.bitacoraPlayoffs[i];
             
-            // 📡 [CONSOLE LOG PARTIDO] Avisamos qué partido se va a jugar y qué espera el server
-            console.log(`⏱️ Simulando ${partido.ronda}: ${window.mundialSeleccionUsuario} vs ${partido.rival}. Servidor dictó: ${partido.ganoUsuarioReal ? "GANA USER" : "PIERDE USER"} (${partido.gL} - ${partido.gV})`);
+            // 📡 [CONSOLE CHECK] Monitoreamos qué goles base propuso el servidor
+            console.log(`⏱️ Jugando ${partido.ronda}: ${window.mundialSeleccionUsuario} vs ${partido.rival}. Goles base propuestos: User ${partido.gL} - Bot ${partido.gV}`);
 
-            // 1. Mandamos a simular el partido minuto a minuto (o tanda de penales)
-            await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, partido.ganoUsuarioReal, partido);
+            // 1. Mandamos a jugar en vivo. Capturamos el veredicto final real de la simulación.
+            // La promesa de la simulación nos resolverá un objeto con el marcador final físico de la pantalla.
+            const veredictoVivo = await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, null, partido);
             
-            // 2. 🔥 CANDADO DE CORTE STRICT: Si perdiste este partido en el backend, matamos el bucle al instante
-            if (partido.ganoUsuarioReal === false || partido.ganoUsuarioReal === "false") {
-                console.warn(`🛑 Eliminado del Mundial en ${partido.ronda}. Deteniendo simulaciones inmediatas.`);
+            // Evaluamos si ganaste legítimamente el partido en vivo (ya sea en los 90' o penales)
+            const ganoPartidoVivo = veredictoVivo && veredictoVivo.gano;
+
+            // 2. 🛡️ FILTRO DE ELIMINACIÓN REAL: Si perdiste el partido en pantalla, morís en esta ronda
+            if (!ganoPartidoVivo) {
+                console.warn(`🛑 ¡Eliminado en vivo en ${partido.ronda}! Resultado final en pantalla: User ${veredictoVivo?.golesTu || 0} - Bot ${veredictoVivo?.golesRival || 0}`);
+                quedoEliminadoMundial = true;
                 
                 if (document.getElementById("btn-volver-vestuario")) {
                     document.getElementById("btn-volver-vestuario").style.display = "block";
                 }
                 
-                // Cortamos el flujo forzado para que no intente ejecutar ninguna ronda más
+                // Cortamos el bucle en seco. El mundial NO te permite jugar las siguientes llaves.
                 break;
+            } else {
+                console.log(`✅ ¡Avanzás a la siguiente llave! Ganaste ${partido.ronda} de forma legítima.`);
             }
         }
 
@@ -2448,16 +2457,26 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
         function finalizarPartidoDirecto(fueEnPenales = false, pTu = 0, pRiv = 0) {
             document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
-            filaPartido.style.borderColor = ganoUsuarioFinalEfectivo ? "var(--verde-match)" : "var(--rojo)";
+            
+            // Si fue a penales ganás según los penales (pTu > pRiv), sino según los 90 minutos de juego
+            const ganoRealEnPantalla = fueEnPenales ? (pTu > pRiv) : (golesTuActuales > golesRivalActuales);
+            
+            filaPartido.style.borderColor = ganoRealEnPantalla ? "var(--verde-match)" : "var(--rojo)";
 
             const finLabel = document.createElement("div");
-            finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:8px; font-family:'Oswald'; color:${ganoUsuarioFinalEfectivo ? 'var(--verde-match)' : 'var(--rojo)'};`;
+            finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:8px; font-family:'Oswald'; color:${ganoRealEnPantalla ? 'var(--verde-match)' : 'var(--rojo)'};`;
             finLabel.innerText = fueEnPenales
-                ? (ganoUsuarioFinalEfectivo ? `🏁 FINAL (PEN: ${pTu}-${pRiv}) - AVANZAS ✅` : `🏁 FINAL (PEN: ${pTu}-${pRiv}) - ELIMINADO ❌`)
-                : (ganoUsuarioFinalEfectivo ? "🏁 FINAL DE LOS 90' - AVANZAS ✅" : "🏁 FINAL DE LOS 90' - ELIMINADO ❌");
+                ? (ganoRealEnPantalla ? `🏁 FINAL (PEN: ${pTu}-${pRiv}) - AVANZAS ✅` : `🏁 FINAL (PEN: ${pTu}-${pRiv}) - ELIMINADO ❌`)
+                : (ganoRealEnPantalla ? "🏁 FINAL DE LOS 90' - AVANZAS ✅" : "🏁 FINAL DE LOS 90' - ELIMINADO ❌");
             
             filaPartido.appendChild(finLabel);
-            resolve();
+            
+            // 🚀 RETORNAMOS EL RESULTADO VIVO AL TORNEO
+            resolve({
+                gano: ganoRealEnPantalla,
+                golesTu: fueEnPenales ? pTu : golesTuActuales,
+                golesRival: fueEnPenales ? pRiv : golesRivalActuales
+            });
         }
     });
 }
