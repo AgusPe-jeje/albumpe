@@ -55,7 +55,7 @@ const verificarToken = (req, res, next) => {
 /* ========================================================================
    🛠️ MIDDLEWARE: MODO MANTENIMIENTO / ACCESO SELECTIVO TESTERS
    ======================================================================== */
-const MODO_MANTENIMIENTO = false; 
+const MODO_MANTENIMIENTO = true; 
 const TESTERS_PERMITIDOS = ["aguspe", "evepro"]; 
 
 app.use((req, res, next) => {
