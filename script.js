@@ -3945,16 +3945,17 @@ async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
     // Si ya hay un modal abierto en pantalla, no hacemos nada
     if (document.getElementById("modal-campeones-reset")) return;
 
-    // Generamos un identificador único para la semana actual basado en el lunes de reset anterior
+    // 📅 Generamos un identificador ISO ultra-preciso (Año + Número de Semana)
+    // Esto garantiza que el ID sea idéntico toda la semana, no importa qué día u hora loguee el usuario.
     const ahora = new Date();
-    const lunesPasado = new Date();
-    // Buscamos el lunes de esta semana a las 00:00 hs
-    lunesPasado.setDate(ahora.getDate() - ((ahora.getDay() + 6) % 7));
-    lunesPasado.setHours(0, 0, 0, 0);
-    const idSemanaActual = `reset_semana_${lunesPasado.getTime()}`;
+    const d = new Date(Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+    const numeroSemana = Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+    const idSemanaActual = `reset_semana_${d.getUTCFullYear()}_${numeroSemana}`;
 
-    // Si no estamos forzando la vista (es decir, es el inicio de sesión) 
-    // y el usuario ya vio el cartel de esta semana, salimos silenciosamente
+    // Si no estamos forzando (inicio de sesión pasivo) y ya guardamos que la vio esta semana, salimos
     if (!forzarVisualizacion && localStorage.getItem(idSemanaActual) === "visto") {
         return; 
     }
@@ -4010,7 +4011,7 @@ async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
             AudioArena.play('pitazo');
         }
 
-        // Marcamos esta semana como "vista" en el navegador del usuario para que no se vuelva a abrir
+        // 💾 Guardamos inmediatamente en localStorage que este usuario ya vio el podio de esta semana
         localStorage.setItem(idSemanaActual, "visto");
 
         document.getElementById("btn-cerrar-campeones").onclick = () => {
