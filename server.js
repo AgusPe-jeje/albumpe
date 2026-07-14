@@ -1699,6 +1699,34 @@ async function procesarResetSemanalRankings() {
     } catch (err) { await client.query('ROLLBACK'); console.error("❌ Error crítico en reset semanal:", err.message); } finally { client.release(); }
 }
 
+app.get('/api/ranking/campeones-historicos', verificarToken, async (req, res) => {
+    try {
+        // Obtenemos el TOP 3 del ranking semanal justo antes de que se limpie, o el top actual guardado
+        // (Asegurate de que filtre por puntos_ranking de mayor a menor)
+        const query = `
+            SELECT username AS nombre, puntos_ranking 
+            FROM usuarios 
+            WHERE puntos_ranking > 0 
+            ORDER BY puntos_ranking DESC 
+            LIMIT 3
+        `;
+        const { rows } = await pool.query(query);
+
+        // Mapeamos los premios dinámicos por puesto
+        const premios = [5000, 2500, 1000]; // Oro para 1ro, 2do y 3ro
+        const campeonesProcesados = rows.map((r, idx) => ({
+            nombre: r.nombre,
+            puntos: r.puntos_ranking,
+            premio_oro: premios[idx] || 500
+        }));
+
+        return res.json({ success: true, campeones: campeonesProcesados });
+    } catch (err) {
+        console.error("❌ Error trayendo campeones del reset:", err);
+        return res.status(500).json({ success: false, error: "Error de base de datos" });
+    }
+});
+
 /* ========================================================================
    🚨 CONFIGURACIÓN Y ENDPOINT SEGURO DE ANUNCIOS GLOBAL (TEMPORADA 2.0)
    ======================================================================== */
