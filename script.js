@@ -1774,6 +1774,21 @@ async function ejecutarTorneoMundial() {
 
         if (!data.ok) return alert(data.mensaje);
 
+        // 📊 [DOUBLE CHECK CONSOLA] Verificamos de entrada qué calculó el servidor
+        console.log("╔══════════════════════════════════════════════════════════╗");
+        console.log("📊 [SERVER RESPONDED] ¡DATOS DE SIMULACIÓN DESDE NEON RECIBIDOS!");
+        console.log(`🌍 Selección Usuario: ${window.mundialSeleccionUsuario}`);
+        console.log(`🏆 ¿Llegó a salir Campeón?: ${data.progreso.campeon ? "SÍ" : "NO"}`);
+        console.log("📋 Fixture de playoffs calculado por el Servidor:");
+        console.table(data.progreso.bitacoraPlayoffs.map(p => ({
+            Ronda: p.ronda,
+            Rival: p.rival,
+            "Goles Tu (gL)": p.gL,
+            "Goles Rival (gV)": p.gV,
+            "¿Ganaste de Verdad?": p.ganoUsuarioReal
+        })));
+        console.log("╚══════════════════════════════════════════════════════════╝");
+
         // 🎯 SECTOR MISIONES API: Trackeo correcto
         if (typeof trackearProgresoMision === 'function') {
              await trackearProgresoMision("mundial_partidos", 1);
@@ -1877,20 +1892,22 @@ async function ejecutarTorneoMundial() {
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
             const partido = data.progreso.bitacoraPlayoffs[i];
             
+            // 📡 [CONSOLE LOG PARTIDO] Avisamos qué partido se va a jugar y qué espera el server
+            console.log(`⏱️ Simulando ${partido.ronda}: ${window.mundialSeleccionUsuario} vs ${partido.rival}. Servidor dictó: ${partido.ganoUsuarioReal ? "GANA USER" : "PIERDE USER"} (${partido.gL} - ${partido.gV})`);
+
             // 1. Mandamos a simular el partido minuto a minuto (o tanda de penales)
             await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, partido.ganoUsuarioReal, partido);
             
-            // 2. 🔥 EL CANDADO INDESTRUCTIBLE: Chequeamos el flag real que mandó el backend
-            // Si el backend decretó que perdiste (ya sea en los 90' o por penales), cortamos el bucle acá mismo
-            if (partido.ganoUsuarioReal === false) {
-                console.log("🛑 Eliminado del Mundial. Se frenan las simulaciones de las siguientes rondas.");
+            // 2. 🔥 CANDADO DE CORTE STRICT: Si perdiste este partido en el backend, matamos el bucle al instante
+            if (partido.ganoUsuarioReal === false || partido.ganoUsuarioReal === "false") {
+                console.warn(`🛑 Eliminado del Mundial en ${partido.ronda}. Deteniendo simulaciones inmediatas.`);
                 
-                // Acá podés activar el botón de "Volver al Vestuario" o limpiar la pantalla de la Arena
                 if (document.getElementById("btn-volver-vestuario")) {
                     document.getElementById("btn-volver-vestuario").style.display = "block";
                 }
                 
-                break; // Corta el bucle for en seco. El mundial NO sigue.
+                // Cortamos el flujo forzado para que no intente ejecutar ninguna ronda más
+                break;
             }
         }
 
@@ -1916,7 +1933,7 @@ async function ejecutarTorneoMundial() {
         chequearEstadoMundialServer(); 
         liberarNavegacionArenaUI();
     } catch (err) { 
-        console.error(err); 
+        console.error("❌ Error grave en ejecución de playoffs:", err); 
         ocultarCarga(); 
         liberarNavegacionArenaUI(); 
     }
