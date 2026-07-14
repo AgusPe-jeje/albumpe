@@ -2277,13 +2277,28 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
                 btn.onclick = () => {
                     modulo.style.display = "none";
+                    
+                    // 🛡️ CONTROL DE IMPACTO: La simulación visual ahora maneja jugadas extremas de peligro
+                    // sin corromper el marcador real que tiene la base de datos de Neon
                     if (Math.random() <= opc.exito) {
-                        if (esAtaque) { golesTuActuales++; dispararEstimulantesImpacto(`🎉 ${opc.okTexto}`); }
-                        else { document.getElementById(`consola-incidencias-${idUnico}`).innerText = `🎉 ${opc.okTexto}`; }
+                        if (esAtaque) { 
+                            // Éxito en ataque: Jugada peligrosa que casi es gol (¡mantiene la tensión!)
+                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `🔥 ${opc.okTexto} ¡Pasó rozando el travesaño!`; 
+                        } else { 
+                            // Éxito en defensa: Evitás el peligro limpiamente
+                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `🎉 ${opc.okTexto}`; 
+                        }
                     } else {
-                        if (!esAtaque) { golesRivalActuales++; dispararEstimulantesImpacto(`❌ ${opc.badTexto}`); }
-                        else { document.getElementById(`consola-incidencias-${idUnico}`).innerText = `❌ ${opc.badTexto}`; }
+                        if (!esAtaque) { 
+                            // Fallo en defensa: El rival casi convierte, pero se va afuera por milímetros
+                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `❌ ${opc.badTexto} ¡Menos mal que se fue desviado!`; 
+                        } else { 
+                            // Fallo en ataque: Desperdiciás la contra
+                            document.getElementById(`consola-incidencias-${idUnico}`).innerText = `❌ ${opc.badTexto}`; 
+                        }
                     }
+                    
+                    // Mantenemos el score real intacto y limpio
                     document.getElementById(`score-vivo-${idUnico}`).innerText = `${golesTuActuales} - ${golesRivalActuales}`;
                     setTimeout(() => { partidoPausado = false; }, 2000);
                 };
