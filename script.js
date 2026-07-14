@@ -2005,7 +2005,7 @@ const CATALOGO_EVENTOS_MUNDIAL = {
         titulo: "⚡ CONTRATAQUE EXPLOSIVO",
         relato: "¡Robo letal en mitad de cancha! Quedaron tus 2 delanteros contra 1 solo defensor desesperado...",
         opciones: [
-            { text: "🏃 Hacer la individual y eludir al arquero", exito: 0.60, okTexto: "¡GOOOL! Gambeta larga, desparramó al arquero por el piso y definió solo.", badTexto: "Se abrió demasiado al enganchar y el central llegó justo a trabarle el remate." },
+            { texto: "🏃 Hacer la individual y eludir al arquero", exito: 0.60, okTexto: "¡GOOOL! Gambeta larga, desparramó al arquero por el piso y definió solo.", badTexto: "Se abrió demasiado al enganchar y el central llegó justo a trabarle el remate." },
             { texto: "🤝 Darle el pase atrás al compañero que entra libre", exito: 0.80, okTexto: "¡GOOOL! Pase milimétrico al medio para que el delantero la empuje a la red.", badTexto: "El pase fue muy exigido, rebotó en el talón del defensor y despejaron." }
         ]
     },
