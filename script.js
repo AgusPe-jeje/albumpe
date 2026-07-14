@@ -1877,7 +1877,7 @@ async function ejecutarTorneoMundial() {
 
         for (let i = 0; i < data.progreso.bitacoraPlayoffs.length; i++) {
             const partido = data.progreso.bitacoraPlayoffs[i];
-
+            
             // 1. Mandamos a jugar en vivo. Capturamos el veredicto final real de la simulación.
             const veredictoVivo = await simularMarcadorPantalla(contenedorLista, partido.ronda, window.mundialSeleccionUsuario, partido.rival, null, partido);
             
@@ -1886,7 +1886,6 @@ async function ejecutarTorneoMundial() {
 
             // 2. 🛡️ FILTRO DE ELIMINACIÓN REAL: Si perdiste el partido en pantalla, morís en esta ronda
             if (!ganoPartidoVivo) {
-                console.warn(`🛑 ¡Eliminado en vivo en ${partido.ronda}! Resultado final en pantalla: User ${veredictoVivo?.golesTu || 0} - Bot ${veredictoVivo?.golesRival || 0}`);
                 quedoEliminadoMundial = true;
                 
                 if (document.getElementById("btn-volver-vestuario")) {
@@ -1895,8 +1894,6 @@ async function ejecutarTorneoMundial() {
                 
                 // Cortamos el bucle en seco. El mundial NO te permite jugar las siguientes llaves.
                 break;
-            } else {
-                console.log(`✅ ¡Avanzás a la siguiente llave! Ganaste ${partido.ronda} de forma legítima.`);
             }
         }
 
