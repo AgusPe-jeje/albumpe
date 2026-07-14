@@ -228,6 +228,7 @@ async function autenticarUsuario(accion) {
             
             cargarAlbumLocal();
             iniciarCronometroResetRanking();
+            mostrarCuadroDeCampeones(false);
             if (typeof actualizarTimbasRestantesUI === 'function') actualizarTimbasRestantesUI();
             if (typeof verificarAvatarInicial === 'function') verificarAvatarInicial();
 
@@ -3900,6 +3901,9 @@ function iniciarCronometroResetRanking() {
             if (timerMundial) timerMundial.innerText = msgReset;
             if (timerSBC) timerSBC.innerText = msgReset;
             
+            // 🏆 Mostramos el podio de campeones en caliente (Solo una vez al resetear)
+            mostrarCuadroDeCampeones();
+
             setTimeout(() => {
                 if (typeof cargarRankingLocal === 'function') cargarRankingLocal();
                 if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
@@ -3918,17 +3922,104 @@ function iniciarCronometroResetRanking() {
         const stringDias = dias > 0 ? `${dias}d ` : "";
         const stringReloj = `${stringDias}${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m ${segundos.toString().padStart(2, '0')}s`;
         
-        // 🚀 INYECCIÓN SIMULTÁNEA CONTROLADA (No rompe si el elemento no está renderizado)
+        // 🚀 INYECCIÓN SIMULTÁNEA CONTROLADA
         if (timerPenales) timerPenales.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
         if (timerMundial) timerMundial.innerText = `⏳ CIERRE DE LIGA: ${stringReloj}`;
         if (timerSBC) timerSBC.innerText = `⏳ ACTUALIZACIÓN DE CARTELERA EN: ${stringReloj}`;
     };
 
-    // Executamos una vez al instante para ganarle al delay del primer segundo
+    // Ejecutamos una vez al instante para ganarle al delay del primer segundo
     calcularYRenderizar();
+    mostrarCuadroDeCampeones(true);
 
     // Arrancamos el bucle limpio
     intervaloResetRanking = setInterval(calcularYRenderizar, 1000);
+}
+
+// =========================================================================
+// 🏆 MODAL DE CAMPEONES Y PREMIACIONES DEL RESET
+// =========================================================================
+async function mostrarCuadroDeCampeones(forzarVisualizacion = false) {
+    // Si ya hay un modal abierto en pantalla, no hacemos nada
+    if (document.getElementById("modal-campeones-reset")) return;
+
+    // Generamos un identificador único para la semana actual basado en el lunes de reset anterior
+    const ahora = new Date();
+    const lunesPasado = new Date();
+    // Buscamos el lunes de esta semana a las 00:00 hs
+    lunesPasado.setDate(ahora.getDate() - ((ahora.getDay() + 6) % 7));
+    lunesPasado.setHours(0, 0, 0, 0);
+    const idSemanaActual = `reset_semana_${lunesPasado.getTime()}`;
+
+    // Si no estamos forzando la vista (es decir, es el inicio de sesión) 
+    // y el usuario ya vio el cartel de esta semana, salimos silenciosamente
+    if (!forzarVisualizacion && localStorage.getItem(idSemanaActual) === "visto") {
+        return; 
+    }
+
+    try {
+        const res = await fetch(`${URL_BASE}/ranking/campeones-historicos`, {
+            headers: obtenerHeadersSeguros()
+        });
+        const data = await res.json();
+
+        if (!data.success || !data.campeones || data.campeones.length === 0) return;
+
+        const overlay = document.createElement("div");
+        overlay.id = "modal-campeones-reset";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(2, 6, 23, 0.95); backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 10000; animation: fadeIn 0.4s ease-out;
+        `;
+
+        const medallas = ["🥇", "🥈", "🥉"];
+        let listaHTML = "";
+        data.campeones.slice(0, 3).forEach((camp, idx) => {
+            const medalla = medallas[idx] || "⭐";
+            listaHTML += `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 12px 18px; border-radius: 8px; margin-bottom: 10px;">
+                    <span style="font-size: 1.1rem;">${medalla} <strong>${camp.nombre.toUpperCase()}</strong></span>
+                    <span style="color: var(--dorado); font-weight: bold;">🏆 +${camp.premio_oro} Oro</span>
+                </div>
+            `;
+        });
+
+        overlay.innerHTML = `
+            <div style="background: linear-gradient(135deg, #0b1329 0%, #020617 100%); border: 2px solid var(--dorado); border-radius: 16px; padding: 30px; width: 90%; max-width: 480px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 30px rgba(255,177,0,0.15);">
+                <div style="font-size: 3rem; margin-bottom: 10px; animation: pulse 1.5s infinite;">🏆</div>
+                <h2 style="color: var(--dorado); font-family: 'Oswald', sans-serif; font-size: 1.8rem; margin: 0 0 5px 0; letter-spacing: 1px;">¡PODIO DE LA LIGA SEMANAL!</h2>
+                <p style="color: #64748b; font-size: 0.9rem; margin: 0 0 20px 0;">Felicitaciones a los reyes de la colina que conquistaron la Arena en la última jornada:</p>
+                
+                <div style="margin-bottom: 25px; text-align: left;">
+                    ${listaHTML}
+                </div>
+
+                <button id="btn-cerrar-campeones" class="btn-estadio" style="background: var(--dorado); color: #000; font-weight: bold; border: none; padding: 12px 24px; font-size: 1rem; border-radius: 8px; cursor: pointer; width: 100%; font-family: 'Oswald', sans-serif; transition: transform 0.2s;">
+                    ¡ENTENDIDO, A SEGUIR COMPITIENDO!
+                </button>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        if (typeof AudioArena !== 'undefined' && AudioArena.play) {
+            AudioArena.play('pitazo');
+        }
+
+        // Marcamos esta semana como "vista" en el navegador del usuario para que no se vuelva a abrir
+        localStorage.setItem(idSemanaActual, "visto");
+
+        document.getElementById("btn-cerrar-campeones").onclick = () => {
+            overlay.style.opacity = "0";
+            overlay.style.transition = "opacity 0.3s ease-out";
+            setTimeout(() => overlay.remove(), 300);
+        };
+
+    } catch (err) {
+        console.error("Error cargando los campeones del reset:", err);
+    }
 }
 
 function toggleVisibilidadMisiones() {
