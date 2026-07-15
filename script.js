@@ -601,6 +601,26 @@ async function comprarSobreEspecifico(tipoCofre) {
                }
           }
 
+          // 🎯 SECTOR MISIONES: 3. Escaneamos comunes nuevos
+          if (typeof trackearProgresoMision === 'function' && data.sobre && Array.isArray(data.sobre)) {
+               let conteoComunesNuevos = 0;
+
+               data.sobre.forEach(carta => {
+                    if (carta.es_foto_perfil) return;
+
+                    const rarezaClean = (carta.rareza || '').toLowerCase();
+                    // Si es común y obtenido === 1, significa que no lo tenías en tu álbum
+                    if (rarezaClean === 'comun' && carta.obtenido === 1) {
+                         conteoComunesNuevos++;
+                    }
+               });
+
+               // Si salieron comunes nuevos, los mandamos a trackear
+               if (conteoComunesNuevos > 0) {
+                    await trackearProgresoMision("jugadores_comunes", conteoComunesNuevos);
+               }
+          }
+
           // Guardamos el sobre completo real en la caché para la grilla del final
           sobreAbiertoCompletoCache = data.sobre;
           indiceCartaActualPack = 0;
@@ -610,7 +630,6 @@ async function comprarSobreEspecifico(tipoCofre) {
           
           if (checkSaltear && checkSaltear.checked) {
                // Filtramos dejando SOLO las cartas nuevas de verdad
-               // (En tus jugadores es obtenido === 1, en avatares es !es_repetido_avatar)
                colaCartasPack = data.sobre.filter(carta => {
                     if (carta.es_foto_perfil) return !carta.es_repetido_avatar;
                     return carta.obtenido === 1;
@@ -622,10 +641,8 @@ async function comprarSobreEspecifico(tipoCofre) {
 
           // 🔀 ATAJO CRÍTICO: Si no tocó NINGUNA carta nueva y el filtro estaba activo
           if (colaCartasPack.length === 0) {
-               // Mandamos un cartel flotante rápido o alert informando el skip automático
                alert("✨ ¡Todas las cartas del sobre eran repetidas! Pasando directo al resumen global.");
                
-               // Saltamos directo al final sin abrir la pantalla de cinemática
                renderizarGrillaFinalSobres();
                alternarBotonesCompraTienda(false); // Rehabilitamos la tienda
                return;
