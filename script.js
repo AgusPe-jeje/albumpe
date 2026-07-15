@@ -4165,9 +4165,9 @@ async function inspeccionarPerfilRival(usuarioId) {
           if (document.getElementById("rival-stat-epicas")) document.getElementById("rival-stat-epicas").innerText = rival.estadisticasAlbum?.epicas || 0;
           if (document.getElementById("rival-stat-legendarias")) document.getElementById("rival-stat-legendarias").innerText = rival.estadisticasAlbum?.legendarias || 0;
 
-          // 3. ⚽ Bloque B: Rendimiento en Competencia del Rival (Remapeado y Protegido)
-          const txtPenalesEfectividad = document.getElementById("rival-txt-penales-efectividad") || document.getElementById("rival-txt-timba-efectividad");
-          const txtPenalesJugadas = document.getElementById("rival-txt-penales-jugadas") || document.getElementById("rival-txt-timba-jugadas");
+          // 3. ⚽ Bloque B: Rendimiento en Competencia del Rival (Penales y Copas)
+          const txtPenalesEfectividad = document.getElementById("rival-txt-penales-efectividad");
+          const txtPenalesJugadas = document.getElementById("rival-txt-penales-jugadas");
 
           // Obtenemos los penales totales y ganados desde el server
           const totales = rival.estadisticasPenales?.jugadas ?? rival.penales_jugados ?? 0;
@@ -4184,9 +4184,33 @@ async function inspeccionarPerfilRival(usuarioId) {
                txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
           }
 
+          // Renderizado de Copas Mundiales (Sincronizado)
           const txtMundiales = document.getElementById("rival-stat-mundiales-copas");
           if (txtMundiales) {
                txtMundiales.innerText = `🏆 ${rival.copasMundiales ?? rival.copas_mundiales ?? 0}`;
+          }
+
+          // =========================================================================
+          // 🎰 RENDIMIENTO DE TIMBAS (NUEVAS COLUMNAS DE NEON)
+          // =========================================================================
+          const timbasTotales = rival.estadisticasTimba?.jugadas ?? 0;
+          const ganadasExacto = rival.estadisticasTimba?.ganadasExacto ?? 0;
+          const ganadasSigno = rival.estadisticasTimba?.ganadasSigno ?? 0;
+
+          // Efectividad: Sumamos los aciertos (Exacto + Signo) contra las timbas totales
+          const aciertosTotales = ganadasExacto + ganadasSigno;
+          const efectividadTimba = timbasTotales > 0 ? Math.round((aciertosTotales / timbasTotales) * 100) : 0;
+
+          const txtTimbaEfectividad = document.getElementById("rival-txt-timba-efectividad");
+          const txtTimbaDetalle = document.getElementById("rival-txt-timba-detalle");
+
+          if (txtTimbaEfectividad) {
+               txtTimbaEfectividad.innerText = `${efectividadTimba}%`;
+          }
+
+          if (txtTimbaDetalle) {
+               // Usamos innerHTML para soportar el formateo de saltos de línea estéticos
+               txtTimbaDetalle.innerHTML = `Exactos: ${ganadasExacto} | Signos: ${ganadasSigno}<br>(De ${timbasTotales} Timbas)`;
           }
 
           // 4. Render de la Foto de Perfil del Rival
@@ -4276,20 +4300,46 @@ async function actualizarMiPerfilUI() {
         if (document.getElementById("stat-epicas")) document.getElementById("stat-epicas").innerText = perfil.estadisticasAlbum?.epicas || 0;
         if (document.getElementById("stat-legendarias")) document.getElementById("stat-legendarias").innerText = perfil.estadisticasAlbum?.legendarias || 0;
 
-        // 3. ⚽ Bloque B: Estadísticas Avanzadas Sincronizadas
-        const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad") || document.getElementById("perfil-txt-timba-efectividad");
-        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas") || document.getElementById("perfil-txt-timba-jugadas");
+        // =========================================================================
+        // 🧤 RENDER DE PENALES PROPIOS (TARJETA 1)
+        // =========================================================================
+        const penalesTotales = perfil.estadisticasPenales?.jugadas ?? perfil.penales_jugados ?? 0;
+        const penalesGanados = perfil.estadisticasPenales?.ganadas ?? perfil.penales_ganados ?? 0;
+        const porcentajePenales = penalesTotales > 0 ? Math.round((penalesGanados / penalesTotales) * 100) : 0;
 
-        const totales = perfil.estadisticasPenales?.jugadas || 0;
-        const ganados = perfil.estadisticasPenales?.ganadas || 0;
-        const porcentaje = totales > 0 ? Math.round((ganados / totales) * 100) : 0;
+        const txtPenalesEfectividad = document.getElementById("perfil-txt-penales-efectividad");
+        const txtPenalesJugadas = document.getElementById("perfil-txt-penales-jugadas");
 
-        if (txtPenalesEfectividad) txtPenalesEfectividad.innerText = `${porcentaje}%`;
-        if (txtPenalesJugadas) txtPenalesJugadas.innerText = `${ganados} Ganados / ${totales} Totales`;
+        if (txtPenalesEfectividad) txtPenalesEfectividad.innerText = `${porcentajePenales}%`;
+        if (txtPenalesJugadas) txtPenalesJugadas.innerText = `${penalesGanados} Ganados / ${penalesTotales} Totales`;
 
-        // 🏆 MUNDIALES GANADOS HISTÓRICOS
-        const txtMundiales = document.getElementById("stat-mundiales-copas") || document.getElementById("rival-stat-mundiales-copas");
-        if (txtMundiales) txtMundiales.innerText = `🏆 ${perfil.torneosGanados || 0} Torneos Arena`;
+        // =========================================================================
+        // 🎰 RENDER DE TIMBAS PROPIAS (TARJETA 2 - PRONÓSTICOS)
+        // =========================================================================
+        const timbasTotales = perfil.estadisticasTimba?.jugadas ?? 0;
+        const ganadasExacto = perfil.estadisticasTimba?.ganadasExacto ?? 0;
+        const ganadasSigno = perfil.estadisticasTimba?.ganadasSigno ?? 0;
+
+        // Efectividad: Sumamos aciertos (Exactos + Signos) contra el total de pronósticos
+        const aciertosTotales = ganadasExacto + ganadasSigno;
+        const efectividadTimba = timbasTotales > 0 ? Math.round((aciertosTotales / timbasTotales) * 100) : 0;
+
+        const txtTimbaEfectividad = document.getElementById("perfil-txt-timba-efectividad");
+        const txtTimbaDetalle = document.getElementById("perfil-txt-timba-detalle");
+
+        if (txtTimbaEfectividad) txtTimbaEfectividad.innerText = `${efectividadTimba}%`;
+        if (txtTimbaDetalle) {
+             txtTimbaDetalle.innerHTML = `Exactos: ${ganadasExacto} | Signos: ${ganadasSigno}<br>(De ${timbasTotales} Timbas)`;
+        }
+
+        // =========================================================================
+        // 🏆 RENDER DE MUNDIALES GANADOS PROPIOS (TARJETA 3)
+        // =========================================================================
+        // Usamos tanto 'copas_mundiales' como 'copasMundiales'
+        const txtMundiales = document.getElementById("stat-mundiales-copas");
+        if (txtMundiales) {
+            txtMundiales.innerText = `🏆 ${perfil.copasMundiales ?? perfil.copas_mundiales ?? 0}`;
+        }
 
         // 🥇 TOP 1 SEMANALES
         const txtTop1Semanales = document.getElementById("perfil-txt-top1-semanal");
