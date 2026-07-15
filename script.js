@@ -1571,18 +1571,34 @@ async function procesarEleccionTimbaSegura(idOpcionElegida) {
 
         alert(`⚽ RESULTADO DE LA TIMBA ⚽\n\n${data.mensajeResultado}`);
         document.getElementById("contenedor-opciones-goles").style.display = "none";
+        
         await cargarAlbumLocal();
         
-        if (document.getElementById("select-tipo-apuesta").value === "cromo") cargarRepetidasEnDesplegableUI();
+        if (document.getElementById("select-tipo-apuesta").value === "cromo") {
+            cargarRepetidasEnDesplegableUI();
+        }
 
         actualizarHistorialUI({
-          local: `${bandLoc} ${nomLoc}`, 
-          visitante: `${bandVis} ${nomVis}`, // 🔥 MAPEO CORREGIDO
-          res: `${data.golesLReal} - ${data.golesVReal}`
-          });
-          timbaPreparada = false; 
-          rotarPartidoTimba();
-    } catch (err) { console.error(err); ocultarCarga(); }
+            local: `${bandLoc} ${nomLoc}`, 
+            visitante: `${bandVis} ${nomVis}`, // 🔥 MAPEO CORREGIDO
+            res: `${data.golesLReal} - ${data.golesVReal}`
+        });
+
+        // =========================================================================
+        // 🚀 REFRESCAR EL PERFIL EN TIEMPO REAL
+        // =========================================================================
+        // Llamamos a la función para que actualice la tarjeta de Predicción Timbas
+        if (typeof actualizarMiPerfilUI === 'function') {
+            await actualizarMiPerfilUI();
+        }
+
+        timbaPreparada = false; 
+        rotarPartidoTimba();
+        
+    } catch (err) { 
+        console.error(err); 
+        ocultarCarga(); 
+    }
 }
 
 setTimeout(rotarPartidoTimba, 1000);
