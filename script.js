@@ -4134,6 +4134,8 @@ async function inspeccionarPerfilRival(usuarioId) {
 
           const rival = data.perfil; 
 
+          console.log("📊 [DATOS DEL RIVAL RECIBIDOS]:", rival);
+
           window.usuarioVisitaId = parseInt(usuarioId);
 
           const cajaFormulario = document.getElementById("caja-formulario-firma");
