@@ -1774,6 +1774,7 @@ async function ejecutarTorneoMundial() {
         ocultarCarga();
 
         if (!data.ok) return alert(data.mensaje);
+        
         // 🎯 SECTOR MISIONES API: Trackeo correcto
         if (typeof trackearProgresoMision === 'function') {
              await trackearProgresoMision("mundial_partidos", 1);
@@ -1892,14 +1893,12 @@ async function ejecutarTorneoMundial() {
                 if (document.getElementById("btn-volver-vestuario")) {
                     document.getElementById("btn-volver-vestuario").style.display = "block";
                 }
-                
-                // Cortamos el bucle en seco. El mundial NO te permite jugar las siguientes llaves.
                 break;
             }
         }
 
         // =========================================================================
-        // 🏆 CORRECCIÓN: VALIDACIÓN Y RECLAMO DE PREMIO CAMPEÓN EN CALIENTE
+        // 🏆 RECLAMO SEGURO DE COPA MUNDIAL (INTEGRADO Y CONTROLADO)
         // =========================================================================
         if (!quedoEliminadoMundial && data.progreso.bitacoraPlayoffs.length > 0) {
              const corona = document.createElement("div");
@@ -1912,29 +1911,46 @@ async function ejecutarTorneoMundial() {
                   await trackearProgresoMision("acumular_oro", 5000);
              }
 
-             // 📡 Avisamos al backend que ganamos la final en vivo para que nos sume la copa en la DB
+             // 📡 Llamada al backend usando tu URL_BASE limpia
              try {
                  const resRecompensa = await fetch(`${URL_BASE}/mundial/reclamar-copa`, {
                      method: 'POST',
                      headers: obtenerHeadersSeguros()
                  });
                  const recompensaData = await resRecompensa.json();
+                 
                  if (recompensaData.success) {
-                     usuarioActual.monedas = recompensaData.datosActualizados.monedas;
-                     usuarioActual.puntos_ranking = recompensaData.datosActualizados.puntos_ranking;
-                     usuarioActual.copas_mundiales = recompensaData.datosActualizados.copas_mundiales;
-                     actualizarInterfazUI();
+                     // Sincronizamos las variables globales de forma redundante para no fallar
+                     if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+                         usuarioActual.monedas = recompensaData.datosActualizados.monedas;
+                         usuarioActual.puntos_ranking = recompensaData.datosActualizados.puntos_ranking;
+                         usuarioActual.copas_mundiales = recompensaData.datosActualizados.copas_mundiales;
+                     }
+                     if (typeof window.usuarioActual !== 'undefined' && window.usuarioActual) {
+                         window.usuarioActual.monedas = recompensaData.datosActualizados.monedas;
+                         window.usuarioActual.puntos_ranking = recompensaData.datosActualizados.puntos_ranking;
+                         window.usuarioActual.copas_mundiales = recompensaData.datosActualizados.copas_mundiales;
+                     }
+                     
+                     // Redibujamos de inmediato la interfaz de usuario
+                     if (typeof actualizarInterfazUI === 'function') {
+                         actualizarInterfazUI();
+                     }
+                 } else {
+                     console.error("❌ El servidor rechazó el reclamo:", recompensaData.error);
                  }
              } catch (errPremio) {
-                 console.error("Error reclamando copa del mundo:", errPremio);
+                 console.error("❌ Error de comunicación con la base de datos:", errPremio);
              }
         }
 
         // Si no saliste campeón pero de igual manera hay que actualizar datos base (por ejemplo, monedas previas)
         if (data.datosActualizados && quedoEliminadoMundial) {
-             usuarioActual.monedas = data.datosActualizados.monedas;
-             usuarioActual.puntos_ranking = data.datosActualizados.puntos_ranking;
-             usuarioActual.copas_mundiales = data.datosActualizados.copas_mundiales;
+             if (typeof usuarioActual !== 'undefined' && usuarioActual) {
+                 usuarioActual.monedas = data.datosActualizados.monedas;
+                 usuarioActual.puntos_ranking = data.datosActualizados.puntos_ranking;
+                 usuarioActual.copas_mundiales = data.datosActualizados.copas_mundiales;
+             }
              actualizarInterfazUI(); 
              if (typeof cargarRankingMundialesLocal === 'function') cargarRankingMundialesLocal();
         }
@@ -2460,9 +2476,25 @@ function simularMarcadorPantalla(contenedor, ronda, tuPais, rival, ganoUsuario, 
 
             const finLabel = document.createElement("div");
             finLabel.style.cssText = `text-align:right; font-size:0.85rem; font-weight:bold; margin-top:8px; font-family:'Oswald'; color:${ganoRealEnPantalla ? 'var(--verde-match)' : 'var(--rojo)'};`;
-            finLabel.innerText = fueEnPenales
-                ? (ganoRealEnPantalla ? `🏁 FINAL (PEN: ${pTu}-${pRiv}) - AVANZAS ✅` : `🏁 FINAL (PEN: ${pTu}-${pRiv}) - ELIMINADO ❌`)
-                : (ganoRealEnPantalla ? "🏁 FINAL DE LOS 90' - AVANZAS ✅" : "🏁 FINAL DE LOS 90' - ELIMINADO ❌");
+            
+            // 🏆 MÍSTICA DINÁMICA: Si es la gran final, ¡gritamos el campeonato!
+            const esFinalisima = ronda.toLowerCase().includes("final del mundo");
+            
+            if (ganoRealEnPantalla) {
+                if (esFinalisima) {
+                    finLabel.innerText = fueEnPenales
+                        ? `🏆 ¡¡¡FINAL DEL PARTIDO!!! (PEN: ${pTu}-${pRiv}) - ¡¡¡SOS CAMPEÓN DEL MUNDO!!! 🎉🌟`
+                        : "🏆 ¡¡¡FINAL DEL PARTIDO!!! - ¡¡¡SOS CAMPEÓN DEL MUNDO!!! 🎉🌟";
+                } else {
+                    finLabel.innerText = fueEnPenales
+                        ? `🏁 FINAL (PEN: ${pTu}-${pRiv}) - AVANZAS ✅`
+                        : "🏁 FINAL DE LOS 90' - AVANZAS ✅";
+                }
+            } else {
+                finLabel.innerText = fueEnPenales
+                    ? `🏁 FINAL (PEN: ${pTu}-${pRiv}) - ELIMINADO ❌`
+                    : "🏁 FINAL DE LOS 90' - ELIMINADO ❌";
+            }
             
             filaPartido.appendChild(finLabel);
             
