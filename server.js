@@ -709,7 +709,10 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
     let tipoDictamen = (opcionElegida.label === labelReal) ? 'exacto' : ((signoElegido === signoReal) ? 'signo' : 'error');
     let balanceMonedas = 0; let puntosAsignados = 0; let mensajeResultado = "";
 
+    const client = await pool.connect();
     try {
+        await client.query('BEGIN');
+
         if (tipoApuesta === "monedas") {
             if (tipoDictamen === 'exacto') {
                 balanceMonedas = montoApuesta * 3; puntosAsignados = 20;
@@ -721,17 +724,17 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
                 balanceMonedas = -montoApuesta;
                 mensajeResultado = `¡ERRASTE! El partido terminó ${golesLReal}-${golesVReal} y elegiste ${opcionElegida.label}.\nPerdiste: ${montoApuesta} monedas.`;
             }
-            await pool.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [balanceMonedas, puntosAsignados, usuario_id]);
+            await client.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [balanceMonedas, puntosAsignados, usuario_id]);
         } else {
-            const cardQuery = await pool.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugadorIdApostado]);
+            const cardQuery = await client.query("SELECT nombre, rareza FROM jugadores WHERE id = $1", [jugadorIdApostado]);
             const cromoApostado = cardQuery.rows[0]; const rarezaOriginal = cromoApostado.rareza.toLowerCase();
 
             if (tipoDictamen === 'exacto' || tipoDictamen === 'signo') {
-                await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
+                await client.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
                 
                 if (rarezaOriginal === "legendaria") {
                     let oroPremio = (tipoDictamen === 'exacto') ? 2500 : 1000; puntosAsignados = (tipoDictamen === 'exacto') ? 40 : 20;
-                    await pool.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [oroPremio, puntosAsignados, usuario_id]);
+                    await client.query("UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2 WHERE id = $3", [oroPremio, puntosAsignados, usuario_id]);
                     mensajeResultado = (tipoDictamen === 'exacto') ? `👑 ¡DIOS SANTO! Clavaste el resultado con tu Legendario.\n\n💰 ¡Cobrás 🪙2.500 MONEDAS!` : `💰 ¡BIEN AHÍ! Acertaste el ganador con tu Legendario.\n\n🎁 ¡Te llevás 🪙1.000 monedas!`;
                 } else {
                     let rarezaPremio = rarezaOriginal;
@@ -741,28 +744,55 @@ app.post('/api/timba/procesar', verificarToken, async (req, res) => {
                         else if (rarezaOriginal === "epica") rarezaPremio = "legendaria";
                     }
 
-                    const poolPremio = await pool.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaPremio]);
+                    const poolPremio = await client.query("SELECT id, nombre, rareza FROM jugadores WHERE rareza = $1 ORDER BY RANDOM() LIMIT 1", [rarezaPremio]);
                     const cromoGanado = poolPremio.rows[0];
 
-                    await pool.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [usuario_id, cromoGanado.id]);
+                    await client.query(`INSERT INTO usuario_progreso (usuario_id, jugador_id, cantidad) VALUES ($1, $2, 1) ON CONFLICT (usuario_id, jugador_id) DO UPDATE SET cantidad = usuario_progreso.cantidad + EXCLUDED.cantidad`, [usuario_id, cromoGanado.id]);
 
                     puntosAsignados = (tipoDictamen === 'exacto') ? 30 : 15;
-                    await pool.query(`UPDATE usuarios SET monedas = monedas + $1, puntos_ranking = puntos_ranking + $2, timbas_jugadas = timbas_jugadas + 1, timbas_ganadas_exacto = timbas_ganadas_exacto + $3, timbas_ganadas_signo = timbas_ganadas_signo + $4 WHERE id = $5`, [0, puntosAsignados, (tipoDictamen === 'exacto' ? 1 : 0), (tipoDictamen === 'signo' ? 1 : 0), usuario_id]);
+                    await client.query(`UPDATE usuarios SET puntos_ranking = puntos_ranking + $1 WHERE id = $2`, [puntosAsignados, usuario_id]);
 
                     mensajeResultado = (tipoDictamen === 'exacto') ? `🔥 ¡PRO DISPARO! Acertaste el exacto (${golesLReal}-${golesVReal}).\n🎁 ¡EVOLUCIÓN! Te ganaste un cromo SUPERIOR: ${cromoGanado.nombre.toUpperCase()}` : `⚽ ¡GOOOL! Acertaste el ganador.\n🃏 La banca te devuelve otro cromo: ${cromoGanado.nombre.toUpperCase()}`;
                 }
             } else {
-                await pool.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
+                await client.query("UPDATE usuario_progreso SET cantidad = cantidad - 1 WHERE usuario_id = $1 AND jugador_id = $2", [usuario_id, jugadorIdApostado]);
                 mensajeResultado = `❌ ¡CROMO PERDIDO! El partido terminó ${golesLReal}-${golesVReal}.\nPerdiste 1 copia de ${cromoApostado.nombre.toUpperCase()}.`;
             }
         }
 
-        const userCheck = await pool.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
+        // =========================================================================
+        // 🎯 CONTROL Y SEGUIMIENTO GLOBAL DE TIMBAS (Soporte Universal Neon)
+        // =========================================================================
+        const incrementoExacto = (tipoDictamen === 'exacto') ? 1 : 0;
+        const incrementoSigno = (tipoDictamen === 'signo') ? 1 : 0;
+
+        await client.query(`
+            UPDATE usuarios 
+            SET timbas_jugadas = timbas_jugadas + 1, 
+                timbas_ganadas_exacto = timbas_ganadas_exacto + $1, 
+                timbas_ganadas_signo = timbas_ganadas_signo + $2 
+            WHERE id = $3
+        `, [incrementoExacto, incrementoSigno, usuario_id]);
+
+        // 🔥 TRACKEAR PROGRESO DE MISIÓN DIARIA / SEMANAL DE "timbas" (Si existe en tu pool)
+        await client.query(`
+            UPDATE usuario_misiones 
+            SET progreso = LEAST(progreso + 1, meta), actualizado_en = NOW() 
+            WHERE usuario_id = $1 AND tipo = 'timbas' AND reclamada = FALSE;
+        `, [usuario_id]);
+
+        const userCheck = await client.query("SELECT monedas, puntos_ranking FROM usuarios WHERE id = $1", [usuario_id]);
         delete apuestasActivasServidor[usuario_id];
 
+        await client.query('COMMIT');
         return res.json({ ok: true, mensajeResultado, golesLReal, golesVReal, datos: userCheck.rows[0] });
+
     } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Error procesando apuesta:", err);
         return res.status(500).json({ ok: false, mensaje: "Error en DB al procesar tu jugada." });
+    } finally {
+        client.release();
     }
 });
 
