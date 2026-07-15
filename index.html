@@ -242,31 +242,49 @@
 
                     <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">⚔️ RENDIMIENTO EN COMPETENCIA</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                        
+                        <!-- 🧤 TARJETA 1: PENALES PROPIOS -->
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: var(--verde-match); font-size: 0.75rem; font-weight: bold; display: block;">EFECTIVIDAD PENALES</span>
-                            <span id="perfil-txt-timba-efectividad" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
-                            <span id="perfil-txt-timba-jugadas" style="color: #94a3b8; font-size: 0.7rem;">0 Duelos Totales</span>
+                            <span style="color: var(--verde-match); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">EFECTIVIDAD PENALES</span>
+                            <span id="perfil-txt-penales-efectividad" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
+                            <span id="perfil-txt-penales-jugadas" style="color: #94a3b8; font-size: 0.7rem; display: block; margin-top: 2px;">0 Ganados / 0 Totales</span>
                         </div>
+
+                        <!-- 🎰 TARJETA 2: TIMBAS PROPIAS (NUEVAS COLUMNAS DE NEON) -->
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; display: block;">MUNDIALES GANADOS</span>
+                            <span style="color: var(--celeste); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">PREDICCIÓN TIMBAS</span>
+                            <span id="perfil-txt-timba-efectividad" style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
+                            <span id="perfil-txt-timba-detalle" style="color: #94a3b8; font-size: 0.65rem; display: block; margin-top: 4px; line-height: 1.2;">Exactos: 0 | Signos: 0<br>(De 0 Timbas)</span>
+                        </div>
+
+                        <!-- 🏆 TARJETA 3: MUNDIALES GANADOS -->
+                        <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
+                            <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">MUNDIALES GANADOS</span>
                             <span id="stat-mundiales-copas" style="color: var(--dorado); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🏆 0</span>
                             <span style="color: #94a3b8; font-size: 0.7rem;">Torneos Arena</span>
                         </div>
+
+                        <!-- 🥇 TARJETA 4: DOMINIO SEMANAL -->
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: var(--celeste); font-size: 0.75rem; font-weight: bold; display: block;">DOMINIO SEMANAL</span>
-                            <span id="perfil-txt-top1-semanal" style="color: #fff; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🥇 0</span>
+                            <span style="color: #a855f7; font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">DOMINIO SEMANAL</span>
+                            <span id="perfil-txt-top1-semanal" style="color: #c084fc; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🥇 0</span>
                             <span style="color: #94a3b8; font-size: 0.7rem;">Top #1 del Ranking</span>
                         </div>
+
+                        <!-- 🇸🇻 TARJETA 5: SELECCIÓN TOP -->
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: var(--rojo); font-size: 0.75rem; font-weight: bold; display: block;">SELECCIÓN TOP</span>
+                            <span style="color: var(--rojo); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">SELECCIÓN TOP</span>
                             <span id="perfil-txt-seleccion-top" style="color: #fff; font-family: 'Oswald'; font-size: 1.4rem; font-weight: bold; display: block; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
                             <span style="color: #94a3b8; font-size: 0.7rem;">Base de Plantel</span>
                         </div>
+
+                        <!-- 🪙 TARJETA 6: BILLETERA (ORO) -->
                         <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                            <span style="color: #e2e8f0; font-size: 0.75rem; font-weight: bold; display: block;">BILLETERA (ORO)</span>
+                            <span style="color: #e2e8f0; font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">BILLETERA (ORO)</span>
                             <span id="stat-monedas" style="color: #fff; font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0</span>
                             <span style="color: #64748b; font-size: 0.7rem;">Fondos Disponibles</span>
                         </div>
+
                     </div>
 
                     <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
@@ -284,7 +302,7 @@
                 </div>
             </div>
 
-<div id="modulo-penales" class="modulo-contenido">
+            <div id="modulo-penales" class="modulo-contenido">
                 <div class="contenedor-penales-layout-estadio">
                     <div class="caja-modulo-estadio juego-penales-principal">
                         <div class="banner-modulo-imagen banner-penales">
@@ -841,16 +859,28 @@
             </div>
 
             <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 25px 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">⚔️ RENDIMIENTO EN COMPETENCIA</h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 25px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 25px;">
+                
+                <!-- 🧤 TARJETA 1: PENALES -->
                 <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                    <span style="color: var(--verde-match); font-size: 0.75rem; font-weight: bold; display: block;">EFECTIVIDAD PENALES</span>
-                    <span id="rival-txt-timba-efectividad" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
-                    <span id="rival-txt-timba-jugadas" style="color: #94a3b8; font-size: 0.7rem;">0 Duelos Totales</span>
+                    <span style="color: var(--verde-match); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">EFECTIVIDAD PENALES</span>
+                    <span id="rival-txt-penales-efectividad" style="color: var(--verde-match); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
+                    <span id="rival-txt-penales-jugadas" style="color: #94a3b8; font-size: 0.7rem; display: block; margin-top: 2px;">0 Ganados / 0 Totales</span>
                 </div>
+
+                <!-- 🎰 TARJETA 2: TIMBAS (PRONÓSTICOS) -->
                 <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center;">
-                    <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; display: block;">MUNDIALES GANADOS</span>
+                    <span style="color: var(--celeste); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">PREDICCIÓN TIMBAS</span>
+                    <span id="rival-txt-timba-efectividad" style="color: var(--celeste); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">0%</span>
+                    <span id="rival-txt-timba-detalle" style="color: #94a3b8; font-size: 0.65rem; display: block; margin-top: 4px; line-height: 1.2;">Exactos: 0 | Signos: 0<br>(De 0 Timbas)</span>
+                </div>
+
+                <!-- 🏆 TARJETA 3: MUNDIALES GANADOS -->
+                <div style="background: rgba(2,6,23,0.5); padding: 12px; border-radius: 8px; border: 1px solid #1e293b; text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                    <span style="color: var(--dorado); font-size: 0.75rem; font-weight: bold; display: block; text-transform: uppercase;">MUNDIALES GANADOS</span>
                     <span id="rival-stat-mundiales-copas" style="color: var(--dorado); font-family: 'Oswald'; font-size: 1.6rem; font-weight: bold; display: block; margin-top: 4px;">🏆 0</span>
                 </div>
+
             </div>
 
             <h3 style="color: var(--dorado); font-family: 'Oswald'; text-align: left; margin: 0 0 10px 0; font-size: 1.2rem; letter-spacing: 0.5px;">🌟 CROMO DESTACADO DEL VESTUARIO</h3>
