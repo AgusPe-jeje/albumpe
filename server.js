@@ -1504,10 +1504,15 @@ app.get('/api/usuarios/perfil/:usuarioId', async (req, res) => {
                 torneosGanados: parseInt(datos.torneos_ganados || 0),
                 top1Semanales: parseInt(datos.ranking_semanal_top1 || 0),
                 seleccionTop: seleccionFavorita,
-                
-                // 🏆 CORRECCIÓN CLAVE: Pasamos las copas mundiales de la base de datos al frontend
                 copas_mundiales: parseInt(datos.copas_mundiales || 0),
-                copasMundiales: parseInt(datos.copas_mundiales || 0), // Mandamos ambas por las dudas
+                copasMundiales: parseInt(datos.copas_mundiales || 0),
+
+                // 🎯 NUEVO: Mapeo de estadísticas de timba
+                estadisticasTimba: {
+                    jugadas: parseInt(datos.timbas_jugadas || 0),
+                    ganadasExacto: parseInt(datos.timbas_ganadas_exacto || 0),
+                    ganadasSigno: parseInt(datos.timbas_ganadas_signo || 0)
+                },
 
                 estadisticasAlbum: { 
                     comunes: parseInt(datos.comunes || 0), 
